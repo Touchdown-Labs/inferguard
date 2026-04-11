@@ -19,6 +19,7 @@ from inferguard.metrics import (
     get_effective_kv_threshold,
 )
 from inferguard.remediation import generate_fix
+from inferguard.safe_actions import decide_safe_actions
 
 log = structlog.get_logger()
 
@@ -140,6 +141,7 @@ class InferGuardAgent:
             if anomaly.severity == "none":
                 anomaly.severity = "warning"
 
+        previous_snapshot = self._last_snapshot
         self._last_preemptions = snapshot.preemptions_total
         self._last_snapshot = snapshot
 
@@ -151,7 +153,7 @@ class InferGuardAgent:
                     "model_name": self.model_name,
                 }
             )
-            return self._with_proof_level({"status": "healthy", "metrics": snapshot.as_dict()})
+            return self._with_proof_level({"status": "healthy", "metrics": snapshot.as_dict(), "safe_actions": []})
 
         diagnosis = await self._diagnose(snapshot, anomaly.reasons)
         remediation = generate_fix(
@@ -185,6 +187,16 @@ class InferGuardAgent:
             }
         )
 
+        safe_actions = decide_safe_actions(
+            snapshot,
+            anomaly,
+            previous_snapshot,
+            self.model_name,
+            incident_id,
+        )
+        for action in safe_actions:
+            await self.memory.log_event("safe_action", action.as_dict())
+
         task = asyncio.create_task(self._check_resolution(incident_id, delay_seconds=180))
         self._track_background_task(task)
 
@@ -195,6 +207,7 @@ class InferGuardAgent:
                 "metrics": snapshot.as_dict(),
                 "diagnosis": diagnosis.as_dict(),
                 "remediation": remediation.as_dict(),
+                "safe_actions": [a.as_dict() for a in safe_actions],
             }
         )
 

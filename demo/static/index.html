@@ -114,6 +114,24 @@
   .config-diff td { padding: 4px 8px; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; }
   .model-note { font-size: 12px; color: var(--orange); margin-top: 6px; }
 
+  /* Autonomous actions */
+  .safe-action-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 10px; margin-bottom: 8px; border-radius: 6px;
+    background: var(--bg); border: 1px solid var(--border);
+  }
+  .safe-action-title { font-size: 13px; font-weight: 600; }
+  .safe-action-reason { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .advisory-pill {
+    align-self: flex-start;
+    padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--yellow);
+    background: rgba(210, 153, 34, 0.12);
+    color: var(--yellow);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
   /* Impact panel */
   .impact-label {
     font-size: 13px; color: var(--dim); margin-top: 12px; padding-top: 8px;
@@ -190,6 +208,11 @@
     <div class="panel" id="remediation-panel">
       <h2>Recommended Fix</h2>
       <div id="remediation-content" class="empty-state">No remediation needed.</div>
+    </div>
+
+    <div class="panel" id="safe-actions-panel">
+      <h2>Autonomous Actions</h2>
+      <div id="safe-actions-content" class="empty-state">No autonomous actions this cycle.</div>
     </div>
 
     <!-- Impact Panel -->
@@ -271,9 +294,11 @@
       updateAnomalyPanel(r.anomaly);
       updateDiagnosisPanel(r.diagnosis);
       updateRemediationPanel(r.remediation);
+      updateSafeActionsPanel(r.safe_actions || []);
       addIncidentLog(cycle, r.anomaly);
     } else if (status === 'healthy') {
       updateAnomalyPanel(null);
+      updateSafeActionsPanel(r.safe_actions || []);
     }
 
     if (r.impact) updateImpactPanel(r.impact);
@@ -448,6 +473,33 @@
       });
     }
     el.innerHTML = html;
+  }
+
+  // --- Autonomous actions panel ---
+  function updateSafeActionsPanel(actions) {
+    const el = document.getElementById('safe-actions-content');
+    if (!actions || actions.length === 0) {
+      el.className = 'empty-state';
+      el.innerHTML = 'No autonomous actions this cycle.';
+      return;
+    }
+
+    function humanizeActionType(value) {
+      return String(value || '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    el.className = '';
+    el.innerHTML = actions.map((a) =>
+      '<div class="safe-action-row">' +
+        '<div>' +
+          '<div class="safe-action-title">' + esc(humanizeActionType(a.action_type)) + '</div>' +
+          '<div class="safe-action-reason">' + esc(a.reason || '') + '</div>' +
+        '</div>' +
+        '<span class="advisory-pill">ADVISORY</span>' +
+      '</div>'
+    ).join('');
   }
 
   // --- Impact panel ---
