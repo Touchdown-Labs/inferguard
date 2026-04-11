@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inferguard"
+version = "0.1.0"
+description = "Standalone-first inference monitoring for vLLM and SGLang endpoints."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    # pydantic intentionally omitted: the current package uses stdlib dataclasses.
+    "httpx>=0.28",
+    "structlog>=25.0",
+    "typer>=0.16",
+    "rich>=14.0",
+]
+
+[project.scripts]
+inferguard = "inferguard.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+demo = [
+    "aiohttp>=3.9",
+    "numpy>=1.26",
+    "tqdm>=4.66",
+]
+mcp = ["fastmcp>=3.1"]
+blaxel = ["blaxel-core>=0.2"]
+inferscope = ["inferscope"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inferguard"]
