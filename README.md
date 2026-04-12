@@ -1,241 +1,135 @@
 # InferGuard
 
-InferGuard is a standalone-first monitoring agent for inference endpoints. It
-scrapes `/metrics`, detects anomalies, diagnoses likely root causes, recommends
-engine-specific fixes, stores incident memory, and can re-check outcomes over
-time. The default runtime path uses direct HTTP scraping and Upstash REST
-clients; any broader Inferscope reuse remains optional and verified-only.
+Autonomous KV cache inference optimization agent for vLLM and SGLang endpoints.
 
-## Supported v1 scope
+InferGuard **detects** anomalies, **diagnoses** root causes via a Blaxel-hosted AI brain, **recommends** per-session surgical fixes grounded in academic primitives (Attention Matching, RLM decomposition, MAD thresholding), **validates** proposed remediations in Daytona sandboxes, and **learns** from resolved outcomes via Upstash Vector memory.
 
-### Models
+## Architecture (v6)
 
-| Family | Notes |
+```
+L1  Production engine (vLLM / SGLang)           read-only /metrics scrape
+L2  InferGuard core (src/inferguard/)            detect, remember, call brain
+L3  Blaxel agent brain (blaxel_agent/)           RLM decomposer + Daytona orchestration
+L4  Daytona sandbox                              canary replay + AM compaction validation
+L5  Upstash memory (Redis + Vector)              rolling state + shape-keyed learning loop
+```
+
+- L2 never imports `rlm` or `daytona-sdk` (those live in L3 only)
+- L3 never imports from `inferguard.*` (layers communicate via dict payloads)
+- Every advisory carries `advisory_only=True` in v1
+
+## Reactive SAFE actions
+
+| Action | Trigger |
 |---|---|
-| GPT-OSS-120B / 20B | Standard GQA-style interpretation with engine-aware remediation |
-| DeepSeek-R1 + selected distills | Requires more conservative KV interpretation because of MLA |
-| Qwen3.5 family | Hybrid DeltaNet / GatedAttention behavior can under-report pressure in standard KV metrics |
+| `recommend_compaction` | KV pressure + prefix thrashing (AM compaction, arXiv:2602.16284) |
+| `throttle_concurrency` | KV > threshold + preemption delta (CONCUR AIMD) |
+| `flush_session_radix` | RLM prefix cache thrashing |
+| `drain_and_recycle` | Swap activity or VRAM drift |
+| `quarantine_shape` | Deterministic crash on specific request shape |
+| `shrink_speculation_window` | Spec-decode acceptance collapse |
 
-### Engines
+## Proactive advisories
 
-| Engine | Status |
-|---|---|
-| vLLM | In scope |
-| SGLang | In scope |
-| Dynamo / TRT-LLM / ATOM | Out of scope for InferGuard v1 |
-
-### GPUs
-
-| GPU | Status |
-|---|---|
-| H100 SXM | In scope |
-| H200 SXM | In scope |
-| B200 | In scope |
-| A100 / MI300X / MI355X / consumer GPUs | Out of scope for v1 |
+The Blaxel brain runs a proactive investigation every N cycles using RLM-style W1-W4 decomposition (trend / pattern / leading indicators / compaction opportunity) and surfaces advisories before thresholds cross.
 
 ## Install
 
-Core CLI:
-
 ```bash
-pip install -e .
-```
-
-Development and tests:
-
-```bash
-pip install -e '.[dev]'
-pytest tests
-```
-
-Replay-harness operator extras:
-
-```bash
-pip install -e '.[demo]'
-```
-
-Optional MCP server:
-
-```bash
-pip install -e '.[mcp]'
+pip install -e .           # core CLI
+pip install -e '.[dev]'    # development + tests
+pip install -e '.[demo]'   # demo UI + replay harness
+pip install -e '.[mcp]'    # MCP server
 ```
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `TARGET_ENDPOINT` | yes for scan/watch/serve | Base URL for the monitored vLLM or SGLang endpoint |
-| `UPSTASH_REDIS_URL` | optional | Upstash Redis REST URL for state/event storage |
-| `UPSTASH_REDIS_TOKEN` | optional | Upstash Redis REST token |
-| `UPSTASH_VECTOR_URL` | optional | Upstash Vector REST URL for incident recall |
-| `UPSTASH_VECTOR_TOKEN` | optional | Upstash Vector REST token |
-| `GMI_BASE_URL` | optional | GMI Cloud diagnosis API base URL, default `https://api.gmi-serving.com/v1` |
+| `TARGET_ENDPOINT` | yes | Monitored vLLM/SGLang endpoint URL |
 | `GMI_API_KEY` | optional | GMI Cloud diagnosis API key |
-| `GMI_MODEL` | optional | Diagnosis model name, default `openai/gpt-oss-120b` |
-| `KV_ALERT_THRESHOLD` | optional | Base KV saturation threshold, default `0.85` |
-| `TTFT_ALERT_MULTIPLIER` | optional | TTFT alert multiplier over baseline, default `2.0` |
-| `POLL_INTERVAL_SECONDS` | optional | Watch-loop interval, default `30` |
-
-For low-cost backward compatibility, InferGuard also reads `LLM_BASE_URL`,
-`LLM_API_KEY`, and `LLM_MODEL` when the corresponding `GMI_*` variable is
-unset. That compatibility path exists only to ease migration of earlier local
-shells or Blaxel secrets.
+| `GMI_BASE_URL` | optional | GMI Cloud API base (default `https://api.gmi-serving.com/v1`) |
+| `GMI_MODEL` | optional | Diagnosis model (default `openai/gpt-oss-120b`) |
+| `UPSTASH_REDIS_URL` | optional | Redis REST URL for state/events |
+| `UPSTASH_REDIS_TOKEN` | optional | Redis REST token |
+| `UPSTASH_VECTOR_URL` | optional | Vector REST URL for incident recall |
+| `UPSTASH_VECTOR_TOKEN` | optional | Vector REST token |
+| `INFERGUARD_BRAIN_MODE` | optional | `local` or `remote` (default `local`) |
+| `INFERGUARD_PROACTIVE_CYCLE_EVERY` | optional | Proactive cycle cadence (default `5`, `0` to disable) |
+| `BL_API_KEY` | optional | Blaxel API key (remote brain mode) |
+| `DAYTONA_API_KEY` | optional | Daytona API key (canary validation) |
+| `KV_ALERT_THRESHOLD` | optional | Base KV threshold (default `0.85`) |
+| `TTFT_ALERT_MULTIPLIER` | optional | TTFT alert multiplier (default `2.0`) |
+| `POLL_INTERVAL_SECONDS` | optional | Watch-loop interval (default `30`) |
 
 See `.env.example` for a full template.
 
-## CLI usage
+## CLI
 
 ```bash
 inferguard scan http://localhost:8000
 inferguard scan http://localhost:8000 --model deepseek-ai/DeepSeek-R1-0528
-inferguard watch http://localhost:30000 --model Qwen/Qwen3.5-72B --interval 30
+inferguard watch http://localhost:30000 --interval 30
 inferguard recall "KV cache pressure on GPT-OSS"
 inferguard serve http://localhost:8000
 ```
 
-## Architecture
-
-```text
-scrape -> detect -> diagnose -> recommend -> remember -> evaluate -> repeat
-```
-
-## Demo UI
-
-InferGuard includes a lightweight web dashboard for demo and presentation use.
-It consumes structured agent reports and streams them to a single-page UI via
-Server-Sent Events.
-
-### Quick start (Bronze / mock mode)
+## Demo
 
 ```bash
-pip install -e '.[demo]'
-python demo/run_demo.py
+# Mock mode with proactive brain
+INFERGUARD_BRAIN_MODE=local \
+GMI_API_KEY=your-key GMI_MODEL=deepseek-ai/DeepSeek-V3.2 \
+python demo/run_demo.py --scenario incident --model deepseek-ai/DeepSeek-R1-0528
 # Open http://127.0.0.1:8080
 ```
 
-This starts the mock endpoint and the UI in one command. Press Ctrl-C to stop.
+Dashboard: Status, Sparkline, Anomalies, Diagnosis, Recommended Fix, Autonomous Actions (ADVISORY pills), Proactive Advisories (confidence bars + horizon chips), Impact, Incident Log.
 
-### Live mode
-
-```bash
-python demo/run_demo.py --endpoint http://vllm-host:8000 --model deepseek-ai/DeepSeek-R1-0528
-```
-
-### Standalone UI server
+## Deploy to Blaxel
 
 ```bash
-python demo/ui.py --endpoint http://localhost:18000 --model openai/gpt-oss-120b --interval 10
-```
-
-### Proof levels
-
-The UI prominently labels the current proof level:
-
-| Level | Meaning |
-|---|---|
-| **MOCK** | Running against the local mock endpoint. Proves the control loop, not live engine behavior. |
-| **LIVE** | Connected to a real inference endpoint. |
-| **UNKNOWN** | Could not determine — the /health probe failed or returned no mock marker. |
-
-### Operational impact
-
-The impact panel shows relative operational deltas (KV headroom recovered,
-TTFT improvement, queue reduction, detection latency) observed during the
-current session. These are **not** dollar-cost savings — they are operational
-measurements clearly labeled with the session's proof level.
-
-## Deploy (simplest Upstash + Blaxel path)
-
-This is the simplest practical operator path if you want Upstash-backed memory
-and a Blaxel-hosted InferGuard surface without changing the standalone-first
-package architecture.
-
-### 1. Provision Upstash
-
-Create both of these in Upstash:
-
-- **Redis** for short-term state and event logging
-- **Vector** for incident recall (create the index with an embedding model so
-  text upserts auto-embed)
-
-Collect:
-
-- `UPSTASH_REDIS_URL`
-- `UPSTASH_REDIS_TOKEN`
-- `UPSTASH_VECTOR_URL`
-- `UPSTASH_VECTOR_TOKEN`
-
-### 2. Verify locally first
-
-Set the env vars plus a real monitored endpoint:
-
-```bash
-export TARGET_ENDPOINT="http://your-vllm-or-sglang:8000"
-export UPSTASH_REDIS_URL="https://your-redis.upstash.io"
-export UPSTASH_REDIS_TOKEN="AX..."
-export UPSTASH_VECTOR_URL="https://your-vector.upstash.io"
-export UPSTASH_VECTOR_TOKEN="AX..."
-export GMI_BASE_URL="https://api.gmi-serving.com/v1"
-export GMI_API_KEY="gmi-..."
-export GMI_MODEL="openai/gpt-oss-120b"
-```
-
-Then run a one-shot scan:
-
-```bash
-inferguard scan "$TARGET_ENDPOINT"
-```
-
-### 3. Deploy to Blaxel
-
-The repo now includes a minimal Blaxel entrypoint in `serve.py` and a corrected
-`blaxel.toml`.
-
-Typical flow:
-
-```bash
-pip install -e '.[mcp,blaxel]'
-bl login
-bl secrets set target_endpoint "http://your-vllm-or-sglang:8000"
-bl secrets set upstash_redis_url "https://your-redis.upstash.io"
-bl secrets set upstash_redis_token "AX..."
-bl secrets set upstash_vector_url "https://your-vector.upstash.io"
-bl secrets set upstash_vector_token "AX..."
-bl secrets set gmi_api_key "gmi-..."
-bl secrets set gmi_base_url "https://api.gmi-serving.com/v1"
-bl secrets set gmi_model "openai/gpt-oss-120b"
+bl login touchdown-labs
+bl secrets set gmi_api_key "your-key"
+bl secrets set target_endpoint "http://your-vllm:8000"
 bl deploy
 ```
 
-### 4. What Blaxel is doing here
+## Project layout
 
-Blaxel is acting as a **host / preview / deploy layer** for the InferGuard MCP
-surface. It is **not** provisioning GPUs or replacing the monitored endpoint.
-You still point InferGuard at an existing vLLM or SGLang endpoint via
-`TARGET_ENDPOINT`.
+```
+src/inferguard/          L2 core
+  agent.py               reactive loop + proactive dispatch
+  brain_client.py        L2-to-L3 bridge (local/remote)
+  config.py              env-backed configuration
+  diagnosis.py           GMI Cloud structured diagnosis
+  memory.py              Upstash Redis + Vector facade
+  metrics.py             Prometheus scrape + anomaly detection
+  safe_actions.py        SAFE action factories + decision rules
+  remediation.py         engine-specific fix generation
 
-## Demo / replay surface
+blaxel_agent/            L3 Blaxel brain
+  brain.py               InferGuardBrain + W1-W4 decomposition
+  rlm_decomposer.py      RLM wrapper with direct-GMI fallback
+  daytona_client.py       Daytona canary orchestration
+  app.py                 FastAPI for bl deploy
+  canary_scripts/        Daytona workspace scripts
 
-The `demo/` directory vendors the InferenceX replay harness plus a curated
-bundle set that stays inside the documented support boundary:
+demo/                    demo UI + mock + replay
+serve.py                 Blaxel deployment entrypoint
+```
 
-- core `supported` bundles
-- the committed `core/vllm/code_8k1k.json` file, which remains `reviewed_preview`
-- `131k1k` `reviewed_preview` GPT-OSS chat/code bundles plus Qwen3.5 code-only bundles
-- bounded `500k` `reviewed_preview` code-only bundles
-- no DeepSeek-R1 `131k1k`
-- no Qwen `1M` in the default demo tree
+## Research basis
 
-The vendored replay helper supports the truthful smoke path from the execution
-runbook: use `--skip-tokenizer-load` when you want replay selection without
-requiring the heavier tokenizer stack.
+- **AM:** Zweiger et al., MIT, arXiv:2602.16284
+- **RLM:** Zhang et al., MIT, arXiv:2512.24601
+- **Latent Briefing:** Geist, Ramp Labs, 2026
+- **CONCUR:** Chen et al., arXiv:2601.22705
+- **Sarathi-Serve:** Agrawal et al., OSDI 2024
+- **KevlarFlow:** Qian et al., arXiv:2601.22438
 
-## Notes on optional surfaces
+## v1 scope
 
-- MCP is optional and installed separately with `.[mcp]`.
-- The replay helper is copied from InferenceX and kept standalone-first; it
-  does not imply that InferGuard depends on Inferscope runtime imports.
-- Live endpoint validation, replay validation, and mock rehearsal remain
-  separate proof levels.
+Models: GPT-OSS-120B/20B, DeepSeek-R1, Qwen3.5. Engines: vLLM, SGLang. GPUs: H100/H200/B200.
 
 License: Apache-2.0.
