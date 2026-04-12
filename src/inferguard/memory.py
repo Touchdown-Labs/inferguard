@@ -57,6 +57,23 @@ class UpstashRedis:
         result = await self._cmd("XRANGE", stream, start, end, "COUNT", count)
         return result or []
 
+    async def scan_keys(self, pattern: str, count: int = 200) -> list[str]:
+        """Minimal non-cursor SCAN helper. v5.2 cap: 200 keys per call is
+        enough for a 10-minute snapshot window at 10s poll intervals (=60
+        snapshots). Returns an empty list on any error so callers can
+        degrade gracefully.
+        """
+        try:
+            result = await self._cmd("SCAN", 0, "MATCH", pattern, "COUNT", count)
+        except Exception:
+            return []
+        if not isinstance(result, list) or len(result) < 2:
+            return []
+        keys = result[1]
+        if not isinstance(keys, list):
+            return []
+        return [str(k) for k in keys]
+
 
 class UpstashVector:
     """Minimal Upstash Vector REST client using text auto-embedding."""
@@ -195,6 +212,78 @@ class MemoryStore:
             return {}
         return json.loads(raw)
 
+    async def load_window_snapshots(self, window_seconds: int = 600) -> list[dict[str, Any]]:
+        """Read the last N seconds of metric snapshots from Redis.
+
+        Keys live at `inferguard:snapshot:{unix_ts_int}`. Uses SCAN to find
+        matching keys, filters by the timestamp suffix against
+        `time.time() - window_seconds`, GETs each, and returns deserialized
+        snapshot dicts ordered by timestamp ascending. Graceful empty list
+        if Redis is not provisioned.
+        """
+        if not self.redis:
+            return []
+        try:
+            keys = await self.redis.scan_keys(f"{self.SNAPSHOT_PREFIX}*")
+        except Exception:
+            return []
+        if not keys:
+            return []
+        cutoff = int(time.time() - max(window_seconds, 0))
+        wanted: list[tuple[int, str]] = []
+        for k in keys:
+            suffix = k.rsplit(":", 1)[-1]
+            try:
+                ts = int(suffix)
+            except ValueError:
+                continue
+            if ts >= cutoff:
+                wanted.append((ts, k))
+        wanted.sort(key=lambda x: x[0])
+        snapshots: list[dict[str, Any]] = []
+        for _, k in wanted[-120:]:  # cap at 120 to keep the sandbox payload lean
+            try:
+                raw = await self.redis.get(k)
+                if raw:
+                    snapshots.append(json.loads(raw))
+            except Exception:
+                continue
+        return snapshots
+
+    async def load_event_log_tail(self, count: int = 50) -> list[dict[str, Any]]:
+        """Read the last N events from the inferguard:events Redis stream.
+
+        Parses the stream entry field dicts into plain dicts. Returns in
+        chronological order. Empty list if Redis is unavailable.
+        """
+        if not self.redis:
+            return []
+        try:
+            raw_entries = await self.redis.xrange(self.STREAM_KEY, count=count)
+        except Exception:
+            return []
+        entries: list[dict[str, Any]] = []
+        for entry in raw_entries or []:
+            # Upstash XRANGE entries are [id, [field1, value1, field2, value2, ...]]
+            if not isinstance(entry, list) or len(entry) != 2:
+                continue
+            entry_id, fields = entry
+            if not isinstance(fields, list):
+                continue
+            parsed: dict[str, Any] = {"_id": str(entry_id)}
+            for i in range(0, len(fields) - 1, 2):
+                key = str(fields[i])
+                value = fields[i + 1]
+                if key == "data" and isinstance(value, str):
+                    try:
+                        parsed[key] = json.loads(value)
+                        continue
+                    except json.JSONDecodeError:
+                        pass
+                parsed[key] = value
+            entries.append(parsed)
+        return entries
+
     async def update_incident_resolution(
         self,
         incident_id: str,
@@ -202,18 +291,31 @@ class MemoryStore:
         *,
         improvements: list[str] | None = None,
         regressions: list[str] | None = None,
+        observed_kv_reduction: float | None = None,
+        observed_accuracy_delta_pp: float | None = None,
+        observed_overhead_s: float | None = None,
+        action_type: str | None = None,
     ) -> None:
         if self.vector:
             try:
-                await self.vector.update_metadata(
-                    incident_id,
-                    {
-                        "resolution_effective": resolved,
-                        "resolution_checked_at": time.time(),
-                        "improvements": improvements or [],
-                        "regressions": regressions or [],
-                    },
-                )
+                metadata_update: dict[str, Any] = {
+                    "resolution_effective": resolved,
+                    "resolution_checked_at": time.time(),
+                    "improvements": improvements or [],
+                    "regressions": regressions or [],
+                }
+                # v5.2: persist observed compaction outcomes into the Vector row
+                # so the learning loop has labeled training rows for the MAD
+                # threshold policy (PRD v5.1 §P write-side gap closure).
+                if observed_kv_reduction is not None:
+                    metadata_update["observed_kv_reduction"] = float(observed_kv_reduction)
+                if observed_accuracy_delta_pp is not None:
+                    metadata_update["observed_accuracy_delta_pp"] = float(observed_accuracy_delta_pp)
+                if observed_overhead_s is not None:
+                    metadata_update["observed_overhead_s"] = float(observed_overhead_s)
+                if action_type is not None:
+                    metadata_update["action_type"] = str(action_type)
+                await self.vector.update_metadata(incident_id, metadata_update)
             except Exception as exc:  # pragma: no cover - network failure path
                 log.warning("resolution_update_failed", id=incident_id, error=str(exc))
 

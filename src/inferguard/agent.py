@@ -9,6 +9,11 @@ from typing import Any, AsyncGenerator
 import httpx
 import structlog
 
+from inferguard.brain_client import (
+    BrainClient,
+    InvestigationContext,
+    ProactiveAdvisory,
+)
 from inferguard.config import InferGuardConfig
 from inferguard.diagnosis import DiagnosisResult, diagnose
 from inferguard.memory import Incident, MemoryStore, UpstashRedis, UpstashVector
@@ -40,6 +45,12 @@ class InferGuardAgent:
         redis = UpstashRedis(config.redis_url, config.redis_token) if config.has_redis else None
         vector = UpstashVector(config.vector_url, config.vector_token) if config.has_vector else None
         self.memory = MemoryStore(redis, vector)
+
+        self._brain_client = BrainClient(config=config, memory=self.memory)
+        self._proactive_cycle_every = self.config.proactive_cycle_every
+        self._reactive_cycle_counter = 0
+        self._last_proactive_advisories: list[dict[str, Any]] = []
+        self._proactive_task: asyncio.Task[Any] | None = None
 
     async def _scrape(self) -> MetricSnapshot:
         snapshot = await MetricSnapshot.scrape_endpoint(self.config.target_endpoint)
@@ -153,7 +164,14 @@ class InferGuardAgent:
                     "model_name": self.model_name,
                 }
             )
-            return self._with_proof_level({"status": "healthy", "metrics": snapshot.as_dict(), "safe_actions": []})
+            return self._with_proof_level(
+                {
+                    "status": "healthy",
+                    "metrics": snapshot.as_dict(),
+                    "safe_actions": [],
+                    "proactive_advisories": self._drain_proactive_advisories(),
+                }
+            )
 
         diagnosis = await self._diagnose(snapshot, anomaly.reasons)
         remediation = generate_fix(
@@ -207,7 +225,29 @@ class InferGuardAgent:
         for action in safe_actions:
             await self.memory.log_event("safe_action", action.as_dict())
 
-        task = asyncio.create_task(self._check_resolution(incident_id, delay_seconds=180))
+        # v6: when an anomaly fires in a one-shot scan context, proactively
+        # invoke the brain inline so /api/scan reports include advisories.
+        # In the watch loop this path still fires every N cycles from watch(),
+        # so we guard with a "buffer is empty" check to avoid duplicating work.
+        if self.config.brain_mode == "local" and not self._last_proactive_advisories:
+            try:
+                await asyncio.wait_for(self.proactive_cycle(), timeout=45.0)
+            except asyncio.TimeoutError:
+                log.info("proactive_inline_timeout")
+            except Exception as exc:
+                log.debug("proactive_inline_failed", error=str(exc))
+
+        canary_observed = self._extract_canary_outcome_from_advisories(self._last_proactive_advisories)
+        task = asyncio.create_task(
+            self._check_resolution(
+                incident_id,
+                delay_seconds=180,
+                observed_kv_reduction=canary_observed.get("observed_kv_reduction"),
+                observed_accuracy_delta_pp=canary_observed.get("observed_accuracy_delta_pp"),
+                observed_overhead_s=canary_observed.get("observed_overhead_s"),
+                action_type=canary_observed.get("action_type"),
+            )
+        )
         self._track_background_task(task)
 
         return self._with_proof_level(
@@ -218,8 +258,79 @@ class InferGuardAgent:
                 "diagnosis": diagnosis.as_dict(),
                 "remediation": remediation.as_dict(),
                 "safe_actions": [a.as_dict() for a in safe_actions],
+                "proactive_advisories": self._drain_proactive_advisories(),
             }
         )
+
+    def _drain_proactive_advisories(self) -> list[dict[str, Any]]:
+        advisories = list(self._last_proactive_advisories)
+        self._last_proactive_advisories = []
+        return advisories
+
+    def _extract_canary_outcome_from_advisories(
+        self, advisories: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        for advisory in advisories:
+            if not isinstance(advisory, dict):
+                continue
+            for action in advisory.get("recommended_safe_actions", []):
+                if not isinstance(action, dict):
+                    continue
+                verdict = action.get("canary_verdict")
+                if not isinstance(verdict, dict):
+                    continue
+                return {
+                    "observed_kv_reduction": verdict.get("observed_kv_reduction"),
+                    "observed_accuracy_delta_pp": verdict.get("observed_accuracy_delta_pp"),
+                    "observed_overhead_s": verdict.get("observed_overhead_s"),
+                    "action_type": action.get("action_type"),
+                }
+        return {}
+
+    async def proactive_cycle(self) -> list[ProactiveAdvisory]:
+        """Run one proactive investigation cycle via BrainClient."""
+        if self._last_snapshot is None or self._last_snapshot.error:
+            return []
+
+        window_snapshots: list[dict[str, Any]] = []
+        prior_incidents: list[dict[str, Any]] = []
+        event_log_tail: list[dict[str, Any]] = []
+        try:
+            window_snapshots = await self.memory.load_window_snapshots(window_seconds=600)
+        except Exception as exc:
+            log.debug("proactive_window_load_failed", error=str(exc))
+        try:
+            prior_incidents = await self.memory.find_similar_incidents(
+                f"KV cache inference health {self.model_name}", top_k=10,
+            )
+        except Exception as exc:
+            log.debug("proactive_prior_incidents_failed", error=str(exc))
+        try:
+            event_log_tail = await self.memory.load_event_log_tail(count=50)
+        except Exception as exc:
+            log.debug("proactive_event_tail_failed", error=str(exc))
+
+        ctx = InvestigationContext(
+            window_snapshots=window_snapshots,
+            prior_incidents=prior_incidents,
+            event_log_tail=event_log_tail,
+            current_model_name=self.model_name or "unknown",
+            current_engine=self._last_snapshot.engine,
+            current_snapshot=self._last_snapshot.as_dict(),
+            llm_backend={
+                "base_url": self.config.llm_base_url,
+                "api_key": self.config.llm_api_key,
+                "model": self.config.llm_model,
+            },
+        )
+        advisories = await self._brain_client.request_investigation(ctx)
+        for advisory in advisories:
+            try:
+                await self.memory.log_event("proactive_advisory", advisory.as_dict())
+            except Exception as exc:
+                log.debug("proactive_advisory_log_failed", error=str(exc))
+        self._last_proactive_advisories = [a.as_dict() for a in advisories]
+        return advisories
 
     async def watch(self, max_cycles: int = 0) -> AsyncGenerator[dict[str, Any], None]:
         cycle = 0
@@ -228,9 +339,28 @@ class InferGuardAgent:
             report = await self.run_once()
             report["cycle"] = cycle
             yield report
+
+            self._reactive_cycle_counter += 1
+            if (
+                self._proactive_cycle_every > 0
+                and self._reactive_cycle_counter % self._proactive_cycle_every == 0
+                and (self._proactive_task is None or self._proactive_task.done())
+            ):
+                self._proactive_task = asyncio.create_task(self.proactive_cycle())
+                self._track_background_task(self._proactive_task)
+
             await asyncio.sleep(self.config.poll_interval_seconds)
 
-    async def _check_resolution(self, incident_id: str, delay_seconds: int = 180) -> None:
+    async def _check_resolution(
+        self,
+        incident_id: str,
+        delay_seconds: int = 180,
+        *,
+        observed_kv_reduction: float | None = None,
+        observed_accuracy_delta_pp: float | None = None,
+        observed_overhead_s: float | None = None,
+        action_type: str | None = None,
+    ) -> None:
         await asyncio.sleep(delay_seconds)
         try:
             snapshot = await self._scrape()
@@ -266,6 +396,10 @@ class InferGuardAgent:
                 resolved,
                 improvements=improvements,
                 regressions=regressions,
+                observed_kv_reduction=observed_kv_reduction,
+                observed_accuracy_delta_pp=observed_accuracy_delta_pp,
+                observed_overhead_s=observed_overhead_s,
+                action_type=action_type,
             )
         except Exception as exc:  # pragma: no cover - safety/logging path
             log.warning("resolution_check_failed", incident_id=incident_id, error=str(exc))
