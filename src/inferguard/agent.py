@@ -187,12 +187,22 @@ class InferGuardAgent:
             }
         )
 
+        prior_compaction_outcomes: list[dict[str, Any]] = []
+        try:
+            prior_compaction_outcomes = await self.memory.find_similar_incidents(
+                f"KV compaction session trajectory {self.model_name} {' '.join(anomaly.reasons)}",
+                top_k=3,
+            )
+        except Exception as exc:  # pragma: no cover - network/degraded path
+            log.debug("prior_compaction_lookup_failed", error=str(exc))
+
         safe_actions = decide_safe_actions(
             snapshot,
             anomaly,
             previous_snapshot,
             self.model_name,
             incident_id,
+            prior_compaction_outcomes=prior_compaction_outcomes,
         )
         for action in safe_actions:
             await self.memory.log_event("safe_action", action.as_dict())
