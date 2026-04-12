@@ -47,6 +47,9 @@ class InferGuardConfig:
     kv_alert_threshold: float = 0.85
     ttft_alert_multiplier: float = 2.0
     poll_interval_seconds: int = 30
+    brain_mode: str = "local"
+    brain_agent_name: str = "inferguard-brain"
+    proactive_cycle_every: int = 5
 
     @classmethod
     def from_env(cls) -> "InferGuardConfig":
@@ -67,6 +70,12 @@ class InferGuardConfig:
             kv_alert_threshold=float(os.environ.get("KV_ALERT_THRESHOLD", "0.85")),
             ttft_alert_multiplier=float(os.environ.get("TTFT_ALERT_MULTIPLIER", "2.0")),
             poll_interval_seconds=int(os.environ.get("POLL_INTERVAL_SECONDS", "30")),
+            brain_mode=os.environ.get("INFERGUARD_BRAIN_MODE", "local").strip() or "local",
+            brain_agent_name=os.environ.get(
+                "INFERGUARD_BRAIN_AGENT_NAME", "inferguard-brain"
+            ).strip()
+            or "inferguard-brain",
+            proactive_cycle_every=int(os.environ.get("INFERGUARD_PROACTIVE_CYCLE_EVERY", "5")),
         )
 
     @property

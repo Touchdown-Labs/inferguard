@@ -1,9 +1,3 @@
-"""Blaxel entrypoint for InferGuard.
+"""Blaxel entrypoint for InferGuard v6 L3 brain service."""
 
-Exposes the FastMCP application created by the standalone-first InferGuard
-package so Blaxel can discover and host it.
-"""
-
-from inferguard.mcp_server import create_mcp_server
-
-app = create_mcp_server()
+from blaxel_agent.app import app
