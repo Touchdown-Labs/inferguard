@@ -111,7 +111,9 @@ def test_external_validated_healthcheck_is_not_launch_bound(tmp_path: Path) -> N
     healthcheck_path = root / "launch" / "healthcheck.json"
     healthcheck = json.loads(healthcheck_path.read_text(encoding="utf-8"))
     healthcheck["status"] = "external_validated"
-    healthcheck_path.write_text(json.dumps(healthcheck, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    healthcheck_path.write_text(
+        json.dumps(healthcheck, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     diagnosis = diagnose(root).to_dict()
 

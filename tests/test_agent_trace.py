@@ -102,7 +102,9 @@ def test_default_trace_redacts_prompts(tmp_path: Path) -> None:
     tracer = make_tracer(tmp_path)
     tracer.record_http_exchange(
         endpoint="http://localhost/v1/chat/completions",
-        request_body=json.dumps({"model": "m", "messages": [{"role": "user", "content": "SECRET"}]}).encode(),
+        request_body=json.dumps(
+            {"model": "m", "messages": [{"role": "user", "content": "SECRET"}]}
+        ).encode(),
         response_body=b'data: {"choices":[{"delta":{"content":"ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}\n\ndata: [DONE]\n\n',
         status_code=200,
         timestamp_start=1.0,
@@ -118,7 +120,9 @@ def test_save_prompts_writes_local_debug_file(tmp_path: Path) -> None:
     tracer = make_tracer(tmp_path, save_prompts=True)
     tracer.record_http_exchange(
         endpoint="http://localhost/v1/chat/completions",
-        request_body=json.dumps({"model": "m", "messages": [{"role": "user", "content": "SECRET"}]}).encode(),
+        request_body=json.dumps(
+            {"model": "m", "messages": [{"role": "user", "content": "SECRET"}]}
+        ).encode(),
         response_body=b'{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":1}}',
         status_code=200,
         timestamp_start=1.0,
@@ -134,7 +138,9 @@ def test_http_exchange_estimates_tokens_without_usage(tmp_path: Path) -> None:
     tracer = make_tracer(tmp_path)
     event = tracer.record_http_exchange(
         endpoint="http://localhost/v1/chat/completions",
-        request_body=json.dumps({"model": "m", "messages": [{"role": "user", "content": "hello world"}]}).encode(),
+        request_body=json.dumps(
+            {"model": "m", "messages": [{"role": "user", "content": "hello world"}]}
+        ).encode(),
         response_body=b'data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: [DONE]\n\n',
         status_code=200,
         timestamp_start=1.0,
@@ -306,7 +312,9 @@ def test_langgraph_callback_records_tool_span_without_argument_content(tmp_path:
 
 
 @pytest.mark.harness
-def test_langgraph_callback_save_prompts_writes_tool_args_to_local_debug_file(tmp_path: Path) -> None:
+def test_langgraph_callback_save_prompts_writes_tool_args_to_local_debug_file(
+    tmp_path: Path,
+) -> None:
     tracer = make_tracer(tmp_path, framework="langgraph", save_prompts=True)
     callback = LangGraphCallback(tracer)
     callback.on_tool_start({"name": "search_docs"}, {"query": "SECRET ARGUMENT"}, run_id="tool-1")

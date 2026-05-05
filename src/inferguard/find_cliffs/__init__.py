@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -100,11 +99,15 @@ def format_stdout_summary(capacity: CapacityCliffs) -> str:
 
 def _load_sweep_cells(root: Path) -> list[SweepCell]:
     jobs_dir = root / "jobs"
-    job_dirs = [path for path in sorted(jobs_dir.iterdir()) if path.is_dir()] if jobs_dir.exists() else []
+    job_dirs = (
+        [path for path in sorted(jobs_dir.iterdir()) if path.is_dir()] if jobs_dir.exists() else []
+    )
     cells: list[SweepCell] = []
     for job_dir in job_dirs:
         paths = _artifact_paths(root, job_dir)
-        operator_path = _first_existing(job_dir / "operator_profile.json", job_dir / "manifests" / "operator_profile.json")
+        operator_path = _first_existing(
+            job_dir / "operator_profile.json", job_dir / "manifests" / "operator_profile.json"
+        )
         request_path = _first_existing(
             job_dir / "request_profile" / "requests_summary.json",
             job_dir / "request_profile" / "request_summary.json",

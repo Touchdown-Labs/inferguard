@@ -133,8 +133,14 @@ class ClusterDaemon:
         self.daemon = daemon or Daemon(permission_policy=self.permission_policy)
         self.leader_url = leader_url.rstrip("/") if leader_url else None
         self.rank_labels = rank_labels or detect_rank_labels()
-        self.token_path = Path(token_path) if token_path is not None else default_cluster_token_path()
-        self.token = token if token is not None else load_cluster_token(self.token_path, self.permission_policy)
+        self.token_path = (
+            Path(token_path) if token_path is not None else default_cluster_token_path()
+        )
+        self.token = (
+            token
+            if token is not None
+            else load_cluster_token(self.token_path, self.permission_policy)
+        )
         self.privacy_opt_in = privacy_opt_in
         self.heartbeat_seconds = heartbeat_seconds
         self.stale_after_seconds = stale_after_seconds
@@ -158,7 +164,7 @@ class ClusterDaemon:
     def follower(cls, *, leader_url: str, **kwargs: Any) -> ClusterDaemon:
         return cls(mode="follower", leader_url=leader_url, **kwargs)
 
-    def start_server(self, *, host: str = "0.0.0.0", port: int = 9466) -> str:
+    def start_server(self, *, host: str = "127.0.0.1", port: int = 9466) -> str:
         """Start the leader HTTP server for snapshots and merged metrics."""
 
         if self.mode != "leader":
@@ -166,7 +172,9 @@ class ClusterDaemon:
         if self._server is not None:
             actual_port = self._server.server_address[1]
             return f"http://{host}:{actual_port}/metrics"
-        self.permission_policy.check_bind(host, port, opted_in=self.privacy_opt_in).raise_if_denied()
+        self.permission_policy.check_bind(
+            host, port, opted_in=self.privacy_opt_in
+        ).raise_if_denied()
         cluster = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -180,7 +188,9 @@ class ClusterDaemon:
                     return
                 length = int(self.headers.get("Content-Length", "0") or 0)
                 try:
-                    payload = json.loads(self.rfile.read(length).decode("utf-8") if length else "{}")
+                    payload = json.loads(
+                        self.rfile.read(length).decode("utf-8") if length else "{}"
+                    )
                     record = cluster.receive_snapshot(payload)
                 except PermissionError as exc:
                     _write_json(self, 403, {"error": str(exc)})
@@ -188,7 +198,9 @@ class ClusterDaemon:
                 except (ValueError, TypeError, json.JSONDecodeError) as exc:
                     _write_json(self, 400, {"error": str(exc)})
                     return
-                _write_json(self, 202, {"accepted": True, "record": record.as_dict(now=cluster.clock())})
+                _write_json(
+                    self, 202, {"accepted": True, "record": record.as_dict(now=cluster.clock())}
+                )
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib callback name
                 if self.path == "/metrics":
@@ -456,7 +468,9 @@ def detect_rank_labels(
         or hostname
         or socket.gethostname()
     )
-    slurm_procid = _first_env(environ, "SLURM_PROCID", "PMI_RANK", "OMPI_COMM_WORLD_RANK", "RANK") or "0"
+    slurm_procid = (
+        _first_env(environ, "SLURM_PROCID", "PMI_RANK", "OMPI_COMM_WORLD_RANK", "RANK") or "0"
+    )
     slurm_nodeid = _first_env(environ, "SLURM_NODEID", "GROUP_RANK", "NODE_RANK") or "0"
     rank = environ.get("INFERGUARD_RANK") or environ.get("RANK") or slurm_procid
     cluster_id = (
@@ -510,7 +524,9 @@ def _non_negative_int(value: Any, field_name: str) -> int:
 
 
 def _prometheus_labels(labels: dict[str, str]) -> str:
-    return ",".join(f'{key}="{_escape_prometheus_label(str(value))}"' for key, value in sorted(labels.items()))
+    return ",".join(
+        f'{key}="{_escape_prometheus_label(str(value))}"' for key, value in sorted(labels.items())
+    )
 
 
 def _escape_prometheus_label(value: str) -> str:

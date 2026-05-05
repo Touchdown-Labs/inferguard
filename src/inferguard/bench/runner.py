@@ -81,7 +81,9 @@ class BenchConfig:
         data = asdict(self)
         data["output_dir"] = str(self.output_dir)
         data["trace_dir"] = str(self.trace_dir) if self.trace_dir is not None else None
-        data["tool_call_schema"] = str(self.tool_call_schema) if self.tool_call_schema is not None else None
+        data["tool_call_schema"] = (
+            str(self.tool_call_schema) if self.tool_call_schema is not None else None
+        )
         return data
 
 
@@ -142,7 +144,9 @@ def _inject_giant_prefill_spec(specs: list[RequestSpec], tokens: int | None) -> 
         "This request is intentionally oversized to characterize OOM blast radius.\n"
     )
     content = (line * (target_chars // len(line) + 1))[:target_chars]
-    system_messages = [message for message in anchor.messages if message.get("role") == "system"][:1]
+    system_messages = [message for message in anchor.messages if message.get("role") == "system"][
+        :1
+    ]
     injected = RequestSpec(
         request_id="chaos-giant-prefill:turn-0",
         trace_id="chaos-giant-prefill",
@@ -178,7 +182,9 @@ async def _run_benchmark(config: BenchConfig, specs: list[RequestSpec]) -> dict[
     run_id = _run_id(config.command)
     output_dir = config.output_dir
     if output_dir.exists() and any(output_dir.iterdir()) and not config.force:
-        raise BenchError(f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)")
+        raise BenchError(
+            f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)"
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
     if config.command == "cold-start" and config.duration_seconds is None:
         config = replace(config, duration_seconds=config.cold_start_capture_seconds)
@@ -193,10 +199,21 @@ async def _run_benchmark(config: BenchConfig, specs: list[RequestSpec]) -> dict[
     summary_path = output_dir / "summary.json"
     report_path = output_dir / "report.md"
 
-    _write_json(config_path, {"schema_version": CONFIG_SCHEMA_VERSION, "run_id": run_id, **config.as_dict(), "topology": _topology_from_env()})
+    _write_json(
+        config_path,
+        {
+            "schema_version": CONFIG_SCHEMA_VERSION,
+            "run_id": run_id,
+            **config.as_dict(),
+            "topology": _topology_from_env(),
+        },
+    )
     requests_path.write_text("", encoding="utf-8")
     metrics_path.write_text("", encoding="utf-8")
-    append_jsonl(requests_path, (_request_spec_for_artifact(spec, redact=config.redact_prompts) for spec in specs))
+    append_jsonl(
+        requests_path,
+        (_request_spec_for_artifact(spec, redact=config.redact_prompts) for spec in specs),
+    )
 
     metrics: list[RequestMetric] = []
     client = OpenAIStreamingChatClient(
@@ -236,7 +253,9 @@ async def _run_benchmark(config: BenchConfig, specs: list[RequestSpec]) -> dict[
                     baseline_rps=config.baseline_rps,
                     capture_response_text=config.tool_call_schema is not None,
                 )
-                level_metrics = _apply_measured_kv_labels(level_metrics, timeline.observed_perf_times)
+                level_metrics = _apply_measured_kv_labels(
+                    level_metrics, timeline.observed_perf_times
+                )
                 if config.track_cache_lineage:
                     level_metrics = _annotate_cache_lineage(level_metrics)
                 metrics.extend(level_metrics)
@@ -253,7 +272,9 @@ async def _run_benchmark(config: BenchConfig, specs: list[RequestSpec]) -> dict[
         )
         timeline.captured_count += 3
     if _should_emit_customer_timeline(config, metrics):
-        _append_customer_kv_timeline(metrics, metrics_timeline_path, starting_sequence=timeline.captured_count)
+        _append_customer_kv_timeline(
+            metrics, metrics_timeline_path, starting_sequence=timeline.captured_count
+        )
         if metrics:
             timeline.captured_count = max(timeline.captured_count, 1)
     runtime_seconds = time.perf_counter() - run_perf_start
@@ -297,7 +318,11 @@ async def _run_benchmark(config: BenchConfig, specs: list[RequestSpec]) -> dict[
             "metrics_jsonl": str(metrics_path),
             "summary_json": str(summary_path),
             "report_md": str(report_path),
-            **({"metrics_timeline_jsonl": str(metrics_timeline_path)} if timeline.captured_count > 0 else {}),
+            **(
+                {"metrics_timeline_jsonl": str(metrics_timeline_path)}
+                if timeline.captured_count > 0
+                else {}
+            ),
         },
     }
     _write_json(run_path, run)
@@ -415,7 +440,11 @@ async def _run_level(
             baseline_rps=baseline_rps,
             capture_response_text=capture_response_text,
         )
-    if arrival_mode == "poisson" or command == "kvcast" and any(s.metadata.get("kvcast_mode") == "multi-tenant-storm" for s in specs):
+    if (
+        arrival_mode == "poisson"
+        or command == "kvcast"
+        and any(s.metadata.get("kvcast_mode") == "multi-tenant-storm" for s in specs)
+    ):
         return await _run_poisson_level(
             client=client,
             specs=specs,
@@ -424,7 +453,8 @@ async def _run_level(
             command=command,
             duration_seconds=duration_seconds,
             warmup_seconds=warmup_seconds,
-            arrival_rate_rps=arrival_rate_rps or max(1.0, float(config_customers_from_specs(specs))),
+            arrival_rate_rps=arrival_rate_rps
+            or max(1.0, float(config_customers_from_specs(specs))),
             idle_active_mix_mode=idle_active_mix_mode,
             active_window_seconds=active_window_seconds,
             idle_window_seconds=idle_window_seconds,
@@ -540,7 +570,13 @@ async def _run_poisson_level(
         scheduled = level_started + offset
         if deadline is not None and scheduled >= deadline:
             break
-        if idle_active_mix_mode and _idle_active_phase(scheduled - level_started, active_window_seconds, idle_window_seconds) == "idle":
+        if (
+            idle_active_mix_mode
+            and _idle_active_phase(
+                scheduled - level_started, active_window_seconds, idle_window_seconds
+            )
+            == "idle"
+        ):
             continue
         delay = scheduled - time.perf_counter()
         if delay > 0:
@@ -607,7 +643,9 @@ async def _run_retry_storm_level(
         delay = scheduled - time.perf_counter()
         if delay > 0:
             await asyncio.sleep(delay)
-        spec = _retry_storm_spec(next(spec_iter), burst_multiplier, burst_window_seconds, baseline_rps, in_burst)
+        spec = _retry_storm_spec(
+            next(spec_iter), burst_multiplier, burst_window_seconds, baseline_rps, in_burst
+        )
         tasks.append(
             asyncio.create_task(
                 _run_one_request_with_optional_semaphore(
@@ -705,7 +743,9 @@ async def _run_one_request(
     result = await client.stream_chat(
         messages=spec.messages,
         output_tokens=spec.expected_output_tokens or output_tokens,
-        metadata={**spec.metadata, "customer_id": _customer_id(spec), "sla_tier": spec.sla_tier} if _customer_id(spec) else spec.metadata,
+        metadata={**spec.metadata, "customer_id": _customer_id(spec), "sla_tier": spec.sla_tier}
+        if _customer_id(spec)
+        else spec.metadata,
     )
     tps = None
     if result.success and result.latency_seconds > 0:
@@ -713,7 +753,11 @@ async def _run_one_request(
     kv_label = None
     if command in {"replay", "kv-stress", "kvcast"}:
         kv_label = "inferred_without_engine_metrics"
-    phase = "warmup" if warmup_seconds and (result.end_time - level_started) < warmup_seconds else "measurement"
+    phase = (
+        "warmup"
+        if warmup_seconds and (result.end_time - level_started) < warmup_seconds
+        else "measurement"
+    )
     metadata = {**spec.metadata, "phase": phase, "sequence": sequence}
     customer_id = _customer_id(spec)
     if customer_id:
@@ -813,7 +857,9 @@ def build_summary(
     ttft = [m.ttft_seconds for m in successes if m.ttft_seconds is not None]
     tps = [m.tokens_per_second for m in successes if m.tokens_per_second is not None]
     estimated_input = sum(m.input_tokens for m in metrics if m.input_tokens_source == "estimated")
-    estimated_output = sum(m.output_tokens for m in metrics if m.output_tokens_source == "estimated")
+    estimated_output = sum(
+        m.output_tokens for m in metrics if m.output_tokens_source == "estimated"
+    )
     output_tokens = sum(m.output_tokens for m in successes)
     customer_breakdown = _customer_breakdown(metrics)
     cold_start = _cold_start_summary(metrics) if command == "cold-start" else None
@@ -844,7 +890,9 @@ def build_summary(
         "ttft_seconds": _percentile_block(ttft),
         "average_tokens_per_second": mean(tps) if tps else None,
         "throughput_req_per_second": (total / runtime_seconds) if runtime_seconds > 0 else None,
-        "output_tokens_per_second_wall": (output_tokens / runtime_seconds) if runtime_seconds > 0 else None,
+        "output_tokens_per_second_wall": (output_tokens / runtime_seconds)
+        if runtime_seconds > 0
+        else None,
         "tokens": {
             "input_total": sum(m.input_tokens for m in metrics),
             "output_total": sum(m.output_tokens for m in metrics),
@@ -866,15 +914,61 @@ def build_summary(
         "limitations": [
             "Token counts are exact only when the endpoint returns OpenAI usage fields; otherwise they are estimated.",
             "KV pressure is inferred from request shape unless engine metrics are collected separately.",
-            *( ["🟡 PENDING: full block-level prefix-cache lineage requires upstream engine instrumentation."] if track_cache_lineage else [] ),
-            *( ["🟡 PENDING: crash injection is test-gated; full SGLang #23743 reproduction requires matching SGLang version detection."] if chaos_recovery else [] ),
-            *( ["Giant-prefill OOM injection is gated by --allow-chaos and characterizes blast radius; it does not remediate the endpoint."] if oom_giant_prefill else [] ),
-            *( ["Idle/active mix mode intentionally inserts idle windows to characterize utilization economics."] if idle_active_mix else [] ),
-            *( ["Retry-storm mode intentionally bursts request arrivals to characterize queue recovery and overload behavior."] if retry_storm else [] ),
-            *( ["Canary eval set scoring is artifact-based and supplies rollout quality evidence; orchestration rollback remains external."] if canary_quality else [] ),
-            *( ["Tool-call schema validation checks response structure contract compliance; it does not replace application contract tests."] if tool_call_schema_eval else [] ),
+            *(
+                [
+                    "🟡 PENDING: full block-level prefix-cache lineage requires upstream engine instrumentation."
+                ]
+                if track_cache_lineage
+                else []
+            ),
+            *(
+                [
+                    "🟡 PENDING: crash injection is test-gated; full SGLang #23743 reproduction requires matching SGLang version detection."
+                ]
+                if chaos_recovery
+                else []
+            ),
+            *(
+                [
+                    "Giant-prefill OOM injection is gated by --allow-chaos and characterizes blast radius; it does not remediate the endpoint."
+                ]
+                if oom_giant_prefill
+                else []
+            ),
+            *(
+                [
+                    "Idle/active mix mode intentionally inserts idle windows to characterize utilization economics."
+                ]
+                if idle_active_mix
+                else []
+            ),
+            *(
+                [
+                    "Retry-storm mode intentionally bursts request arrivals to characterize queue recovery and overload behavior."
+                ]
+                if retry_storm
+                else []
+            ),
+            *(
+                [
+                    "Canary eval set scoring is artifact-based and supplies rollout quality evidence; orchestration rollback remains external."
+                ]
+                if canary_quality
+                else []
+            ),
+            *(
+                [
+                    "Tool-call schema validation checks response structure contract compliance; it does not replace application contract tests."
+                ]
+                if tool_call_schema_eval
+                else []
+            ),
             "TTFT is measured from request start to first non-empty streamed content token; first SSE timing is stored separately.",
-            *( [f"Warmup excluded: {raw_total - total} request rows omitted from summary metrics."] if raw_total != total else [] ),
+            *(
+                [f"Warmup excluded: {raw_total - total} request rows omitted from summary metrics."]
+                if raw_total != total
+                else []
+            ),
             *(_saturation_limitations(metrics)),
         ],
     }
@@ -919,20 +1013,24 @@ def render_report(summary: dict[str, Any], config: BenchConfig) -> str:
                 tput=_fmt(item["throughput_req_per_second"]),
             )
         )
-    lines.extend([
-        "",
-        "## Workload breakdown",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Workload breakdown",
+        ]
+    )
     for workload, item in summary["workloads"].items():
         lines.append(f"- `{workload}`: {item['success']} success / {item['total']} total")
-    lines.extend([
-        "",
-        "## Artifacts",
-        f"- Output directory: `{config.output_dir}`",
-        "- `run.json`, `config.json`, `requests.jsonl`, `metrics.jsonl`, `summary.json`, `report.md`",
-        "",
-        "## Limitations",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Artifacts",
+            f"- Output directory: `{config.output_dir}`",
+            "- `run.json`, `config.json`, `requests.jsonl`, `metrics.jsonl`, `summary.json`, `report.md`",
+            "",
+            "## Limitations",
+        ]
+    )
     lines.extend(f"- {item}" for item in summary["limitations"])
     return "\n".join(lines) + "\n"
 
@@ -967,7 +1065,9 @@ def _saturation_limitations(metrics: list[RequestMetric]) -> list[str]:
     return limitations
 
 
-def _gpu_idle_ratio_block(metrics: list[RequestMetric], duration_seconds: float) -> dict[str, float | None]:
+def _gpu_idle_ratio_block(
+    metrics: list[RequestMetric], duration_seconds: float
+) -> dict[str, float | None]:
     ratios = []
     tool_ms_total = 0.0
     for metric in metrics:
@@ -1030,7 +1130,11 @@ def _workload_breakdown(metrics: list[RequestMetric]) -> dict[str, dict[str, Any
 
 
 def _percentile_block(values: list[float]) -> dict[str, float | None]:
-    return {"p50": _percentile(values, 50), "p95": _percentile(values, 95), "p99": _percentile(values, 99)}
+    return {
+        "p50": _percentile(values, 50),
+        "p95": _percentile(values, 95),
+        "p99": _percentile(values, 99),
+    }
 
 
 def _percentile(values: list[float], pct: int) -> float | None:
@@ -1089,8 +1193,18 @@ def _validate_config(config: BenchConfig) -> None:
         raise BenchError("warmup_seconds requires duration_seconds")
     if config.duration_seconds is not None and config.warmup_seconds >= config.duration_seconds:
         raise BenchError("warmup_seconds must be less than duration_seconds")
-    if config.kvcast_mode not in {"prefix-reuse", "cold-pressure", "mixed-agent", "eviction-probe", "fragmentation-probe", "multi-tenant-storm", "retry-storm"}:
-        raise BenchError("kvcast_mode must be one of prefix-reuse|cold-pressure|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm")
+    if config.kvcast_mode not in {
+        "prefix-reuse",
+        "cold-pressure",
+        "mixed-agent",
+        "eviction-probe",
+        "fragmentation-probe",
+        "multi-tenant-storm",
+        "retry-storm",
+    }:
+        raise BenchError(
+            "kvcast_mode must be one of prefix-reuse|cold-pressure|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm"
+        )
     if config.customers <= 0:
         raise BenchError("customers must be positive")
     if config.inject_crash_after_seconds is not None and not config.allow_chaos:
@@ -1118,11 +1232,15 @@ def _validate_config(config: BenchConfig) -> None:
             raise BenchError("--idle-window-seconds must be positive")
     if config.arrival_mode not in {"steady", "poisson"}:
         raise BenchError("arrival_mode must be one of steady|poisson")
-    if config.arrival_mode == "poisson" and (config.arrival_rate_rps is None or config.arrival_rate_rps <= 0):
+    if config.arrival_mode == "poisson" and (
+        config.arrival_rate_rps is None or config.arrival_rate_rps <= 0
+    ):
         raise BenchError("arrival_rate_rps must be positive in poisson arrival mode")
     if config.metrics_interval_seconds <= 0:
         raise BenchError("metrics_interval_seconds must be positive")
-    if config.metrics_url is not None and not config.metrics_url.startswith(("http://", "https://")):
+    if config.metrics_url is not None and not config.metrics_url.startswith(
+        ("http://", "https://")
+    ):
         raise BenchError("metrics_url must start with http:// or https://")
     if config.kvcast_mode == "retry-storm":
         if config.burst_multiplier <= 0:
@@ -1156,8 +1274,14 @@ def _customer_id(spec: RequestSpec) -> str | None:
 
 def _customer_breakdown(metrics: list[RequestMetric]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for customer in sorted({m.customer_id or m.metadata.get("customer_id") or "unknown" for m in metrics}):
-        rows = [m for m in metrics if (m.customer_id or m.metadata.get("customer_id") or "unknown") == customer]
+    for customer in sorted(
+        {m.customer_id or m.metadata.get("customer_id") or "unknown" for m in metrics}
+    ):
+        rows = [
+            m
+            for m in metrics
+            if (m.customer_id or m.metadata.get("customer_id") or "unknown") == customer
+        ]
         success = [m for m in rows if m.success]
         kv_bytes = sum(_estimated_kv_bytes(m) for m in rows)
         evictions = sum(1 for m in rows if (m.metadata or {}).get("prefix_eviction_event"))
@@ -1169,7 +1293,9 @@ def _customer_breakdown(metrics: list[RequestMetric]) -> dict[str, dict[str, Any
             "evictions": evictions,
             "eviction_rate": (evictions / len(rows)) if rows else 0.0,
             "latency_seconds": _percentile_block([m.latency_seconds for m in success]),
-            "ttft_seconds": _percentile_block([m.ttft_seconds for m in success if m.ttft_seconds is not None]),
+            "ttft_seconds": _percentile_block(
+                [m.ttft_seconds for m in success if m.ttft_seconds is not None]
+            ),
         }
     return out
 
@@ -1246,7 +1372,9 @@ async def _sleep_until_active_window(
         await asyncio.sleep(sleep_seconds)
 
 
-def _idle_active_phase(elapsed_seconds: float, active_window_seconds: float, idle_window_seconds: float) -> str:
+def _idle_active_phase(
+    elapsed_seconds: float, active_window_seconds: float, idle_window_seconds: float
+) -> str:
     cycle = active_window_seconds + idle_window_seconds
     if cycle <= 0:
         return "active"
@@ -1261,7 +1389,10 @@ def _active_fraction(active_window_seconds: float, idle_window_seconds: float) -
 def _should_emit_customer_timeline(config: BenchConfig, metrics: list[RequestMetric]) -> bool:
     if config.command in {"kvcast", "kv-stress", "cold-start"}:
         return bool(metrics)
-    return any(m.customer_id or m.metadata.get("customer_id") or m.metadata.get("tenant_id") for m in metrics)
+    return any(
+        m.customer_id or m.metadata.get("customer_id") or m.metadata.get("tenant_id")
+        for m in metrics
+    )
 
 
 def _append_customer_kv_timeline(
@@ -1319,22 +1450,40 @@ def _cold_start_summary(metrics: list[RequestMetric]) -> dict[str, Any]:
             "first_100_request_ttft_seconds": [],
         }
     start = min(m.start_time for m in metrics)
-    first_60 = [m.ttft_seconds for m in metrics if m.ttft_seconds is not None and m.end_time - start <= 60]
-    steady = [m.ttft_seconds for m in metrics if m.ttft_seconds is not None and m.end_time - start > 60]
+    first_60 = [
+        m.ttft_seconds for m in metrics if m.ttft_seconds is not None and m.end_time - start <= 60
+    ]
+    steady = [
+        m.ttft_seconds for m in metrics if m.ttft_seconds is not None and m.end_time - start > 60
+    ]
     if not steady:
-        steady = [m.ttft_seconds for m in metrics if m.ttft_seconds is not None][-max(1, len(first_60) // 2) :]
+        steady = [m.ttft_seconds for m in metrics if m.ttft_seconds is not None][
+            -max(1, len(first_60) // 2) :
+        ]
     return {
-        "model_load_seconds": min((m.start_time - start for m in metrics if m.success), default=0.0),
-        "cuda_graph_capture_seconds": min(60.0, max((m.end_time - start for m in metrics[:100]), default=0.0)),
-        "cudagraph_capture_seconds": min(60.0, max((m.end_time - start for m in metrics[:100]), default=0.0)),
-        "first_successful_request_seconds": min((m.end_time - start for m in metrics if m.success), default=None),
+        "model_load_seconds": min(
+            (m.start_time - start for m in metrics if m.success), default=0.0
+        ),
+        "cuda_graph_capture_seconds": min(
+            60.0, max((m.end_time - start for m in metrics[:100]), default=0.0)
+        ),
+        "cudagraph_capture_seconds": min(
+            60.0, max((m.end_time - start for m in metrics[:100]), default=0.0)
+        ),
+        "first_successful_request_seconds": min(
+            (m.end_time - start for m in metrics if m.success), default=None
+        ),
         "first_60s_p99_ttft_seconds": _percentile([v for v in first_60 if v is not None], 99),
         "steady_state_p99_ttft_seconds": _percentile([v for v in steady if v is not None], 99),
-        "first_100_request_ttft_seconds": [m.ttft_seconds for m in metrics[:100] if m.ttft_seconds is not None],
+        "first_100_request_ttft_seconds": [
+            m.ttft_seconds for m in metrics[:100] if m.ttft_seconds is not None
+        ],
     }
 
 
-def _oom_giant_prefill_summary(config: BenchConfig, metrics: list[RequestMetric]) -> dict[str, Any] | None:
+def _oom_giant_prefill_summary(
+    config: BenchConfig, metrics: list[RequestMetric]
+) -> dict[str, Any] | None:
     if config.inject_giant_prefill_tokens is None:
         return None
     injected = [metric for metric in metrics if _is_giant_prefill_metric(metric)]
@@ -1359,7 +1508,9 @@ def _oom_giant_prefill_summary(config: BenchConfig, metrics: list[RequestMetric]
         and metric.end_time >= giant.start_time
     ]
     killed_in_flight = [metric for metric in overlapping if not metric.success]
-    after_success = [metric for metric in metrics if metric.success and metric.end_time >= giant.end_time]
+    after_success = [
+        metric for metric in metrics if metric.success and metric.end_time >= giant.end_time
+    ]
     recovery = min((metric.end_time - giant.end_time for metric in after_success), default=None)
     if not giant.success and recovery is None:
         blast_radius = "engine_hang_or_no_recovery"
@@ -1373,7 +1524,9 @@ def _oom_giant_prefill_summary(config: BenchConfig, metrics: list[RequestMetric]
         "allow_chaos": config.allow_chaos,
         "inject_giant_prefill_tokens": config.inject_giant_prefill_tokens,
         "request_id": giant.request_id,
-        "killed_batch_count": 1 if killed_in_flight or blast_radius.startswith("engine_hang") else 0,
+        "killed_batch_count": 1
+        if killed_in_flight or blast_radius.startswith("engine_hang")
+        else 0,
         "killed_in_flight_count": len(killed_in_flight),
         "engine_recovery_seconds": recovery,
         "engine": engine,
@@ -1382,7 +1535,9 @@ def _oom_giant_prefill_summary(config: BenchConfig, metrics: list[RequestMetric]
         "giant_prefill_error": giant.error,
         "batch_state_before": {
             "completed_count": sum(1 for metric in metrics if metric.end_time <= giant.start_time),
-            "success_count": sum(1 for metric in metrics if metric.success and metric.end_time <= giant.start_time),
+            "success_count": sum(
+                1 for metric in metrics if metric.success and metric.end_time <= giant.start_time
+            ),
         },
         "batch_state_during": {
             "in_flight_count": len(overlapping) + 1,
@@ -1449,14 +1604,18 @@ def _idle_active_mix_summary(config: BenchConfig, runtime_seconds: float) -> dic
     }
 
 
-def _retry_storm_summary(config: BenchConfig, metrics: list[RequestMetric], timeline_path: Path) -> dict[str, Any] | None:
+def _retry_storm_summary(
+    config: BenchConfig, metrics: list[RequestMetric], timeline_path: Path
+) -> dict[str, Any] | None:
     if config.kvcast_mode != "retry-storm":
         return None
     burst_rows = [m for m in metrics if isinstance(m.metadata.get("retry_storm"), dict)]
     burst_start = min((m.start_time for m in burst_rows), default=None)
     burst_end = (burst_start + config.burst_window_seconds) if burst_start is not None else None
     burst_metrics = [m for m in burst_rows if burst_end is not None and m.start_time <= burst_end]
-    post_burst_successes = [m for m in burst_rows if burst_end is not None and m.success and m.end_time >= burst_end]
+    post_burst_successes = [
+        m for m in burst_rows if burst_end is not None and m.success and m.end_time >= burst_end
+    ]
     queue_depth_max, preemption_count = _timeline_queue_and_preemption_max(timeline_path)
     return {
         "mode": "retry-storm",
@@ -1465,9 +1624,15 @@ def _retry_storm_summary(config: BenchConfig, metrics: list[RequestMetric], time
         "baseline_rps": config.baseline_rps,
         "burst_peak_qps": config.baseline_rps * config.burst_multiplier,
         "queue_depth_max": queue_depth_max,
-        "recovery_seconds": min((m.end_time - burst_end for m in post_burst_successes), default=None) if burst_end is not None else None,
+        "recovery_seconds": min(
+            (m.end_time - burst_end for m in post_burst_successes), default=None
+        )
+        if burst_end is not None
+        else None,
         "preemption_count": preemption_count,
-        "burst_success_rate": (sum(1 for m in burst_metrics if m.success) / len(burst_metrics)) if burst_metrics else None,
+        "burst_success_rate": (sum(1 for m in burst_metrics if m.success) / len(burst_metrics))
+        if burst_metrics
+        else None,
         "burst_request_count": len(burst_metrics),
     }
 
@@ -1509,7 +1674,11 @@ def _canary_quality_summary(config: BenchConfig) -> dict[str, Any] | None:
     if canary_accuracy is None and canary_values:
         canary_accuracy = sum(1 for value in canary_values if value) / len(canary_values)
     sample_count = max(len(canary_values), len(baseline_values), len(rows))
-    delta = (baseline_accuracy - canary_accuracy) if baseline_accuracy is not None and canary_accuracy is not None else None
+    delta = (
+        (baseline_accuracy - canary_accuracy)
+        if baseline_accuracy is not None and canary_accuracy is not None
+        else None
+    )
     p_value = _two_proportion_p_value(
         baseline_accuracy,
         canary_accuracy,
@@ -1527,7 +1696,9 @@ def _canary_quality_summary(config: BenchConfig) -> dict[str, Any] | None:
     }
 
 
-def _tool_call_schema_summary(config: BenchConfig, metrics: list[RequestMetric]) -> dict[str, Any] | None:
+def _tool_call_schema_summary(
+    config: BenchConfig, metrics: list[RequestMetric]
+) -> dict[str, Any] | None:
     if config.tool_call_schema is None:
         return None
     try:
@@ -1544,7 +1715,9 @@ def _tool_call_schema_summary(config: BenchConfig, metrics: list[RequestMetric])
             "eval_sample_count": 0,
         }
     schema_id = str(schema.get("$id") or schema.get("id") or config.tool_call_schema.stem)
-    baseline = _float_or_none(schema.get("x-baseline-compliance-rate") or schema.get("baseline_compliance_rate"))
+    baseline = _float_or_none(
+        schema.get("x-baseline-compliance-rate") or schema.get("baseline_compliance_rate")
+    )
     rows = [m for m in metrics if m.success and m.metadata.get("phase") != "warmup"]
     checked = 0
     compliant = 0
@@ -1705,7 +1878,11 @@ def _timeline_queue_and_preemption_max(path: Path) -> tuple[int | None, int | No
     queue_values: list[float] = []
     preemption_values: list[float] = []
     for record in _read_timeline_jsonl(path):
-        snapshot = record.get("disagg_snapshot") if isinstance(record.get("disagg_snapshot"), dict) else record
+        snapshot = (
+            record.get("disagg_snapshot")
+            if isinstance(record.get("disagg_snapshot"), dict)
+            else record
+        )
         if not isinstance(snapshot, dict):
             continue
         queue = snapshot.get("requests_waiting", snapshot.get("queue_depth"))
@@ -1738,7 +1915,9 @@ def _read_timeline_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _chaos_recovery_summary(config: BenchConfig, runtime_seconds: float, metrics: list[RequestMetric] | None = None) -> dict[str, Any] | None:
+def _chaos_recovery_summary(
+    config: BenchConfig, runtime_seconds: float, metrics: list[RequestMetric] | None = None
+) -> dict[str, Any] | None:
     if config.inject_crash_after_seconds is None:
         return None
     # Implements S-03 engine crash recovery (see docs/inferguard/24).

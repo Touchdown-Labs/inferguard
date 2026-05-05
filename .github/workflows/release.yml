@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
 
@@ -35,15 +35,16 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME#v}"
           VERSION=$(python - <<'PY'
-import re
-from pathlib import Path
-text = Path("src/inferguard/__init__.py").read_text(encoding="utf-8")
-m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
-if not m:
-    raise SystemExit("Could not find __version__ in src/inferguard/__init__.py")
-print(m.group(1))
-PY
-)
+          import re
+          from pathlib import Path
+
+          text = Path("src/inferguard/__init__.py").read_text(encoding="utf-8")
+          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+          if not m:
+              raise SystemExit("Could not find __version__ in src/inferguard/__init__.py")
+          print(m.group(1))
+          PY
+          )
           echo "Tag version: ${TAG}"
           echo "Package version: ${VERSION}"
           test "${TAG}" = "${VERSION}"
@@ -53,15 +54,15 @@ PY
         run: |
           set -euo pipefail
           python - <<'PY'
-import tomli
-from inferguard import __version__
+          import tomli
+          from inferguard import __version__
 
-pyproject = tomli.loads(open("pyproject.toml", encoding="utf-8").read())
-assert pyproject["project"]["version"] == __version__, (
-    f"version mismatch: pyproject={pyproject['project']['version']} vs __init__={__version__}"
-)
-print("version match OK:", __version__)
-PY
+          pyproject = tomli.loads(open("pyproject.toml", encoding="utf-8").read())
+          assert pyproject["project"]["version"] == __version__, (
+              f"version mismatch: pyproject={pyproject['project']['version']} vs __init__={__version__}"
+          )
+          print("version match OK:", __version__)
+          PY
 
       - name: Install build tooling
         run: pip install build twine
@@ -72,8 +73,33 @@ PY
       - name: Twine check
         run: twine check dist/*
 
+      - name: pip-audit (vulnerability check)
+        run: |
+          pip install pip-audit
+          pip-audit . --desc --strict
+
+      - name: bandit (SAST)
+        run: |
+          pip install bandit
+          bandit -r src/inferguard -ll
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        with:
+          path: .
+          format: spdx-json
+          output-file: inferguard-${{ github.ref_name }}-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sbom
+          path: inferguard-${{ github.ref_name }}-sbom.spdx.json
+
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
           repository-url: https://test.pypi.org/legacy/
 
@@ -89,7 +115,14 @@ PY
           inferguard-mcp --help
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+
+      - name: Sigstore sign artifacts
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
+        with:
+          inputs: dist/*.whl dist/*.tar.gz
+          upload-signing-artifacts: true
+          release-signing-artifacts: false
 
       - name: Prepare release notes from CHANGELOG
         shell: bash
@@ -101,9 +134,10 @@ PY
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           body_path: RELEASE_NOTES.md
           generate_release_notes: true
           files: |
             dist/*
+            inferguard-${{ github.ref_name }}-sbom.spdx.json

@@ -12,7 +12,9 @@ def test_slurm_scripts_parse_with_bash_n() -> None:
     scripts = sorted(SLURM_DIR.glob("*.sh")) + sorted(SLURM_DIR.glob("*.sbatch"))
     assert len(scripts) >= 7
     for script in scripts:
-        completed = subprocess.run(["bash", "-n", str(script)], text=True, capture_output=True, check=False)
+        completed = subprocess.run(
+            ["bash", "-n", str(script)], text=True, capture_output=True, check=False
+        )
         assert completed.returncode == 0, f"{script}: {completed.stderr}"
 
 
@@ -50,5 +52,7 @@ def test_matrix_runner_renders_sbatch_without_unexpanded_required_variables(tmp_
         assert "${LMCACHE_SLURM_ACCOUNT" not in text
         assert "export LMCACHE_MODEL_PATH=" in text
         assert "submit_lmcache_kv_stress.sbatch" in text
-        completed = subprocess.run(["bash", "-n", str(path)], text=True, capture_output=True, check=False)
+        completed = subprocess.run(
+            ["bash", "-n", str(path)], text=True, capture_output=True, check=False
+        )
         assert completed.returncode == 0, f"{path}: {completed.stderr}"

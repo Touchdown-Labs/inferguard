@@ -62,7 +62,9 @@ def atomic_write_json(path: str | Path, obj: Any) -> None:
     atomic_write_text(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
 
 
-def load_json_object(path: str | Path | None, *, logger: logging.Logger | None = None) -> dict[str, Any] | None:
+def load_json_object(
+    path: str | Path | None, *, logger: logging.Logger | None = None
+) -> dict[str, Any] | None:
     """Best-effort JSON object reader used by operator-facing report paths.
 
     Truncated JSON, missing files, non-UTF8 content, and non-object payloads are

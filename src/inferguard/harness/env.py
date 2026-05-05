@@ -502,16 +502,16 @@ def _detect_lambda(
     base: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     lambda_keys = [
-        key
-        for key in env
-        if key.startswith("LAMBDA_") and key not in _LAMBDA_SERVERLESS_KEYS
+        key for key in env if key.startswith("LAMBDA_") and key not in _LAMBDA_SERVERLESS_KEYS
     ]
     hostname = env.get("HOSTNAME", "").lower()
     label_haystack = " ".join(labels.values()).lower()
     hostname_signal = any(
         token in hostname for token in ("lambda-cloud", "lambda-gpu", "lambda-1click", "one-click")
     )
-    label_signal = "lambda" in label_haystack and ("1click" in label_haystack or "one-click" in label_haystack)
+    label_signal = "lambda" in label_haystack and (
+        "1click" in label_haystack or "one-click" in label_haystack
+    )
     one_click = (
         _truthy(_first(env, "LAMBDA_ONE_CLICK", "LAMBDA_1CLICK_CLUSTER"))
         or hostname_signal

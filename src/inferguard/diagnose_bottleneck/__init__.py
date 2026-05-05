@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-from inferguard.io import atomic_write_json
 from inferguard.diagnose_bottleneck.render import (
     render_bottleneck_diagnosis_markdown,
     render_diagnosis_markdown,
@@ -21,6 +20,7 @@ from inferguard.diagnose_bottleneck.types import (
     Evidence,
     Verdict,
 )
+from inferguard.io import atomic_write_json
 
 DIAGNOSIS_JSON_FILENAME = "bottleneck_diagnosis.json"
 DIAGNOSIS_MARKDOWN_FILENAME = "bottleneck_diagnosis.md"

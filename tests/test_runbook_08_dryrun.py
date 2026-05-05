@@ -29,7 +29,9 @@ def test_runbook_08_dryrun_script_emits_packet(tmp_path: Path) -> None:
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert (results_root / "inferguard_report" / "report.json").exists()
     assert (results_root / "inferguard_report" / "operator_brief.md").exists()
-    assert (results_root / "compare" / "vllm-coding-long-native-vs-lmcache" / "compare.json").exists()
+    assert (
+        results_root / "compare" / "vllm-coding-long-native-vs-lmcache" / "compare.json"
+    ).exists()
     packet_index = results_root / "packets" / "packet_index.csv"
     assert packet_index.exists()
     packets = sorted((results_root / "packets").glob("private-repro_*.zip"))

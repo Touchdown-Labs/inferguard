@@ -296,10 +296,7 @@ def _prefix_hit_rate_finding(deltas: dict[str, int | float]) -> ProfileFinding |
     return ProfileFinding(
         code="profile_prefix_hit_rate_low",
         severity=severity,
-        message=(
-            f"prefix cache hit-rate delta was {rate:.0%} "
-            f"over {queries_delta:g} queries"
-        ),
+        message=(f"prefix cache hit-rate delta was {rate:.0%} over {queries_delta:g} queries"),
         evidence={
             "prefix_cache_hits_delta": hits_delta,
             "prefix_cache_queries_delta": queries_delta,
@@ -396,7 +393,9 @@ def _dedupe_findings(findings: list[ProfileFinding]) -> list[ProfileFinding]:
 def _recommendation(findings: list[ProfileFinding]) -> str:
     codes = {finding.code for finding in findings}
     if "profile_metrics_unavailable" in codes:
-        return "Metrics were unavailable; verify the endpoint base URL and that /metrics is exposed."
+        return (
+            "Metrics were unavailable; verify the endpoint base URL and that /metrics is exposed."
+        )
     if "profile_kv_cache_critical" in codes or (
         "profile_kv_cache_high" in codes and "profile_preemptions_rising" in codes
     ):

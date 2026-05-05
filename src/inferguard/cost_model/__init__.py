@@ -10,7 +10,13 @@ from typing import Any
 from inferguard.io import load_json_object
 
 from .envelope import derive_safe_concurrency_envelope
-from .types import COST_REPORT_SCHEMA_VERSION, CostInput, CostReport, SafeConcurrencyEnvelope, UsefulTaskMetric
+from .types import (
+    COST_REPORT_SCHEMA_VERSION,
+    CostInput,
+    CostReport,
+    SafeConcurrencyEnvelope,
+    UsefulTaskMetric,
+)
 from .useful_task import compute_useful_task_metric, load_useful_task_definition
 
 _COST_INPUT_MISSING_REASON = "not_proven — cost input not supplied"
@@ -37,13 +43,19 @@ def compute_cost(
     root = Path(results_root).resolve()
     validation_status = _validation_status(root)
     validation_reason = (
-        None if validation_status == "live_complete" else f"{_LIVE_COMPLETE_REQUIRED_REASON} (status={validation_status})"
+        None
+        if validation_status == "live_complete"
+        else f"{_LIVE_COMPLETE_REQUIRED_REASON} (status={validation_status})"
     )
     try:
         cost = _coerce_cost_input(cost_input)
         slo_data = _load_slo(slo)
-        envelope_ttft_ms = _first_number(slo_ttft_ms, _slo_value(slo_data, "slo_ttft_ms", "ttft_ms_p99"))
-        envelope_e2e_ms = _first_number(slo_e2e_ms, _slo_value(slo_data, "slo_e2e_ms", "e2e_latency_ms_p99"))
+        envelope_ttft_ms = _first_number(
+            slo_ttft_ms, _slo_value(slo_data, "slo_ttft_ms", "ttft_ms_p99")
+        )
+        envelope_e2e_ms = _first_number(
+            slo_e2e_ms, _slo_value(slo_data, "slo_e2e_ms", "e2e_latency_ms_p99")
+        )
         useful_ttft_ms = _first_number(useful_task_slo_ttft_ms, envelope_ttft_ms)
         useful_definition = load_useful_task_definition(
             useful_task_definition,
@@ -119,7 +131,11 @@ def compute_cost(
         throughput=throughput,
         envelope_status=envelope.claim_status,
     )
-    claim_status = "measured" if cost_per_completion is not None and cost_per_useful is not None else "not_proven"
+    claim_status = (
+        "measured"
+        if cost_per_completion is not None and cost_per_useful is not None
+        else "not_proven"
+    )
     if validation_reason and claim_status == "measured":
         claim_status = "inferred"
         field_status = _downgrade_measured_statuses(field_status)
@@ -402,7 +418,9 @@ def _load_job(root: Path, spec: dict[str, Any]) -> dict[str, Any]:
         "metrics_path": _rel(metrics_path, root) if metrics_path else None,
         "operator_profile_path": _rel(profile_path, root) if profile_path else None,
         "sku": sku,
-        "engine": spec.get("engine") or request_summary.get("engine") or metrics_summary.get("engine"),
+        "engine": spec.get("engine")
+        or request_summary.get("engine")
+        or metrics_summary.get("engine"),
     }
 
 
@@ -415,10 +433,13 @@ def _enrich_request_rows(
     request_count = _int_value(summary.get("request_count")) or len(rows)
     success_count = _int_value(summary.get("success_count")) or request_count
     prompt_avg = _safe_div(_number(summary.get("prompt_tokens_total")) or 0.0, request_count) or 0.0
-    completion_avg = _safe_div(
-        _number(summary.get("completion_tokens_total")) or 0.0,
-        success_count,
-    ) or 0.0
+    completion_avg = (
+        _safe_div(
+            _number(summary.get("completion_tokens_total")) or 0.0,
+            success_count,
+        )
+        or 0.0
+    )
     enriched: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
@@ -468,7 +489,9 @@ def _job_cost(job: dict[str, Any], rate: float) -> dict[str, Any]:
     }
 
 
-def _accumulate_totals(totals: dict[str, float], job: dict[str, Any], job_cost: dict[str, Any]) -> None:
+def _accumulate_totals(
+    totals: dict[str, float], job: dict[str, Any], job_cost: dict[str, Any]
+) -> None:
     totals["total_gpu_hours"] += float(job_cost["gpu_hours"])
     totals["gpu_seconds_total"] += float(job_cost["gpu_seconds"])
     totals["total_cost_usd"] += float(job_cost["total_cost_usd"])
@@ -560,7 +583,10 @@ def _job_envelope_levels(job: dict[str, Any]) -> list[dict[str, Any]]:
                 "success_rate": len(successes) / len(level_rows) if level_rows else None,
                 "p99_ttft_ms": _percentile([_number(row.get("ttft_ms")) for row in successes], 99),
                 "p99_e2e_ms": _percentile(
-                    [_number(row.get("e2e_latency_ms") or row.get("latency_ms")) for row in successes],
+                    [
+                        _number(row.get("e2e_latency_ms") or row.get("latency_ms"))
+                        for row in successes
+                    ],
                     99,
                 ),
                 "source": job.get("request_rows_path"),
@@ -654,15 +680,21 @@ def _field_statuses(
     not_proven = "not_proven"
     completion_status = measured if cost_per_completion is not None else not_proven
     return {
-        "cost_per_million_prompt_tokens_usd": measured if cost_per_prompt is not None else not_proven,
+        "cost_per_million_prompt_tokens_usd": measured
+        if cost_per_prompt is not None
+        else not_proven,
         "cost_per_million_completion_tokens_usd": completion_status,
         "cost_per_million_generated_tokens_usd": completion_status,
         "cost_per_million_prompt_tokens": measured if cost_per_prompt is not None else not_proven,
         "cost_per_million_generated_tokens": completion_status,
         "cost_per_useful_task_usd": measured if cost_per_useful is not None else not_proven,
         "cost_per_useful_task": measured if cost_per_useful is not None else not_proven,
-        "failed_request_waste_percent": measured if failed_waste_percent is not None else not_proven,
-        "failed_request_waste_dollars": measured if failed_waste_percent is not None else not_proven,
+        "failed_request_waste_percent": measured
+        if failed_waste_percent is not None
+        else not_proven,
+        "failed_request_waste_dollars": measured
+        if failed_waste_percent is not None
+        else not_proven,
         "gpu_hour_normalized_throughput": measured if throughput is not None else not_proven,
         "safe_concurrency_envelope": envelope_status,
     }

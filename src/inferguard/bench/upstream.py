@@ -59,7 +59,9 @@ def run_upstream(config: UpstreamBenchConfig) -> dict[str, Any]:
     run_id = _run_id(f"upstream-{config.engine}-{config.profile}")
     output_dir = config.output_dir
     if output_dir.exists() and any(output_dir.iterdir()) and not config.force:
-        raise BenchError(f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)")
+        raise BenchError(
+            f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)"
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     started_at = _now_iso()
@@ -89,7 +91,9 @@ def run_upstream(config: UpstreamBenchConfig) -> dict[str, Any]:
 
     stdout_path.write_text(completed.stdout or "", encoding="utf-8")
     stderr_path.write_text(completed.stderr or "", encoding="utf-8")
-    upstream_data = _parse_json_payload(completed.stdout) or _parse_json_payload(completed.stderr) or {}
+    upstream_data = (
+        _parse_json_payload(completed.stdout) or _parse_json_payload(completed.stderr) or {}
+    )
     _write_json(upstream_json_path, upstream_data)
     _write_json(
         config_path,
@@ -106,7 +110,9 @@ def run_upstream(config: UpstreamBenchConfig) -> dict[str, Any]:
     _write_requests(requests_path, requests)
     metric_rows = _metric_rows(upstream_data, config, run_id, completed.returncode, runtime_seconds)
     _write_jsonl(metrics_path, metric_rows)
-    summary = _summary(upstream_data, config, run_id, completed.returncode, runtime_seconds, metric_rows)
+    summary = _summary(
+        upstream_data, config, run_id, completed.returncode, runtime_seconds, metric_rows
+    )
     _write_json(summary_path, summary)
 
     run = {
@@ -159,7 +165,9 @@ def _validate_config(config: UpstreamBenchConfig) -> None:
 
 def _build_command(config: UpstreamBenchConfig) -> list[str]:
     if config.engine == "vllm":
-        dataset_name = "prefix_repetition" if config.profile == "prefix-repetition" else config.profile
+        dataset_name = (
+            "prefix_repetition" if config.profile == "prefix-repetition" else config.profile
+        )
         command = [
             "vllm",
             "bench",
@@ -247,8 +255,12 @@ def _metric_rows(
     returncode: int,
     runtime_seconds: float,
 ) -> list[dict[str, Any]]:
-    total = _int_first(data, "num_requests", "total_num_prompts", "num_prompts", default=config.num_prompts)
-    success = 0 if returncode else _int_first(data, "successful_requests", "completed", default=total)
+    total = _int_first(
+        data, "num_requests", "total_num_prompts", "num_prompts", default=config.num_prompts
+    )
+    success = (
+        0 if returncode else _int_first(data, "successful_requests", "completed", default=total)
+    )
     failed = max(total - success, 0)
     row = {
         "schema_version": METRIC_SCHEMA_VERSION,
@@ -280,8 +292,12 @@ def _summary(
     runtime_seconds: float,
     metric_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    total = _int_first(data, "num_requests", "total_num_prompts", "num_prompts", default=config.num_prompts)
-    success = 0 if returncode else _int_first(data, "successful_requests", "completed", default=total)
+    total = _int_first(
+        data, "num_requests", "total_num_prompts", "num_prompts", default=config.num_prompts
+    )
+    success = (
+        0 if returncode else _int_first(data, "successful_requests", "completed", default=total)
+    )
     failed = max(total - success, 0)
     input_total = _int_first(data, "total_input_tokens", "input_tokens", default=0)
     output_total = _int_first(data, "total_output_tokens", "output_tokens", default=0)
@@ -335,7 +351,9 @@ def _summary(
                 "success": success,
                 "failed": failed,
                 "latency_seconds": {
-                    "p50": _seconds_first(data, "median_e2el_ms", "median_latency_ms", "mean_e2el_ms"),
+                    "p50": _seconds_first(
+                        data, "median_e2el_ms", "median_latency_ms", "mean_e2el_ms"
+                    ),
                     "p95": _seconds_first(data, "p95_e2el_ms", "p95_latency_ms", "mean_e2el_ms"),
                     "p99": _seconds_first(data, "p99_e2el_ms", "p99_latency_ms", "mean_e2el_ms"),
                 },
@@ -347,7 +365,9 @@ def _summary(
                 "throughput_req_per_second": _float_first(data, "request_throughput"),
             }
         ],
-        "workloads": {f"upstream-{config.profile}": {"total": total, "success": success, "failed": failed}},
+        "workloads": {
+            f"upstream-{config.profile}": {"total": total, "success": success, "failed": failed}
+        },
         "limitations": [
             "Upstream engine-native benchmark output is normalized from the engine CLI JSON/stdout payload.",
             "Per-request rows are present only when the upstream engine emits request-level records.",
@@ -373,7 +393,9 @@ def _write_requests(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8"
+    )
 
 
 def _int_first(data: dict[str, Any], *keys: str, default: int) -> int:

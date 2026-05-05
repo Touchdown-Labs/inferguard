@@ -10,7 +10,7 @@ from typing import Any
 def build_vllm_command(
     model_path: str,
     *,
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     port: int = 8000,
     tensor_parallel_size: int = 1,
     pipeline_parallel_size: int = 1,

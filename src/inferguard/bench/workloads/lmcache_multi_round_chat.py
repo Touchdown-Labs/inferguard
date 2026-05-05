@@ -41,7 +41,11 @@ def generate_records(
     for session in range(sessions):
         history: list[str] = []
         for turn in range(turns):
-            history.append(_synthetic_text(f"chat-{session}-{turn}", max(64, context_length_target // 16), seed))
+            history.append(
+                _synthetic_text(
+                    f"chat-{session}-{turn}", max(64, context_length_target // 16), seed
+                )
+            )
             prompt = f"SYSTEM:\n{system_prompt}\n\nHISTORY:\n" + "\n".join(history)
             jitter = rng.randint(0, 9999)
             records.append(
@@ -59,7 +63,11 @@ def generate_records(
                     prompt=prompt,
                     seed=seed,
                     redact_prompts=redact_prompts,
-                    metadata={"session_index": session, "history_turns": turn + 1, "jitter": jitter},
+                    metadata={
+                        "session_index": session,
+                        "history_turns": turn + 1,
+                        "jitter": jitter,
+                    },
                 )
             )
     return records
@@ -122,7 +130,9 @@ def _synthetic_text(label: str, target_tokens: int, seed: int) -> str:
 
 def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8"
+    )
     return path
 
 

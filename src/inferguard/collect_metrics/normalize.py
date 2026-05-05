@@ -294,7 +294,9 @@ def build_metrics_summary(
 ) -> dict[str, Any]:
     """Build the ``inferguard-metrics-summary/v1`` group dictionary."""
 
-    groups: dict[str, dict[str, Any]] = {group: {"claim_status": "not_proven"} for group in NORMALIZED_GROUPS}
+    groups: dict[str, dict[str, Any]] = {
+        group: {"claim_status": "not_proven"} for group in NORMALIZED_GROUPS
+    }
     engine_by_group: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for row in engine_rows:
         engine_by_group[str(row.get("group"))].append(row)
@@ -336,7 +338,9 @@ def _prefill_group(
     return _group(
         request_prefill_time_seconds=_hist_value(samples, "vllm:request_prefill_time_seconds"),
         prompt_tokens_total=prompt_tokens,
-        prompt_tokens_source=_source_for(observed, "vllm:prompt_tokens_total", "sglang:prompt_tokens_total"),
+        prompt_tokens_source=_source_for(
+            observed, "vllm:prompt_tokens_total", "sglang:prompt_tokens_total"
+        ),
     )
 
 
@@ -376,7 +380,9 @@ def _queue_group(
         requests_running=running,
         requests_waiting=waiting,
         request_queue_time_seconds=_hist_value(samples, "vllm:request_queue_time_seconds"),
-        running_source=_source_for(observed, "vllm:num_requests_running", "sglang:num_running_reqs"),
+        running_source=_source_for(
+            observed, "vllm:num_requests_running", "sglang:num_running_reqs"
+        ),
         waiting_source=_source_for(observed, "vllm:num_requests_waiting", "sglang:num_queue_reqs"),
     )
 
@@ -421,9 +427,7 @@ def _kv_cache_group(
         ),
         dynamo_kvbm_l1_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l1_gpu"}),
         dynamo_kvbm_l2_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l2_cpu"}),
-        dynamo_kvbm_l3_count=_labeled_sum(
-            samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}
-        ),
+        dynamo_kvbm_l3_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}),
         dynamo_l1_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l1_gpu"}),
         dynamo_l2_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l2_cpu"}),
         dynamo_l3_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}),
@@ -475,7 +479,11 @@ def _lmcache_group(
     )
     miss_count = _sum_metric(samples, "lmcache_miss_count", "lmcache:miss_count")
     retrieve_hit_rate = _max_metric(
-        samples, "lmcache:retrieve_hit_rate", "lmcache_retrieve_hit_rate", "lmcache:hit_rate", "lmcache_hit_rate"
+        samples,
+        "lmcache:retrieve_hit_rate",
+        "lmcache_retrieve_hit_rate",
+        "lmcache:hit_rate",
+        "lmcache_hit_rate",
     )
     if retrieve_hit_rate is None and hit_count is not None and miss_count is not None:
         total = hit_count + miss_count
@@ -580,16 +588,22 @@ def _last_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
 
 
 def _max_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
-    values = [sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)]
+    values = [
+        sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)
+    ]
     return max(values) if values else None
 
 
 def _sum_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
-    values = [sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)]
+    values = [
+        sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)
+    ]
     return sum(values) if values else None
 
 
-def _labeled_sum(samples: Iterable[LabeledSample], name: str, labels: Mapping[str, str]) -> float | None:
+def _labeled_sum(
+    samples: Iterable[LabeledSample], name: str, labels: Mapping[str, str]
+) -> float | None:
     values = [
         sample.value
         for sample in samples
@@ -613,7 +627,9 @@ def _hist_value(samples: Iterable[LabeledSample], base_name: str) -> float | Non
 
 def _quantile_value(samples: Iterable[LabeledSample], base_name: str) -> float | None:
     preferred = ("0.95", "0.99", "0.5", "0.50", "p95", "p99", "p50")
-    matches = [sample for sample in samples if sample.name == base_name and "quantile" in sample.labels]
+    matches = [
+        sample for sample in samples if sample.name == base_name and "quantile" in sample.labels
+    ]
     for quantile in preferred:
         for sample in matches:
             if sample.labels.get("quantile") == quantile and math.isfinite(sample.value):
@@ -690,7 +706,9 @@ def _labels_mention_lmcache(sample: LabeledSample) -> bool:
     return any(str(value).startswith("LMCache") for value in sample.labels.values())
 
 
-def _dcgm_original_rows(samples: Iterable[Any]) -> dict[tuple[str | None, int | None], dict[str, float]]:
+def _dcgm_original_rows(
+    samples: Iterable[Any],
+) -> dict[tuple[str | None, int | None], dict[str, float]]:
     rows: dict[tuple[str | None, int | None], dict[str, float]] = defaultdict(dict)
     for sample in samples:
         if sample.name not in DCGM_FIELD_SPECS:

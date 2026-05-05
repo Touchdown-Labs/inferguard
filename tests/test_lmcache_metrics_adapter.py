@@ -36,7 +36,9 @@ def test_lmcache_prometheus_fixture_parses_normalized_fields() -> None:
 
 
 def test_lmcache_adapter_snapshot_exposes_normalized_fields() -> None:
-    snap = _parse_lmcache((FIXTURES / "full.prom").read_text(encoding="utf-8"), url="http://lmcache", role="transfer")
+    snap = _parse_lmcache(
+        (FIXTURES / "full.prom").read_text(encoding="utf-8"), url="http://lmcache", role="transfer"
+    )
 
     assert snap.endpoint.engine == "lmcache"
     assert snap.endpoint.connector == "nixl"
@@ -48,7 +50,11 @@ def test_lmcache_adapter_snapshot_exposes_normalized_fields() -> None:
 
 
 def test_lmcache_unknown_metrics_are_preserved() -> None:
-    snap = _parse_lmcache((FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"), url="http://lmcache", role="prefill")
+    snap = _parse_lmcache(
+        (FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"),
+        url="http://lmcache",
+        role="prefill",
+    )
 
     assert snap.lmcache_hit_rate == 0.625
     assert snap.lmcache_tier_cpu_bytes == 1024
@@ -89,7 +95,9 @@ def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:
                 "topology": {"cache_mode": "lmcache-cpu"},
                 "completion": {"success_rate": 1.0},
                 "metrics": {"p99_ttft": 1.2},
-                "artifacts": {"inferguard_bench_metrics_timeline_jsonl": "cells/lmcache/metrics_timeline.jsonl"},
+                "artifacts": {
+                    "inferguard_bench_metrics_timeline_jsonl": "cells/lmcache/metrics_timeline.jsonl"
+                },
             },
         ],
         "findings": [],

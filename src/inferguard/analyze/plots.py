@@ -8,7 +8,9 @@ from typing import Any
 PLOT_EXTRA_MESSAGE = "Install with: pip install 'inferguard[plot]'"
 
 
-def render_plots(report_dict: dict[str, Any], output_dir: Path, logger: Any | None = None) -> list[Path]:
+def render_plots(
+    report_dict: dict[str, Any], output_dir: Path, logger: Any | None = None
+) -> list[Path]:
     """Render all available report plots into ``output_dir``."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -57,7 +59,9 @@ def plot_throughput_per_gpu(report_dict: dict[str, Any], output_path: Path) -> P
     values: list[float] = []
     for cell in _sorted_cells(report_dict):
         metrics = cell.get("metrics") or {}
-        throughput_per_gpu = _number(metrics.get("output_tput_per_gpu") or metrics.get("tput_per_gpu"))
+        throughput_per_gpu = _number(
+            metrics.get("output_tput_per_gpu") or metrics.get("tput_per_gpu")
+        )
         gpu_count = _gpu_count(cell)
         if throughput_per_gpu is None:
             total_throughput = _number(metrics.get("output_tput_tps"))
@@ -124,7 +128,9 @@ def _save_svg(fig: Any, output_path: Path, plt: Any) -> Path:
 
 def _sorted_cells(report_dict: dict[str, Any]) -> list[dict[str, Any]]:
     cells = report_dict.get("cells") or []
-    return sorted((cell for cell in cells if isinstance(cell, dict)), key=lambda c: str(c.get("cell_id", "")))
+    return sorted(
+        (cell for cell in cells if isinstance(cell, dict)), key=lambda c: str(c.get("cell_id", ""))
+    )
 
 
 def _series_label(cell: dict[str, Any]) -> str:

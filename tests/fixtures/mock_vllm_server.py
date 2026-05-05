@@ -89,7 +89,9 @@ class MockVLLMState:
             self.token_count += max(output_tokens, 1)
             transfer_bytes = max(output_tokens, 1) * (8192 if self.rig_profile == "gb200" else 2048)
             self.kv_sent_bytes += transfer_bytes if self.role == "prefill" else transfer_bytes // 2
-            self.kv_recv_bytes += transfer_bytes // 2 if self.role == "decode" else transfer_bytes // 4
+            self.kv_recv_bytes += (
+                transfer_bytes // 2 if self.role == "decode" else transfer_bytes // 4
+            )
             self.max_cache_usage = max(self.max_cache_usage, self.gpu_cache_usage)
 
     @property
@@ -120,22 +122,22 @@ class MockVLLMState:
         count = max(self.completed_requests, 1)
         token_count = max(self.token_count, 1)
         lines = [
-                "# HELP vllm:gpu_cache_usage_perc Mock GPU KV cache usage.",
-                "# TYPE vllm:gpu_cache_usage_perc gauge",
-                f"vllm:gpu_cache_usage_perc {self.gpu_cache_usage:.6f}",
-                f"vllm:num_requests_running {self.active_requests}",
-                f"vllm:num_requests_waiting {self.waiting_requests}",
-                "vllm:num_requests_swapped 0",
-                "vllm:num_preemptions_total 0",
-                f'vllm:kv_transfer_sent_bytes_total{{connector="nixl"}} {self.kv_sent_bytes}',
-                f'vllm:kv_transfer_recv_bytes_total{{connector="nixl"}} {self.kv_recv_bytes}',
-                f'vllm:kv_transfer_errors_total{{connector="nixl"}} {self.kv_errors}',
-                f"vllm:time_to_first_token_seconds_sum {self.ttft_sum:.6f}",
-                f"vllm:time_to_first_token_seconds_count {count}",
-                f"vllm:time_per_output_token_seconds_sum {self.tpot_sum:.6f}",
-                f"vllm:time_per_output_token_seconds_count {token_count}",
-                "",
-            ]
+            "# HELP vllm:gpu_cache_usage_perc Mock GPU KV cache usage.",
+            "# TYPE vllm:gpu_cache_usage_perc gauge",
+            f"vllm:gpu_cache_usage_perc {self.gpu_cache_usage:.6f}",
+            f"vllm:num_requests_running {self.active_requests}",
+            f"vllm:num_requests_waiting {self.waiting_requests}",
+            "vllm:num_requests_swapped 0",
+            "vllm:num_preemptions_total 0",
+            f'vllm:kv_transfer_sent_bytes_total{{connector="nixl"}} {self.kv_sent_bytes}',
+            f'vllm:kv_transfer_recv_bytes_total{{connector="nixl"}} {self.kv_recv_bytes}',
+            f'vllm:kv_transfer_errors_total{{connector="nixl"}} {self.kv_errors}',
+            f"vllm:time_to_first_token_seconds_sum {self.ttft_sum:.6f}",
+            f"vllm:time_to_first_token_seconds_count {count}",
+            f"vllm:time_per_output_token_seconds_sum {self.tpot_sum:.6f}",
+            f"vllm:time_per_output_token_seconds_count {token_count}",
+            "",
+        ]
         if self.enable_lmcache:
             lines.extend(
                 [
@@ -369,11 +371,15 @@ def _chat_completions(state: MockVLLMState):
         if state.should_fail(messages, sequence):
             await asyncio.sleep(0.01)
             await state.end_request(output_tokens=0, failed=True)
-            return web.json_response({"error": {"message": "simulated workload failure"}}, status=500)
+            return web.json_response(
+                {"error": {"message": "simulated workload failure"}}, status=500
+            )
 
         if not payload.get("stream", False):
             try:
-                await asyncio.sleep(state.profile["ttft"] + state.profile["tpot"] * max(1, max_tokens))
+                await asyncio.sleep(
+                    state.profile["ttft"] + state.profile["tpot"] * max(1, max_tokens)
+                )
                 body: dict[str, Any] = {
                     "choices": [
                         {"message": {"role": "assistant", "content": _completion_text(max_tokens)}}
@@ -393,7 +399,9 @@ def _chat_completions(state: MockVLLMState):
         await response.prepare(request)
         try:
             stream_options = payload.get("stream_options") if isinstance(payload, dict) else {}
-            include_usage = bool(isinstance(stream_options, dict) and stream_options.get("include_usage"))
+            include_usage = bool(
+                isinstance(stream_options, dict) and stream_options.get("include_usage")
+            )
             continuous_usage = bool(
                 isinstance(stream_options, dict) and stream_options.get("continuous_usage_stats")
             )
@@ -434,7 +442,9 @@ async def _write_sse(response: web.StreamResponse, payload: dict[str, Any]) -> N
     await response.write(f"data: {json.dumps(payload, separators=(',', ':'))}\n\n".encode())
 
 
-def _usage(messages: list[dict[str, Any]], max_tokens: int, state: MockVLLMState) -> dict[str, int] | None:
+def _usage(
+    messages: list[dict[str, Any]], max_tokens: int, state: MockVLLMState
+) -> dict[str, int] | None:
     if state.suppress_usage:
         return None
     prompt_tokens = _estimate_prompt_tokens(messages)

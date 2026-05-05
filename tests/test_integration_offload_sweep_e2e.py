@@ -101,7 +101,11 @@ def _run_offload_sweep(
 
 
 def _bash_executable() -> str:
-    for candidate in (Path("/opt/homebrew/bin/bash"), Path("/usr/local/bin/bash"), Path("/bin/bash")):
+    for candidate in (
+        Path("/opt/homebrew/bin/bash"),
+        Path("/usr/local/bin/bash"),
+        Path("/bin/bash"),
+    ):
         if candidate.exists():
             return str(candidate)
     return "bash"

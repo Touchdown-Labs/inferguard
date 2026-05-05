@@ -145,17 +145,32 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.5"}, "type": "float"},
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.50"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.5"}, "type": "float"},
-        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.5"}, "type": "float", "convert": "seconds_to_ms"},
+        {
+            "name": "lmcache_retrieve_latency_seconds",
+            "labels": {"quantile": "0.5"},
+            "type": "float",
+            "convert": "seconds_to_ms",
+        },
     ),
     "lmcache_retrieve_latency_ms_p95": (
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.95"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.95"}, "type": "float"},
-        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.95"}, "type": "float", "convert": "seconds_to_ms"},
+        {
+            "name": "lmcache_retrieve_latency_seconds",
+            "labels": {"quantile": "0.95"},
+            "type": "float",
+            "convert": "seconds_to_ms",
+        },
     ),
     "lmcache_retrieve_latency_ms_p99": (
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.99"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.99"}, "type": "float"},
-        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.99"}, "type": "float", "convert": "seconds_to_ms"},
+        {
+            "name": "lmcache_retrieve_latency_seconds",
+            "labels": {"quantile": "0.99"},
+            "type": "float",
+            "convert": "seconds_to_ms",
+        },
     ),
     "lmcache_nixl_transfer_bytes": (
         {"name": "lmcache:nixl_transfer_bytes", "type": "int"},
@@ -165,7 +180,11 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_nixl_transfer_latency_ms": (
         {"name": "lmcache:nixl_transfer_latency_ms", "type": "float"},
         {"name": "lmcache_nixl_transfer_latency_ms", "type": "float"},
-        {"name": "lmcache_nixl_transfer_latency_seconds", "type": "float", "convert": "seconds_to_ms"},
+        {
+            "name": "lmcache_nixl_transfer_latency_seconds",
+            "type": "float",
+            "convert": "seconds_to_ms",
+        },
     ),
     "lmcache_remote_bytes_sent": (
         {"name": "lmcache:remote_bytes_sent_total", "type": "int"},
@@ -227,7 +246,9 @@ def parse_lmcache_prometheus(text: str) -> LmcacheMetrics:
     return LmcacheMetrics(**values)
 
 
-def _first_alias(samples: list[LabeledSample], aliases: tuple[dict[str, Any], ...]) -> tuple[Any | None, set[str]]:
+def _first_alias(
+    samples: list[LabeledSample], aliases: tuple[dict[str, Any], ...]
+) -> tuple[Any | None, set[str]]:
     seen: set[str] = set()
     for alias in aliases:
         for sample in samples:

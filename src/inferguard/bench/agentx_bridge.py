@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import subprocess
 import sys
 import time
@@ -94,8 +93,13 @@ def run_agentx_replay(config: AgentXReplayConfig) -> dict[str, Any]:
         },
     )
 
-    with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
-        completed = subprocess.run(command, cwd=str(tester_script.parent), stdout=stdout, stderr=stderr, check=False)
+    with (
+        stdout_path.open("w", encoding="utf-8") as stdout,
+        stderr_path.open("w", encoding="utf-8") as stderr,
+    ):
+        completed = subprocess.run(
+            command, cwd=str(tester_script.parent), stdout=stdout, stderr=stderr, check=False
+        )
     if completed.returncode != 0:
         raise BenchError(
             f"AgentX trace replay tester failed with exit code {completed.returncode}; "
@@ -155,7 +159,11 @@ def run_agentx_replay(config: AgentXReplayConfig) -> dict[str, Any]:
             "agentx_detailed_results_csv": str(detailed_path),
             "agentx_stdout_log": str(stdout_path),
             "agentx_stderr_log": str(stderr_path),
-            **({"agentx_metrics_server_metrics_csv": str(server_metrics_path)} if server_metrics_path else {}),
+            **(
+                {"agentx_metrics_server_metrics_csv": str(server_metrics_path)}
+                if server_metrics_path
+                else {}
+            ),
         },
     }
     _write_json(run_path, run)

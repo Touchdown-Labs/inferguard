@@ -49,7 +49,9 @@ def test_operator_brief_emits_required_keys_and_cliffs(tmp_path) -> None:
 
     report = analyze_results(
         tmp_path,
-        AnalyzeOptions(output_dir=tmp_path / "inferguard_report", output_format="both", operator_brief=True),
+        AnalyzeOptions(
+            output_dir=tmp_path / "inferguard_report", output_format="both", operator_brief=True
+        ),
     )
 
     brief_path = tmp_path / "inferguard_report" / "operator_brief.json"
@@ -61,7 +63,10 @@ def test_operator_brief_emits_required_keys_and_cliffs(tmp_path) -> None:
     assert brief["best_stable_config"][0]["cell_id"] == "c2"
     assert brief["cliff_detection"]["ttft_p99"][0]["cell_id"] == "c4"
     assert brief["cliff_detection"]["failure"][0]["cell_id"] == "c8"
-    assert any(item["status"] == "observed" and item["cell_id"] == "c4" for item in brief["cliff_detection"]["oom"])
+    assert any(
+        item["status"] == "observed" and item["cell_id"] == "c4"
+        for item in brief["cliff_detection"]["oom"]
+    )
     assert "recommended_engine_config" in brief
     assert "raw_artifact_paths" in brief
     assert any(path.endswith("report.json") for path in brief["raw_artifact_paths"])
@@ -106,13 +111,18 @@ def test_hma_preflight_finding_appears_in_operator_brief(tmp_path) -> None:
 
     report = analyze_results(
         tmp_path,
-        AnalyzeOptions(output_dir=tmp_path / "inferguard_report", output_format="both", operator_brief=True),
+        AnalyzeOptions(
+            output_dir=tmp_path / "inferguard_report", output_format="both", operator_brief=True
+        ),
     )
 
     assert any(f["code"] == "hma_offload_incompatible" for f in report["findings"])
     brief = json.loads((tmp_path / "inferguard_report" / "operator_brief.json").read_text())
     assert brief["operator_findings"][0]["code"] == "hma_offload_incompatible"
-    assert "hma_offload_incompatible" in (tmp_path / "inferguard_report" / "operator_brief.md").read_text()
+    assert (
+        "hma_offload_incompatible"
+        in (tmp_path / "inferguard_report" / "operator_brief.md").read_text()
+    )
 
 
 def test_operator_brief_defaults_on_when_gpus_cli_flag_is_provided(tmp_path) -> None:
@@ -162,7 +172,9 @@ def test_operator_brief_cost_comparison_table(tmp_path) -> None:
     (run_dir / "requests.jsonl").write_text("{}\n", encoding="utf-8")
     (run_dir / "run.json").write_text("{}\n", encoding="utf-8")
     (run_dir / "config.json").write_text(
-        json.dumps({"model": "mock-dsv4", "topology": {"framework": "vllm", "cache_mode": "native"}}),
+        json.dumps(
+            {"model": "mock-dsv4", "topology": {"framework": "vllm", "cache_mode": "native"}}
+        ),
         encoding="utf-8",
     )
 

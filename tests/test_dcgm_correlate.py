@@ -141,7 +141,9 @@ def test_collect_once_broadcasts_vllm_aggregate_to_each_gpu_row(tmp_path: Path) 
 
 
 @pytest.mark.harness
-def test_empty_dcgm_scrape_emits_null_gpu_row(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_empty_dcgm_scrape_emits_null_gpu_row(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING)
     rows = collect_once(tmp_path, dcgm_text="")
     assert len(rows) == 1

@@ -151,8 +151,12 @@ class OpenAIStreamingChatClient:
         try:
             headers = _request_headers(metadata, self.api_key)
             if not self.stream:
-                return await self._chat_once(http, payload=payload, headers=headers, messages=messages)
-            async with http.stream("POST", self.endpoint, json=payload, headers=headers) as response:
+                return await self._chat_once(
+                    http, payload=payload, headers=headers, messages=messages
+                )
+            async with http.stream(
+                "POST", self.endpoint, json=payload, headers=headers
+            ) as response:
                 status_code = response.status_code
                 response.raise_for_status()
                 async for line in response.aiter_lines():
@@ -226,8 +230,12 @@ class OpenAIStreamingChatClient:
             latency_seconds=end - start,
             ttft_seconds=ttft,
             output_text=output_text,
-            input_tokens=prompt_tokens if prompt_tokens is not None else estimate_messages_tokens(messages),
-            output_tokens=completion_tokens if completion_tokens is not None else estimate_text_tokens(output_text),
+            input_tokens=prompt_tokens
+            if prompt_tokens is not None
+            else estimate_messages_tokens(messages),
+            output_tokens=completion_tokens
+            if completion_tokens is not None
+            else estimate_text_tokens(output_text),
             input_tokens_source="api_usage" if prompt_tokens is not None else "estimated",
             output_tokens_source="api_usage" if completion_tokens is not None else "estimated",
             status_code=status_code,
@@ -280,10 +288,16 @@ class OpenAIStreamingChatClient:
         end = time.perf_counter()
         content = _message_content(data)
         usage = data.get("usage") if isinstance(data, dict) else None
-        prompt_tokens = _int_or_none(usage.get("prompt_tokens")) if isinstance(usage, dict) else None
-        completion_tokens = _int_or_none(usage.get("completion_tokens")) if isinstance(usage, dict) else None
+        prompt_tokens = (
+            _int_or_none(usage.get("prompt_tokens")) if isinstance(usage, dict) else None
+        )
+        completion_tokens = (
+            _int_or_none(usage.get("completion_tokens")) if isinstance(usage, dict) else None
+        )
         cached_tokens = _cached_tokens_from_usage(usage) if isinstance(usage, dict) else None
-        output_tokens = completion_tokens if completion_tokens is not None else estimate_text_tokens(content)
+        output_tokens = (
+            completion_tokens if completion_tokens is not None else estimate_text_tokens(content)
+        )
         return ChatResult(
             success=bool(content),
             start_time=start,
@@ -291,7 +305,9 @@ class OpenAIStreamingChatClient:
             latency_seconds=end - start,
             ttft_seconds=None,
             output_text=content,
-            input_tokens=prompt_tokens if prompt_tokens is not None else estimate_messages_tokens(messages),
+            input_tokens=prompt_tokens
+            if prompt_tokens is not None
+            else estimate_messages_tokens(messages),
             output_tokens=output_tokens,
             input_tokens_source="api_usage" if prompt_tokens is not None else "estimated",
             output_tokens_source="api_usage" if completion_tokens is not None else "estimated",
@@ -347,7 +363,9 @@ def _request_headers(metadata: dict[str, Any] | None, api_key: str | None) -> di
 def _customer_headers(metadata: dict[str, Any] | None) -> dict[str, str]:
     if not metadata:
         return {}
-    customer_id = metadata.get("customer_id") or metadata.get("tenant_id") or metadata.get("customer")
+    customer_id = (
+        metadata.get("customer_id") or metadata.get("tenant_id") or metadata.get("customer")
+    )
     if customer_id in (None, ""):
         return {}
     # Implements S-21 per-customer KV footprint accounting (see docs/inferguard/24).

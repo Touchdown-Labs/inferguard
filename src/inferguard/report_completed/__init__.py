@@ -160,7 +160,9 @@ def _build_context(root: Path, options: RecommendationOptions) -> dict[str, Any]
         paths["useful_task_definition"] = _rel(path, root)
         evidence.add(_rel(path, root))
 
-    capacity_path = _first_existing(root / "capacity_cliffs.json", root / "cliffs" / "capacity_cliffs.json")
+    capacity_path = _first_existing(
+        root / "capacity_cliffs.json", root / "cliffs" / "capacity_cliffs.json"
+    )
     capacity: dict[str, Any] = {}
     if capacity_path:
         capacity = _read_json(capacity_path, root, evidence)
@@ -219,7 +221,9 @@ def _build_job(root: Path, spec: dict[str, Any], evidence: set[str]) -> dict[str
     output_dir = Path(str(spec.get("output_dir") or Path("jobs") / job_id))
     job_dir = output_dir if output_dir.is_absolute() else root / output_dir
     rel_dir = _rel(job_dir, root)
-    profile_path = _first_existing(job_dir / "operator_profile.json", job_dir / "manifests" / "operator_profile.json")
+    profile_path = _first_existing(
+        job_dir / "operator_profile.json", job_dir / "manifests" / "operator_profile.json"
+    )
     request_path = _first_existing(
         job_dir / "request_profile" / "requests_summary.json",
         job_dir / "request_profile" / "request_summary.json",
@@ -291,7 +295,12 @@ def _build_job(root: Path, spec: dict[str, Any], evidence: set[str]) -> dict[str
         or profile.get("gpu_sku")
         or profile.get("hardware_sku")
     )
-    engine = _normalize_engine(spec.get("engine") or profile.get("engine") or request.get("engine") or metrics.get("engine"))
+    engine = _normalize_engine(
+        spec.get("engine")
+        or profile.get("engine")
+        or request.get("engine")
+        or metrics.get("engine")
+    )
     return {
         "job_id": job_id,
         "job_dir": str(job_dir),
@@ -328,7 +337,9 @@ def _operator_brief_extension(root: Path, jobs: list[dict[str, Any]]) -> dict[st
             "workload": {"workload_class": request.get("workload_label") or "default"},
             "completion": {"success_rate": request.get("success_rate")},
             "metrics": {
-                "p99_ttft": _seconds(_nested(request, "ttft_ms", "p99") or _nested(request, "ttft_ms", "p95")),
+                "p99_ttft": _seconds(
+                    _nested(request, "ttft_ms", "p99") or _nested(request, "ttft_ms", "p95")
+                ),
                 "p99_latency": _seconds(_nested(request, "e2e_latency_ms", "p99")),
             },
             "artifacts": {"metrics_timeline": paths.get("engine_timeline")},
@@ -341,7 +352,9 @@ def _operator_brief_extension(root: Path, jobs: list[dict[str, Any]]) -> dict[st
             "findings": [],
             "artifact_manifest": [
                 {"path": path, "present": True}
-                for path in sorted({path for job in jobs for path in (job.get("paths") or {}).values()})
+                for path in sorted(
+                    {path for job in jobs for path in (job.get("paths") or {}).values()}
+                )
             ],
         }
     )

@@ -23,12 +23,18 @@ def generate_records(
     seed: int = 1703,
     redact_prompts: bool = False,
 ) -> list[dict[str, Any]]:
-    corpus = [f"RETRIEVED_DOC_{idx:02d}\n{_synthetic_text(f'mtrag-doc-{idx}', doc_tokens, seed)}" for idx in range(docs)]
+    corpus = [
+        f"RETRIEVED_DOC_{idx:02d}\n{_synthetic_text(f'mtrag-doc-{idx}', doc_tokens, seed)}"
+        for idx in range(docs)
+    ]
     records: list[dict[str, Any]] = []
     for turn in range(turns):
         order = list(range(docs))
         random.Random(seed + turn).shuffle(order)
-        prompt = "\n".join(corpus[idx] for idx in order) + f"\n\nSynthesize answer for reordered turn {turn}."
+        prompt = (
+            "\n".join(corpus[idx] for idx in order)
+            + f"\n\nSynthesize answer for reordered turn {turn}."
+        )
         records.append(
             _base_record(
                 family="mtrag_reorder",

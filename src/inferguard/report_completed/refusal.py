@@ -62,7 +62,11 @@ def can_emit_cost(args: Any) -> bool:
 
 
 def _validation_status(validation: dict[str, Any]) -> str:
-    return str(validation.get("status") or validation.get("executive_verdict_status") or "not_enough_evidence")
+    return str(
+        validation.get("status")
+        or validation.get("executive_verdict_status")
+        or "not_enough_evidence"
+    )
 
 
 def _jobs_from_context(*contexts: dict[str, Any]) -> list[dict[str, Any]]:

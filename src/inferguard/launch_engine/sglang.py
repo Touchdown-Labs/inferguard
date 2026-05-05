@@ -14,7 +14,7 @@ BLACKWELL_SGLANG_SKU_TOKENS = ("B200", "GB200", "GB300", "BLACKWELL")
 def build_sglang_command(
     model_path: str,
     *,
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     port: int = 30000,
     tensor_parallel_size: int = 1,
     data_parallel_size: int = 1,

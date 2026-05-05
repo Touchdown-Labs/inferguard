@@ -73,13 +73,17 @@ def test_stdout_summary_format() -> None:
     report = classify(FIXTURES / "failure_logs" / "oom")
     stdout = format_stdout_summary(report) + "\n"
 
-    assert re.match(r"^inferguard classify-failures: failures=\d+ top_class=\S+ claim=\w+\n$", stdout)
+    assert re.match(
+        r"^inferguard classify-failures: failures=\d+ top_class=\S+ claim=\w+\n$", stdout
+    )
 
 
 def test_xid_evidence_attached() -> None:
     report = _report(FIXTURES / "run_dirs" / "cuda_error_with_xid")
 
-    assert any("DCGM_FI_DEV_XID_ERRORS" in str(path) for path in report["failures"][0]["evidence_paths"])
+    assert any(
+        "DCGM_FI_DEV_XID_ERRORS" in str(path) for path in report["failures"][0]["evidence_paths"]
+    )
 
 
 def test_cli_writes_artifacts(tmp_path: Path) -> None:

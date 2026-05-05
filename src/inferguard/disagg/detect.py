@@ -12,7 +12,7 @@ from __future__ import annotations
 from inferguard.disagg.types import DisaggFinding, DisaggStatus
 
 # Thresholds. Kept in one place so they are reviewable as policy.
-IMBALANCE_RATIO_LOW = 0.5   # decode-side starved
+IMBALANCE_RATIO_LOW = 0.5  # decode-side starved
 IMBALANCE_RATIO_HIGH = 2.0  # prefill-side starved
 KV_TRANSFER_STALL_MAX_BYTES = 0  # both sides flat = stall
 

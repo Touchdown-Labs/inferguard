@@ -33,3 +33,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+.eggs/
+.env
+.env.local
+*.log

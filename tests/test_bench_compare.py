@@ -69,7 +69,9 @@ def test_compare_strict_identity_fails_on_low_overlap(tmp_path: Path) -> None:
     run_b = _write_run(tmp_path / "b", engine="sglang", traces=["other-1"])
 
     with pytest.raises(CompareError, match="Trace identity overlap"):
-        compare_runs(run_a, run_b, CompareOptions(output_dir=tmp_path / "compare", strict_identity=True))
+        compare_runs(
+            run_a, run_b, CompareOptions(output_dir=tmp_path / "compare", strict_identity=True)
+        )
 
 
 def test_bench_compare_help_surfaces_options() -> None:

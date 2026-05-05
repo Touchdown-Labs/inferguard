@@ -53,7 +53,9 @@ class RouterVerdict(BaseModel):
     bottleneck_class: BottleneckClass
     execution_paths: list[ExecutionPath]
     evidence: list[FindingRef] = Field(default_factory=list)
-    claim_label: Literal["measured_local", "inferred_without_engine_metrics", "not_proven"] = "inferred_without_engine_metrics"
+    claim_label: Literal["measured_local", "inferred_without_engine_metrics", "not_proven"] = (
+        "inferred_without_engine_metrics"
+    )
     claim_boundary: str = (
         "Router verdicts are routing recommendations from workload shape and benchmark "
         "artifacts. They are not live production claims until validated by matching "

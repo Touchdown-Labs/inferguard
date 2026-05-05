@@ -45,9 +45,7 @@ def test_agentx_matrix_expands_gmi_hardware_and_contract(tmp_path: Path) -> None
         "sglang_agentx",
         "vllm_agentx",
     }
-    assert {job["trace_source"] for job in plan["jobs"]} == {
-        "semianalysisai/cc-traces-weka-042026"
-    }
+    assert {job["trace_source"] for job in plan["jobs"]} == {"semianalysisai/cc-traces-weka-042026"}
 
     contract = json.loads(
         (tmp_path / "matrix" / "expected_artifact_contract.json").read_text(encoding="utf-8")

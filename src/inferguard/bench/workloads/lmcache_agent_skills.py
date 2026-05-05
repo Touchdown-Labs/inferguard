@@ -22,11 +22,16 @@ def generate_records(
     seed: int = 1704,
     redact_prompts: bool = False,
 ) -> list[dict[str, Any]]:
-    skill_docs = [f"SKILL_DOC_{idx}\n{_synthetic_text(f'agent-skill-{idx}', skill_tokens, seed)}" for idx in range(skills)]
+    skill_docs = [
+        f"SKILL_DOC_{idx}\n{_synthetic_text(f'agent-skill-{idx}', skill_tokens, seed)}"
+        for idx in range(skills)
+    ]
     shared_suffix = "\n".join(skill_docs)
     records: list[dict[str, Any]] = []
     for turn in range(turns):
-        dynamic = _synthetic_text(f"dynamic-user-{turn}", max(128, context_length_target // 8), seed)
+        dynamic = _synthetic_text(
+            f"dynamic-user-{turn}", max(128, context_length_target // 8), seed
+        )
         prompt = f"USER_CONTEXT:\n{dynamic}\n\nREUSABLE_SKILL_DOCS:\n{shared_suffix}"
         records.append(
             _base_record(

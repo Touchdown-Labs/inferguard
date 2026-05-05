@@ -68,7 +68,9 @@ def test_vllm_upstream_mocked_subprocess_writes_artifacts(monkeypatch, tmp_path)
     ]:
         assert (out / name).exists()
 
-    report = analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json"))
+    report = analyze_results(
+        tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json")
+    )
     assert report["cells"][0]["source_format"] == "inferguard-bench-native"
     assert report["cells"][0]["metrics"]["p99_ttft"] == 0.07
 

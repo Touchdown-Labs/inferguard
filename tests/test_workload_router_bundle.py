@@ -107,7 +107,15 @@ def test_workload_analyze_router_classify_and_emit_bundle(tmp_path) -> None:
     bundle_dir = tmp_path / "bundle"
     result = CliRunner().invoke(
         app,
-        ["emit-bundle", str(verdict_path), "--output", str(bundle_dir), "--target", "slurm", "--json"],
+        [
+            "emit-bundle",
+            str(verdict_path),
+            "--output",
+            str(bundle_dir),
+            "--target",
+            "slurm",
+            "--json",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -117,9 +125,10 @@ def test_workload_analyze_router_classify_and_emit_bundle(tmp_path) -> None:
     assert (bundle_dir / "prometheus-rules.yaml").exists()
     assert (bundle_dir / "cost-floor.csv").exists()
     assert (bundle_dir / "RUNBOOK.md").exists()
-    assert json.loads((bundle_dir / "meta.json").read_text(encoding="utf-8"))[
-        "bottleneck_class"
-    ] == "kv_bound"
+    assert (
+        json.loads((bundle_dir / "meta.json").read_text(encoding="utf-8"))["bottleneck_class"]
+        == "kv_bound"
+    )
 
 
 def test_router_classify_quality_regression_prefers_frontier_api(tmp_path) -> None:

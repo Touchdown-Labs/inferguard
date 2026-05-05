@@ -53,8 +53,12 @@ def test_zero_useful_tasks(tmp_path: Path) -> None:
     root = write_run_dir(
         tmp_path / "all_failures",
         [
-            request_row("r1", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2000),
-            request_row("r2", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2500),
+            request_row(
+                "r1", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2000
+            ),
+            request_row(
+                "r2", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2500
+            ),
         ],
         concurrency=1,
         success_count=0,
@@ -77,7 +81,9 @@ def test_waste_percent(tmp_path: Path) -> None:
         tmp_path / "partial_failures",
         [
             request_row("r1", success=True, completion_tokens=64, ttft_ms=100, e2e_latency_ms=1000),
-            request_row("r2", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2000),
+            request_row(
+                "r2", success=False, completion_tokens=0, ttft_ms=None, e2e_latency_ms=2000
+            ),
         ],
         concurrency=1,
         success_count=1,
@@ -272,7 +278,9 @@ def write_sweep_run_dir(root: Path) -> Path:
         (4, 600, 3000, 1.0),
     ):
         job_id = f"job-h200-c{concurrency}"
-        jobs.append({"job_id": job_id, "output_dir": f"jobs/{job_id}", "sku": "H200", "engine": "vllm"})
+        jobs.append(
+            {"job_id": job_id, "output_dir": f"jobs/{job_id}", "sku": "H200", "engine": "vllm"}
+        )
         rows = [
             request_row(
                 f"{job_id}-r{i}",
@@ -284,7 +292,13 @@ def write_sweep_run_dir(root: Path) -> Path:
             )
             for i in range(10)
         ]
-        write_job(root, job_id, rows, concurrency=concurrency, success_count=sum(1 for row in rows if row["success"]))
+        write_job(
+            root,
+            job_id,
+            rows,
+            concurrency=concurrency,
+            success_count=sum(1 for row in rows if row["success"]),
+        )
     root.mkdir(parents=True, exist_ok=True)
     (root / "matrix_plan.json").write_text(
         json.dumps({"jobs": jobs, "schema_version": "inferguard-gmi-profile-summary/v1"}, indent=2),
@@ -308,7 +322,12 @@ def write_run_dir(
         json.dumps(
             {
                 "jobs": [
-                    {"job_id": job_id, "output_dir": f"jobs/{job_id}", "sku": "H200", "engine": "vllm"}
+                    {
+                        "job_id": job_id,
+                        "output_dir": f"jobs/{job_id}",
+                        "sku": "H200",
+                        "engine": "vllm",
+                    }
                 ],
                 "schema_version": "inferguard-gmi-profile-summary/v1",
             },
@@ -378,9 +397,19 @@ def write_job(
         "success_rate": success_count / len(rows) if rows else 0,
         "duration_seconds": duration_seconds,
         "prompt_tokens_total": sum(int(row.get("prompt_tokens") or 0) for row in rows),
-        "completion_tokens_total": sum(int(row.get("completion_tokens") or 0) for row in successful),
-        "ttft_ms": {"p50": percentile(successful, "ttft_ms", 50), "p95": percentile(successful, "ttft_ms", 95), "p99": percentile(successful, "ttft_ms", 99)},
-        "e2e_latency_ms": {"p50": percentile(successful, "e2e_latency_ms", 50), "p95": percentile(successful, "e2e_latency_ms", 95), "p99": percentile(successful, "e2e_latency_ms", 99)},
+        "completion_tokens_total": sum(
+            int(row.get("completion_tokens") or 0) for row in successful
+        ),
+        "ttft_ms": {
+            "p50": percentile(successful, "ttft_ms", 50),
+            "p95": percentile(successful, "ttft_ms", 95),
+            "p99": percentile(successful, "ttft_ms", 99),
+        },
+        "e2e_latency_ms": {
+            "p50": percentile(successful, "e2e_latency_ms", 50),
+            "p95": percentile(successful, "e2e_latency_ms", 95),
+            "p99": percentile(successful, "e2e_latency_ms", 99),
+        },
         "claim_status": "measured",
     }
     (request_dir / "requests_summary.json").write_text(
@@ -388,7 +417,13 @@ def write_job(
         encoding="utf-8",
     )
     (metrics_dir / "metrics_summary.json").write_text(
-        json.dumps({"schema_version": "inferguard-metrics-summary/v1", "duration_seconds": duration_seconds}, indent=2),
+        json.dumps(
+            {
+                "schema_version": "inferguard-metrics-summary/v1",
+                "duration_seconds": duration_seconds,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
 

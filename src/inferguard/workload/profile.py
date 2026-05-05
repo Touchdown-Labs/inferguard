@@ -74,7 +74,9 @@ def fingerprint_samples(
         output_token_distribution=_distribution(output_tokens),
         session_length_distribution=_distribution(list(by_session.values())),
         prefix_reuse_score=round(prefix_reuse_score, 6),
-        prefill_decode_ratio=round(prefill_decode_ratio, 6) if prefill_decode_ratio is not None else None,
+        prefill_decode_ratio=round(prefill_decode_ratio, 6)
+        if prefill_decode_ratio is not None
+        else None,
         tool_call_fanout_distribution=_distribution(tool_counts),
         retry_rate=round(retry_rate, 6),
         rag_chunk_volume=rag_chunk_volume,

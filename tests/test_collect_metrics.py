@@ -231,7 +231,9 @@ def test_dcgm_schema_locked(tmp_path: Path) -> None:
     finally:
         server.stop()
 
-    first = json.loads((tmp_path / "gpu_metrics_timeline.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    first = json.loads(
+        (tmp_path / "gpu_metrics_timeline.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
     assert first["schema_version"] == "dcgm-correlated/v1"
 
 

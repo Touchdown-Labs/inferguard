@@ -13,7 +13,9 @@ def test_intvty_median_is_inverse_of_tpot_median(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    report = analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json"))
+    report = analyze_results(
+        tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json")
+    )
 
     metrics = report["cells"][0]["metrics"]
     assert metrics["median_tpot"] == 0.02

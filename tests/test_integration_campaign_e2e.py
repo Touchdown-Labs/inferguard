@@ -66,13 +66,17 @@ def test_run_isb1_campaign_allows_one_partial_workload_failure(tmp_path: Path) -
     assert result.returncode == 0, output
     assert "| kv-pressure | failed |" in output
 
-    report = json.loads((results_root / "inferguard_report" / "report.json").read_text(encoding="utf-8"))
+    report = json.loads(
+        (results_root / "inferguard_report" / "report.json").read_text(encoding="utf-8")
+    )
     kv_cell_ids = {
         item["cell_id"]
         for item in report["artifact_manifest"]
         if item.get("cell_id") and "kv-pressure" in item.get("path", "")
     }
-    kv_findings = [finding for finding in report["findings"] if finding.get("cell_id") in kv_cell_ids]
+    kv_findings = [
+        finding for finding in report["findings"] if finding.get("cell_id") in kv_cell_ids
+    ]
     assert {finding["code"] for finding in kv_findings} & {
         "partial_run",
         "invalid_run_no_successful_requests",
@@ -115,7 +119,11 @@ def _run_campaign(
 
 
 def _bash_executable() -> str:
-    for candidate in (Path("/opt/homebrew/bin/bash"), Path("/usr/local/bin/bash"), Path("/bin/bash")):
+    for candidate in (
+        Path("/opt/homebrew/bin/bash"),
+        Path("/usr/local/bin/bash"),
+        Path("/bin/bash"),
+    ):
         if candidate.exists():
             return str(candidate)
     return "bash"

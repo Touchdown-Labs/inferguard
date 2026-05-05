@@ -84,11 +84,14 @@ def test_parse_sglang_no_metrics_returns_error() -> None:
 
 
 def test_parse_vllm_offload_fields() -> None:
-    text = _fixture("vllm.txt") + """
+    text = (
+        _fixture("vllm.txt")
+        + """
 vllm:kv_offload_dma_bytes_per_second 83400000000
 vllm:kv_offload_async_queue_depth 5
 vllm:kv_offload_eviction_count_total 11
 """
+    )
     snap = _parse_vllm(text, url="http://p", role="prefill")
     assert snap.vllm_offload_dma_bytes_per_sec == 83400000000.0
     assert snap.vllm_offload_async_queue_depth == 5

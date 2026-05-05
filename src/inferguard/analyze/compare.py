@@ -54,7 +54,9 @@ def compare_runs(run_a_dir: Path, run_b_dir: Path, options: CompareOptions) -> d
     _validate_options(options)
     output_dir = options.output_dir
     if output_dir.exists() and any(output_dir.iterdir()) and not options.force:
-        raise CompareError(f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)")
+        raise CompareError(
+            f"output_dir is not empty: {output_dir} (choose a new directory or pass --force)"
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     run_a = _load_run(run_a_dir, explicit_label=options.label_a, fallback_label="run_a")
@@ -125,10 +127,16 @@ def render_compare_markdown(report: dict[str, Any]) -> str:
     if report.get("findings"):
         lines.extend(["## Findings", ""])
         for finding in report["findings"]:
-            lines.append(f"- **{finding['severity'].upper()}** `{finding['code']}` — {finding['message']}")
+            lines.append(
+                f"- **{finding['severity'].upper()}** `{finding['code']}` — {finding['message']}"
+            )
         lines.append("")
 
-    blue_green = [finding for finding in report.get("findings", []) if finding.get("code") == "blue_green_p99_regression"]
+    blue_green = [
+        finding
+        for finding in report.get("findings", [])
+        if finding.get("code") == "blue_green_p99_regression"
+    ]
     if blue_green:
         lines.extend(
             [
@@ -200,7 +208,9 @@ def _load_run(path: Path, *, explicit_label: str | None, fallback_label: str) ->
     requests = _read_jsonl_optional(path / "requests.jsonl")
     metrics = _read_jsonl_optional(path / "metrics.jsonl")
     if summary.get("schema_version") != "inferguard-bench-summary/v1":
-        raise CompareError(f"unsupported summary schema in {path / 'summary.json'}: {summary.get('schema_version')!r}")
+        raise CompareError(
+            f"unsupported summary schema in {path / 'summary.json'}: {summary.get('schema_version')!r}"
+        )
     label = explicit_label or _derive_label(summary, config, path, fallback_label)
     engine = _derive_engine(summary, config, label)
     return _RunArtifacts(
@@ -214,7 +224,9 @@ def _load_run(path: Path, *, explicit_label: str | None, fallback_label: str) ->
     )
 
 
-def _trace_identity(run_a: _RunArtifacts, run_b: _RunArtifacts, *, min_overlap: float) -> dict[str, Any]:
+def _trace_identity(
+    run_a: _RunArtifacts, run_b: _RunArtifacts, *, min_overlap: float
+) -> dict[str, Any]:
     keys_a = _identity_keys(run_a.requests) or _identity_keys(run_a.metrics)
     keys_b = _identity_keys(run_b.requests) or _identity_keys(run_b.metrics)
     overlap = keys_a & keys_b
@@ -242,11 +254,19 @@ def _compare_workloads(
         stats_a = _workload_stats(run_a, workload, options)
         stats_b = _workload_stats(run_b, workload, options)
         delta = {
-            "p99_ttft_seconds": _delta(stats_b.get("p99_ttft_seconds"), stats_a.get("p99_ttft_seconds")),
-            "p99_tpot_seconds": _delta(stats_b.get("p99_tpot_seconds"), stats_a.get("p99_tpot_seconds")),
-            "p99_latency_seconds": _delta(stats_b.get("p99_latency_seconds"), stats_a.get("p99_latency_seconds")),
+            "p99_ttft_seconds": _delta(
+                stats_b.get("p99_ttft_seconds"), stats_a.get("p99_ttft_seconds")
+            ),
+            "p99_tpot_seconds": _delta(
+                stats_b.get("p99_tpot_seconds"), stats_a.get("p99_tpot_seconds")
+            ),
+            "p99_latency_seconds": _delta(
+                stats_b.get("p99_latency_seconds"), stats_a.get("p99_latency_seconds")
+            ),
             "cost_per_task": _delta(stats_b.get("cost_per_task"), stats_a.get("cost_per_task")),
-            "cliff_concurrency": _delta(stats_b.get("cliff_concurrency"), stats_a.get("cliff_concurrency")),
+            "cliff_concurrency": _delta(
+                stats_b.get("cliff_concurrency"), stats_a.get("cliff_concurrency")
+            ),
         }
         rows.append(
             {
@@ -275,7 +295,11 @@ def _blue_green_findings(
                 continue
             factor = candidate / baseline
             p_value = _metric_p_value(run_a, run_b, workload, label)
-            if factor > BLUE_GREEN_P99_REGRESSION_FACTOR and p_value is not None and p_value < BLUE_GREEN_SIGNIFICANCE_P_VALUE:
+            if (
+                factor > BLUE_GREEN_P99_REGRESSION_FACTOR
+                and p_value is not None
+                and p_value < BLUE_GREEN_SIGNIFICANCE_P_VALUE
+            ):
                 findings.append(
                     {
                         "code": "blue_green_p99_regression",
@@ -299,7 +323,9 @@ def _blue_green_findings(
     return findings
 
 
-def _metric_p_value(run_a: _RunArtifacts, run_b: _RunArtifacts, workload: str, metric: str) -> float | None:
+def _metric_p_value(
+    run_a: _RunArtifacts, run_b: _RunArtifacts, workload: str, metric: str
+) -> float | None:
     a_values = _metric_values(run_a, workload, metric)
     b_values = _metric_values(run_b, workload, metric)
     if len(a_values) < 2 or len(b_values) < 2:
@@ -319,10 +345,14 @@ def _metric_values(run: _RunArtifacts, workload: str, metric: str) -> list[float
     rows = [
         row
         for row in run.metrics
-        if row.get("workload_class") == workload and bool(row.get("success")) and _phase(row) != "warmup"
+        if row.get("workload_class") == workload
+        and bool(row.get("success"))
+        and _phase(row) != "warmup"
     ]
     if metric == "ttft":
-        return [value for value in (_num(row.get("ttft_seconds")) for row in rows) if value is not None]
+        return [
+            value for value in (_num(row.get("ttft_seconds")) for row in rows) if value is not None
+        ]
     return [value for value in (_tpot(row) for row in rows) if value is not None]
 
 
@@ -347,9 +377,13 @@ def _workload_stats(run: _RunArtifacts, workload: str, options: CompareOptions) 
             "success": len(successes),
             "failed": len(rows) - len(successes),
             "failed_rate": ((len(rows) - len(successes)) / len(rows)) if rows else 0.0,
-            "p99_ttft_seconds": _percentile([_num(row.get("ttft_seconds")) for row in successes], 99),
+            "p99_ttft_seconds": _percentile(
+                [_num(row.get("ttft_seconds")) for row in successes], 99
+            ),
             "p99_tpot_seconds": _percentile(tpot_values, 99),
-            "p99_latency_seconds": _percentile([_num(row.get("latency_seconds")) for row in successes], 99),
+            "p99_latency_seconds": _percentile(
+                [_num(row.get("latency_seconds")) for row in successes], 99
+            ),
             "cliff_concurrency": _cliff_concurrency(rows),
             "cost_per_task": _cost_per_task(successes, options),
         }
@@ -361,7 +395,9 @@ def _workload_stats(run: _RunArtifacts, workload: str, options: CompareOptions) 
     success = int(_num(summary_workload.get("success")) or 0)
     failed = int(_num(summary_workload.get("failed")) or max(total - success, 0))
     ttft_block = summary_workload.get("ttft_seconds") or run.summary.get("ttft_seconds") or {}
-    latency_block = summary_workload.get("latency_seconds") or run.summary.get("latency_seconds") or {}
+    latency_block = (
+        summary_workload.get("latency_seconds") or run.summary.get("latency_seconds") or {}
+    )
     return {
         "total": total,
         "success": success,
@@ -394,7 +430,11 @@ def _cliff_concurrency(rows: list[dict[str, Any]]) -> int | None:
         p99_ttft = _percentile([_num(row.get("ttft_seconds")) for row in successes], 99)
         if failed_rate >= FAILURE_CLIFF_RATE:
             return level
-        if baseline is not None and p99_ttft is not None and p99_ttft >= baseline * TTFT_CLIFF_MULTIPLIER:
+        if (
+            baseline is not None
+            and p99_ttft is not None
+            and p99_ttft >= baseline * TTFT_CLIFF_MULTIPLIER
+        ):
             return level
     return None
 
@@ -434,7 +474,9 @@ def _cost_per_task(successes: list[dict[str, Any]], options: CompareOptions) -> 
     return mean(latencies) * options.cost_per_gpu_hour * options.gpus / 3600.0
 
 
-def _summary_cost_per_task(summary: dict[str, Any], success: int, options: CompareOptions) -> float | None:
+def _summary_cost_per_task(
+    summary: dict[str, Any], success: int, options: CompareOptions
+) -> float | None:
     if options.cost_per_gpu_hour is None or options.gpus is None or success <= 0:
         return None
     runtime = _num(summary.get("runtime_seconds"))

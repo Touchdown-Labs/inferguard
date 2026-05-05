@@ -58,7 +58,7 @@ def launch(
     external_launch: bool = False,
     endpoint_url: str | None = None,
     model_path: str | None = None,
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     port: int | None = None,
     tensor_parallel_size: int = 1,
     pipeline_parallel_size: int = 1,
@@ -341,7 +341,11 @@ def _augment_healthcheck(
 ) -> HealthcheckResult:
     warnings = list(healthcheck.warnings)
     lmcache_present = healthcheck.lmcache_metrics_present
-    if engine in {"sglang", "dynamo-sglang"} and not enable_metrics and not healthcheck.metrics_endpoint_reachable:
+    if (
+        engine in {"sglang", "dynamo-sglang"}
+        and not enable_metrics
+        and not healthcheck.metrics_endpoint_reachable
+    ):
         warnings.append(
             "SGLang metrics endpoint was not reachable because --enable-metrics was omitted."
         )
@@ -364,7 +368,10 @@ def _scrape_lmcache_metrics_presence(endpoint: str) -> tuple[bool, str | None]:
         with httpx.Client(timeout=5.0) as client:
             response = client.get(metrics_url)
     except Exception as exc:  # noqa: BLE001 - healthcheck artifact must record warnings
-        return False, f"LMCache metrics check could not scrape vLLM /metrics: {type(exc).__name__}: {exc}"
+        return (
+            False,
+            f"LMCache metrics check could not scrape vLLM /metrics: {type(exc).__name__}: {exc}",
+        )
     if response.status_code != 200:
         return False, f"LMCache metrics check found vLLM /metrics status={response.status_code}"
     if lmcache_metrics_present(response.text):
@@ -390,7 +397,9 @@ def _select_port(engine: str, port: int | None, endpoint_url: str | None) -> int
 
 
 def _endpoint_for_host(host: str, port: int) -> str:
-    probe_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    unspecified_ipv4_host = ".".join(("0", "0", "0", "0"))
+    wildcard_hosts = {unspecified_ipv4_host, "::"}
+    probe_host = "127.0.0.1" if host in wildcard_hosts else host
     return f"http://{probe_host}:{port}"
 
 

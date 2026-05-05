@@ -50,7 +50,9 @@ def test_detects_kubernetes_from_service_host() -> None:
 
 @pytest.mark.harness
 def test_detects_multi_node_from_world_size() -> None:
-    context = EnvironmentAdapter.detect({"WORLD_SIZE": "8", "RANK": "2"}, file_exists=lambda _path: False)
+    context = EnvironmentAdapter.detect(
+        {"WORLD_SIZE": "8", "RANK": "2"}, file_exists=lambda _path: False
+    )
     assert context.backend == "multi-node"
     assert context.is_multi_node is True
     assert context.rank == 2
@@ -59,14 +61,18 @@ def test_detects_multi_node_from_world_size() -> None:
 
 @pytest.mark.harness
 def test_detects_multi_node_from_nccl_env() -> None:
-    context = EnvironmentAdapter.detect({"NCCL_SOCKET_IFNAME": "eth0"}, file_exists=lambda _path: False)
+    context = EnvironmentAdapter.detect(
+        {"NCCL_SOCKET_IFNAME": "eth0"}, file_exists=lambda _path: False
+    )
     assert context.backend == "multi-node"
     assert context.is_multi_node is True
 
 
 @pytest.mark.harness
 def test_detects_gmi_scratch_from_env() -> None:
-    context = EnvironmentAdapter.detect({"GMI_SCRATCH": "/mnt/gmi/job"}, file_exists=lambda _path: False)
+    context = EnvironmentAdapter.detect(
+        {"GMI_SCRATCH": "/mnt/gmi/job"}, file_exists=lambda _path: False
+    )
     assert context.is_gmi is True
     assert context.scratch_path == "/mnt/gmi/job"
 
@@ -85,7 +91,9 @@ def test_detects_disagg_pair_as_logical_endpoint() -> None:
         file_exists=lambda _path: False,
     )
     assert context.backend == "disagg-pair"
-    assert context.logical_endpoint == "disagg://prefill=http://prefill:8000;decode=http://decode:8000"
+    assert (
+        context.logical_endpoint == "disagg://prefill=http://prefill:8000;decode=http://decode:8000"
+    )
 
 
 @pytest.mark.harness
@@ -343,7 +351,9 @@ class TestRadixArkSGLangDetection:
         gmi_env: dict[str, str],
         radixark_env: dict[str, str],
     ) -> None:
-        context = EnvironmentAdapter.detect({**radixark_env, **gmi_env}, file_exists=lambda _path: False)
+        context = EnvironmentAdapter.detect(
+            {**radixark_env, **gmi_env}, file_exists=lambda _path: False
+        )
 
         assert context.provider == "gmi"
         assert context.backend == "gmi"

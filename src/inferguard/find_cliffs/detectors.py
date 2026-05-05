@@ -96,7 +96,12 @@ class SweepCell:
     @property
     def kv_usage_p95(self) -> float | None:
         kv_cache = _dict(self.metrics_summary.get("kv_cache"))
-        for key in ("usage_fraction", "kv_cache_usage_perc", "cache_usage_fraction", "cache_usage_perc"):
+        for key in (
+            "usage_fraction",
+            "kv_cache_usage_perc",
+            "cache_usage_fraction",
+            "cache_usage_perc",
+        ):
             value = _percentile(kv_cache.get(key), "p95")
             if value is not None:
                 return value
@@ -136,7 +141,10 @@ class SweepCell:
         if top_class == "oom_hbm_exhaustion":
             return True
         for failure in self.failure_classification.get("failures") or []:
-            if isinstance(failure, dict) and str(failure.get("class") or "").lower() == "oom_hbm_exhaustion":
+            if (
+                isinstance(failure, dict)
+                and str(failure.get("class") or "").lower() == "oom_hbm_exhaustion"
+            ):
                 return True
         return False
 
@@ -184,7 +192,9 @@ def detect_max_concurrency_before_p99_cliff(
 ) -> Cliff:
     name = "max_concurrency_before_p99_cliff"
     ordered = _by_concurrency(_complete(cells))
-    curve = _curve(ordered, "concurrency", lambda cell: cell.p99_ttft_ms, "request_profile.ttft_ms.p99")
+    curve = _curve(
+        ordered, "concurrency", lambda cell: cell.p99_ttft_ms, "request_profile.ttft_ms.p99"
+    )
     if len(ordered) < MIN_SWEEP_POINTS:
         return _not_proven(name, ordered, curve, "add at least four completed concurrency cells")
 
@@ -250,7 +260,9 @@ def detect_max_context_before_oom(
     del ttft_p99_floor_ms
     name = "max_context_before_oom"
     ordered = _by_context(_complete(cells))
-    curve = _curve(ordered, "context_length", lambda cell: 1.0 if cell.is_oom else 0.0, "oom_observed")
+    curve = _curve(
+        ordered, "context_length", lambda cell: 1.0 if cell.is_oom else 0.0, "oom_observed"
+    )
     distinct_contexts = {cell.context_length for cell in ordered if cell.context_length is not None}
     if len(ordered) < MIN_SWEEP_POINTS or len(distinct_contexts) < MIN_SWEEP_POINTS:
         return _not_proven(name, ordered, curve, "add at least four completed context-length cells")
@@ -301,7 +313,9 @@ def detect_throughput_plateau(
     )
     with_throughput = [cell for cell in ordered if cell.throughput_tokens_per_sec is not None]
     if len(with_throughput) < MIN_SWEEP_POINTS:
-        return _not_proven(name, with_throughput, curve, "add at least four throughput-bearing cells")
+        return _not_proven(
+            name, with_throughput, curve, "add at least four throughput-bearing cells"
+        )
     for idx in range(0, len(with_throughput) - 2):
         trio = with_throughput[idx : idx + 3]
         values = [cell.throughput_tokens_per_sec for cell in trio]
@@ -357,7 +371,12 @@ def detect_kv_saturation_point(
     del ttft_p99_floor_ms, success_rate_floor
     name = "kv_saturation_point"
     ordered = _by_concurrency(_complete(cells))
-    curve = _curve(ordered, "concurrency", lambda cell: cell.kv_usage_p95, "metrics_summary.kv_cache.usage_fraction.p95")
+    curve = _curve(
+        ordered,
+        "concurrency",
+        lambda cell: cell.kv_usage_p95,
+        "metrics_summary.kv_cache.usage_fraction.p95",
+    )
     if len(ordered) < MIN_SWEEP_POINTS:
         return _not_proven(name, ordered, curve, "add at least four completed KV-cache cells")
     for idx, curr in enumerate(ordered):
@@ -377,7 +396,9 @@ def detect_kv_saturation_point(
             and ordered[idx + 1].p99_e2e_ms > curr.p99_e2e_ms * E2E_JUMP_FACTOR
         )
         if prev_jump or next_jump:
-            evidence_cells = [cell for cell in ordered[max(idx - 1, 0) : min(idx + 2, len(ordered))]]
+            evidence_cells = [
+                cell for cell in ordered[max(idx - 1, 0) : min(idx + 2, len(ordered))]
+            ]
             return _measured(
                 name,
                 curr.concurrency,
@@ -415,7 +436,12 @@ def detect_queue_explosion_point(
     del ttft_p99_floor_ms, success_rate_floor
     name = "queue_explosion_point"
     ordered = _by_concurrency(_complete(cells))
-    curve = _curve(ordered, "concurrency", lambda cell: cell.queue_waiting, "metrics_summary.queue.requests_waiting")
+    curve = _curve(
+        ordered,
+        "concurrency",
+        lambda cell: cell.queue_waiting,
+        "metrics_summary.queue.requests_waiting",
+    )
     if len(ordered) < MIN_SWEEP_POINTS:
         return _not_proven(name, ordered, curve, "add at least four completed queue-metric cells")
     for prev, curr in zip(ordered, ordered[1:], strict=False):
@@ -476,7 +502,11 @@ def detect_decode_collapse_point(
     del ttft_p99_floor_ms, success_rate_floor
     name = "decode_collapse_point"
     ordered = _decode_order(_complete(cells))
-    curve_x = "decode_parallelism" if all(cell.decode_parallelism is not None for cell in ordered) else "concurrency"
+    curve_x = (
+        "decode_parallelism"
+        if all(cell.decode_parallelism is not None for cell in ordered)
+        else "concurrency"
+    )
     curve = _curve(ordered, curve_x, lambda cell: cell.p99_tpot_ms, "request_profile.tpot_ms.p99")
     with_tpot = [cell for cell in ordered if cell.p99_tpot_ms is not None]
     if len(with_tpot) < MIN_SWEEP_POINTS:
@@ -485,7 +515,10 @@ def detect_decode_collapse_point(
     monotonic = all(values[idx + 1] > values[idx] for idx in range(0, len(values) - 1))
     if monotonic and values[-1] >= values[0] * DECODE_COLLAPSE_FACTOR:
         threshold = values[0] * DECODE_COLLAPSE_FACTOR
-        collapse = next((cell for cell in with_tpot if float(cell.p99_tpot_ms or 0.0) >= threshold), with_tpot[-1])
+        collapse = next(
+            (cell for cell in with_tpot if float(cell.p99_tpot_ms or 0.0) >= threshold),
+            with_tpot[-1],
+        )
         return _measured(
             name,
             collapse.concurrency,
@@ -542,7 +575,9 @@ def _legacy_capacity_checks(cells: list[SweepCell]) -> dict[str, Any]:
                 "cell_id": cell.job_id,
                 "config": {"concurrency": cell.concurrency},
                 "completion": {"success_rate": cell.success_rate},
-                "metrics": {"p99_ttft": None if cell.p99_ttft_ms is None else cell.p99_ttft_ms / 1000.0},
+                "metrics": {
+                    "p99_ttft": None if cell.p99_ttft_ms is None else cell.p99_ttft_ms / 1000.0
+                },
             }
         )
     return {
@@ -640,7 +675,13 @@ def _not_proven(
 def _evidence_paths(cells: list[SweepCell]) -> tuple[str, ...]:
     paths: list[str] = []
     for cell in cells:
-        for key in ("request_summary", "metrics_summary", "failure_classification", "bottleneck_diagnosis", "operator_profile"):
+        for key in (
+            "request_summary",
+            "metrics_summary",
+            "failure_classification",
+            "bottleneck_diagnosis",
+            "operator_profile",
+        ):
             path = cell.paths.get(key)
             if path:
                 paths.append(path)
