@@ -101,13 +101,11 @@ jobs:
           path: inferguard-${{ github.ref_name }}-sbom.spdx.json
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          skip-existing: true
-          attestations: false
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+        run: twine upload --skip-existing --verbose dist/*
 
       - name: Smoke install from TestPyPI
         shell: bash
@@ -121,12 +119,11 @@ jobs:
           inferguard-mcp --help
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
-          attestations: false
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
+        run: twine upload --skip-existing --verbose dist/*
 
       - name: Sigstore sign artifacts
         uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
