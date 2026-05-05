@@ -12,7 +12,8 @@ supersedes-policy: "New posture document; does not supersede oss/inferguard/docs
 
 This document states the current InferGuard zero-telemetry commitment.
 It applies to CLI v0.4.x.
-It applies to CLI v0.5.x.
+It applies to the current `0.7.1` CLI. References to v0.5.x below name the
+feature tranche where the local-only telemetry posture was introduced.
 It applies to a fresh install.
 It applies before a user runs any explicit telemetry enable command.
 It applies when `DO_NOT_TRACK=1` is present.

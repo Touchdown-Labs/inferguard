@@ -108,7 +108,7 @@ python -m pip install 'inferguard[harness]'
 Operators who vendor the package may pin the release.
 
 ```bash
-python -m pip install 'inferguard[harness]==0.5.*'
+python -m pip install 'inferguard[harness]==0.7.1'
 ```
 
 The harness must not start background services at install time.

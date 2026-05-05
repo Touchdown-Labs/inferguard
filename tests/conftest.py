@@ -286,9 +286,6 @@ def _is_loopback_host(host: str | None) -> bool:
 # To run these tests locally, set MONOREPO_ROOT to the Touchdown-Labs root
 # (the directory containing scripts/run_neocloud_nvidia_profile.py).
 
-import os as _mr_os
-from pathlib import Path as _MRPath
-
 _MONOREPO_DEPENDENT_FILES = {
     # First batch — shell out to /Users/chen/scripts/run_neocloud_nvidia_profile.py
     "test_classify_failures.py",
@@ -321,10 +318,10 @@ def _monorepo_available() -> bool:
     designed to run outside the Touchdown-Labs monorepo. Skip-by-default in
     OSS contexts; opt-in via ``MONOREPO_ROOT=/path/to/Touchdown-Labs``.
     """
-    env_root = _mr_os.environ.get("MONOREPO_ROOT")
+    env_root = os.environ.get("MONOREPO_ROOT")
     if not env_root:
         return False
-    candidate = _MRPath(env_root) / "scripts" / "run_neocloud_nvidia_profile.py"
+    candidate = Path(env_root) / "scripts" / "run_neocloud_nvidia_profile.py"
     return candidate.exists()
 
 
@@ -335,69 +332,5 @@ def pytest_collection_modifyitems(config, items):
         reason="monorepo_only: requires Touchdown-Labs monorepo (set MONOREPO_ROOT to enable)"
     )
     for item in items:
-        if _MRPath(item.fspath).name in _MONOREPO_DEPENDENT_FILES:
-            item.add_marker(skip_marker)
-
-
-# ---------------------------------------------------------------------------
-# Monorepo integration test skipping (added 2026-05-04 for OSS publish)
-# ---------------------------------------------------------------------------
-# Some integration tests shell out to scripts/run_neocloud_nvidia_profile.py
-# from the Touchdown-Labs monorepo. They were not designed to run outside
-# that monorepo. Auto-skip them when the monorepo path is absent so the OSS
-# release pipeline (release.yml -> pytest tests/) doesn't fail on extraction.
-#
-# To run these tests locally, set MONOREPO_ROOT to the Touchdown-Labs root
-# (the directory containing scripts/run_neocloud_nvidia_profile.py).
-
-import os as _mr_os
-from pathlib import Path as _MRPath
-
-_MONOREPO_DEPENDENT_FILES = {
-    # First batch — shell out to /Users/chen/scripts/run_neocloud_nvidia_profile.py
-    "test_classify_failures.py",
-    "test_find_cliffs.py",
-    "test_cost_model.py",
-    "test_launch_engine_sglang.py",
-    "test_request_profile.py",
-    "test_neocloud_nvidia_profile.py",
-    "test_validate_completed.py",
-    "test_launch_engine_lmcache.py",
-    "test_report_completed.py",
-    "test_diagnose_bottleneck.py",
-    "test_agentx_adapter.py",
-    "test_launch_engine.py",
-    # Second batch — expect Path(__file__).parents[3] / "scripts" / ... (monorepo layout)
-    "test_agentx_slurm_matrix.py",
-    "test_lmcache_artifact_contract.py",
-    "test_lmcache_matrix_expansion.py",
-    "test_runbook_08_dryrun.py",
-    "test_scan_release_bundle.py",
-    "test_slurm_script_rendering.py",
-}
-
-
-def _monorepo_available() -> bool:
-    """True only when MONOREPO_ROOT is explicitly set AND points at the script.
-
-    These tests hardcode subprocess invocations to monorepo-internal scripts
-    (e.g., ``/Users/chen/scripts/run_neocloud_nvidia_profile.py``) and are not
-    designed to run outside the Touchdown-Labs monorepo. Skip-by-default in
-    OSS contexts; opt-in via ``MONOREPO_ROOT=/path/to/Touchdown-Labs``.
-    """
-    env_root = _mr_os.environ.get("MONOREPO_ROOT")
-    if not env_root:
-        return False
-    candidate = _MRPath(env_root) / "scripts" / "run_neocloud_nvidia_profile.py"
-    return candidate.exists()
-
-
-def pytest_collection_modifyitems(config, items):
-    if _monorepo_available():
-        return
-    skip_marker = pytest.mark.skip(
-        reason="monorepo_only: requires Touchdown-Labs monorepo (set MONOREPO_ROOT to enable)"
-    )
-    for item in items:
-        if _MRPath(item.fspath).name in _MONOREPO_DEPENDENT_FILES:
+        if Path(item.fspath).name in _MONOREPO_DEPENDENT_FILES:
             item.add_marker(skip_marker)

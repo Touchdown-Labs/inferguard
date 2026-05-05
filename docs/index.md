@@ -26,6 +26,13 @@ evidence is worse than no evidence.
 - Publishability: each claim is marked `measured`, `inferred`, `synthetic`, or `not_proven`.
 - Operator action: bottleneck verdicts, hardware fit, engine configuration, and cost-per-useful-task.
 
+## Current boundaries
+
+InferGuard can validate local evidence, profile endpoints you provide, collect engine/GPU timelines,
+run synthetic smoke tests, and emit local reports. It does not train models, provision cloud
+infrastructure, upload telemetry by default, operate a hosted dashboard, or make publishable claims
+when required live artifacts are missing.
+
 ## Package links
 
 - [PyPI](https://pypi.org/project/inferguard/)

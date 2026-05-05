@@ -16,6 +16,8 @@ It covers the consent token shape.
 It covers local payload generation.
 It covers privacy blocklists.
 It covers the v0.5 DP stub and the v0.6 DP target.
+The local pending-payload behavior described here remains the current `0.7.1`
+behavior; hosted upload and real differential privacy are still not shipped.
 It covers the k-anonymity floor for hosted aggregation.
 It covers revocation.
 It covers GDPR and CCPA handling.

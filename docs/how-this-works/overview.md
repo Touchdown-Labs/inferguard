@@ -44,6 +44,8 @@ to use next.
   explicitly downgraded.
 - Lock you in. The CLI runs anywhere Python runs. The schemas are
   open. The traces are reproducible.
+- Provision infrastructure, host dashboards, or upload telemetry by
+  default. Those remain outside the current OSS package.
 
 ## Next
 

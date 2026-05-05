@@ -43,14 +43,13 @@ PYTHONPATH=src python3 -m inferguard.cli --help
 
 ## Optional dependencies
 
-Some features (the harness orchestrator, MCP server mode, full DCGM
-correlation) require extras. Install them on demand:
+Some features require extras. Install them on demand:
 
 ```bash
 pip install 'inferguard[harness]'    # harness orchestrator
 pip install 'inferguard[mcp]'        # MCP server
-pip install 'inferguard[dcgm]'       # GPU telemetry adapters
-pip install 'inferguard[all]'        # everything
+pip install 'inferguard[plot]'       # plotting support
+pip install 'inferguard[docs]'       # local documentation build
 ```
 
 ## Next

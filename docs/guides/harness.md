@@ -16,6 +16,8 @@ supersedes-policy: "Updates the v0.5 draft harness overview; does not supersede 
 ## 1. Source of truth
 
 This document describes the v0.5 InferGuard harness for OSS readers and production operators.
+The harness described here is still part of the current `0.7.1` package; `v0.5`
+names the feature tranche where these contracts were introduced.
 It is an operator guide, not the architecture authority.
 The canonical design is `docs/designs/2026-04-30-inferguard-harness-architecture.md`.
 The production-readiness investigation is `docs/investigations/2026-04-30-v0.5-harness-production-readiness.md`.
@@ -113,7 +115,7 @@ python -m pip install 'inferguard[harness]'
 Operators who vendor the package may pin the release.
 
 ```bash
-python -m pip install 'inferguard[harness]==0.5.*'
+python -m pip install 'inferguard[harness]==0.7.1'
 ```
 
 The harness must not start background services at install time.

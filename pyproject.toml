@@ -62,7 +62,7 @@ harness = ["prometheus-client>=0.20"]
 Homepage = "https://touchdown-labs.com/inferguard/"
 Repository = "https://github.com/Touchdown-Labs/inferguard"
 Issues = "https://github.com/Touchdown-Labs/inferguard/issues"
-Changelog = "https://github.com/Touchdown-Labs/inferguard/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/Touchdown-Labs/inferguard/releases"
 Documentation = "https://touchdown-labs.com/inferguard/"
 
 [project.scripts]
