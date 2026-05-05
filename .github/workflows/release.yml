@@ -27,6 +27,8 @@ jobs:
         run: pip install -e .[dev,mcp] tomli
 
       - name: Pytest release gate
+        env:
+          COLUMNS: "200"
         run: pytest tests/
 
       - name: Verify tag matches package version
