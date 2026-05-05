@@ -1,0 +1,1 @@
+{"schema_version": "inferguard-engine-metrics-timeline/v1", "sequence": 1, "engine": "vllm", "group": "summary", "metrics": {"vllm:request_success_total": 40, "vllm:prompt_tokens_total": 800000, "vllm:gpu_cache_usage_perc": 0.42, "lmcache:retrieve_hit_rate": 0.22, "lmcache:lookup_hit_rate": 0.22}, "claim_status": "measured"}

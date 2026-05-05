@@ -1,0 +1,1 @@
+{"schema_version": "dcgm-correlated/v1", "sequence": 1, "metrics": {"DCGM_FI_DEV_GPU_UTIL": 78.0, "DCGM_FI_DEV_FB_USED": 51200.0}, "field_ids": {"DCGM_FI_DEV_GPU_UTIL": "203", "DCGM_FI_DEV_FB_USED": "252"}}

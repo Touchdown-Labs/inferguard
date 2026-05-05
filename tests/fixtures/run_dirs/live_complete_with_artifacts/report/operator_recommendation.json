@@ -1,0 +1,440 @@
+{
+  "base_schema_version": "inferguard-operator-brief/v1",
+  "best_engine": {
+    "claim_status": "measured",
+    "reason": "sglang has the strongest measured score among comparable engines.",
+    "value": "sglang"
+  },
+  "best_gpu_sku": {
+    "claim_status": "measured",
+    "reason": "B200 has the strongest measured score among comparable SKUs.",
+    "value": "B200"
+  },
+  "best_model_config": {
+    "claim_status": "inferred",
+    "reason": "Config is inferred from the measured decode_bound bottleneck and launch/profile artifacts.",
+    "value": {
+      "concurrency": 8,
+      "context_length": null,
+      "engine": "sglang",
+      "kv_cache_dtype": "fp8",
+      "max_model_len": 131072,
+      "model": "deepseek-v4-pro",
+      "model_profile": "dsv4-long-context",
+      "quantization": "fp8",
+      "sku": "B200",
+      "tensor_parallel_size": 8
+    }
+  },
+  "bottleneck": {
+    "claim_status": "measured",
+    "verdict": "decode_bound"
+  },
+  "capacity_envelope": {
+    "claim_status": "not_proven",
+    "max_concurrency": null,
+    "max_context": null,
+    "reason": "not_proven \u2014 see capacity_cliffs.json"
+  },
+  "claim_status": "measured",
+  "claim_table": [
+    {
+      "claim_id": "executive_verdict",
+      "claim_text": "recommend B200 on sglang for the measured workload",
+      "evidence_paths": [
+        "expected_artifact_contract.json",
+        "matrix_plan.json",
+        "validation_report.json"
+      ],
+      "status": "measured"
+    },
+    {
+      "claim_id": "best_gpu_sku",
+      "claim_text": "B200 has the strongest measured score among comparable SKUs.",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+        "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "jobs/job-b200-sglang/launch/healthcheck.json",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-b200-sglang/operator_profile.json",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "status": "measured"
+    },
+    {
+      "claim_id": "best_engine",
+      "claim_text": "sglang has the strongest measured score among comparable engines.",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+        "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "jobs/job-b200-sglang/launch/healthcheck.json",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-b200-sglang/operator_profile.json",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "status": "measured"
+    },
+    {
+      "claim_id": "best_model_config",
+      "claim_text": "Config is inferred from the measured decode_bound bottleneck and launch/profile artifacts.",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+        "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "jobs/job-b200-sglang/launch/healthcheck.json",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-b200-sglang/operator_profile.json",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "status": "inferred"
+    },
+    {
+      "claim_id": "bottleneck",
+      "claim_text": "Bottleneck verdict: decode_bound.",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+        "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "jobs/job-b200-sglang/launch/healthcheck.json",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-b200-sglang/operator_profile.json",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "status": "measured"
+    },
+    {
+      "claim_id": "capacity_envelope",
+      "claim_text": "No capacity envelope: not_proven \u2014 see capacity_cliffs.json",
+      "evidence_paths": [],
+      "status": "not_proven"
+    },
+    {
+      "claim_id": "failure_summary",
+      "claim_text": "Top failure class: none.",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "jobs/job-h200-vllm/diagnosis/failure_classification.json"
+      ],
+      "status": "measured"
+    },
+    {
+      "claim_id": "cost_notes",
+      "claim_text": "No cost claim: not_proven \u2014 cost input not supplied",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/request_profile/requests_profile.jsonl",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json",
+        "jobs/job-h200-vllm/request_profile/requests_profile.jsonl",
+        "jobs/job-h200-vllm/request_profile/requests_summary.json"
+      ],
+      "status": "not_proven"
+    },
+    {
+      "claim_id": "lmcache_verdict",
+      "claim_text": "No LMCache verdict: not_proven \u2014 see jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl, jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/metrics_summary.json",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl",
+        "jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl",
+        "jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl",
+        "jobs/job-h200-vllm/metrics/metrics_summary.json"
+      ],
+      "status": "not_proven"
+    },
+    {
+      "claim_id": "gb200_justification",
+      "claim_text": "No GB200/GB300 justification: not_proven \u2014 see jobs/*/preflight/ib_state.txt, jobs/*/preflight/nccl_all_reduce.txt, jobs/*/preflight/nvidia_smi_topo.txt",
+      "evidence_paths": [],
+      "status": "not_proven"
+    }
+  ],
+  "cost_notes": {
+    "claim_status": "not_proven",
+    "claim_status_by_field": {
+      "cost_per_million_completion_tokens_usd": "not_proven \u2014 cost input not supplied",
+      "cost_per_million_generated_tokens": "not_proven \u2014 cost input not supplied",
+      "cost_per_million_generated_tokens_usd": "not_proven \u2014 cost input not supplied",
+      "cost_per_million_prompt_tokens": "not_proven \u2014 cost input not supplied",
+      "cost_per_million_prompt_tokens_usd": "not_proven \u2014 cost input not supplied",
+      "cost_per_useful_task": "not_proven \u2014 cost input not supplied",
+      "cost_per_useful_task_usd": "not_proven \u2014 cost input not supplied",
+      "failed_request_waste_dollars": "not_proven \u2014 cost input not supplied",
+      "failed_request_waste_percent": "not_proven \u2014 cost input not supplied",
+      "gpu_hour_normalized_throughput": "not_proven \u2014 cost input not supplied",
+      "safe_concurrency_envelope": "not_proven \u2014 cost input not supplied"
+    },
+    "cost_per_million_completion_tokens_usd": null,
+    "cost_per_million_generated_tokens": null,
+    "cost_per_million_generated_tokens_usd": null,
+    "cost_per_million_prompt_tokens": null,
+    "cost_per_million_prompt_tokens_usd": null,
+    "cost_per_useful_task": null,
+    "cost_per_useful_task_usd": null,
+    "failed_request_waste_dollars": null,
+    "failed_request_waste_percent": null,
+    "gpu_hour_normalized_throughput": null,
+    "reason": "not_proven \u2014 cost input not supplied",
+    "safe_concurrency_envelope": {
+      "claim_status": "not_proven",
+      "reason": "not_proven \u2014 cost input not supplied",
+      "safe_concurrency": null
+    },
+    "schema_version": "inferguard-cost/v1"
+  },
+  "evidence_artifacts": [
+    "expected_artifact_contract.json",
+    "jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+    "jobs/job-b200-sglang/diagnosis/failure_classification.json",
+    "jobs/job-b200-sglang/launch/healthcheck.json",
+    "jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl",
+    "jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl",
+    "jobs/job-b200-sglang/metrics/metrics_summary.json",
+    "jobs/job-b200-sglang/operator_profile.json",
+    "jobs/job-b200-sglang/preflight/ib_state.txt",
+    "jobs/job-b200-sglang/request_profile/requests_profile.jsonl",
+    "jobs/job-b200-sglang/request_profile/requests_summary.json",
+    "jobs/job-h200-vllm/diagnosis/bottleneck_diagnosis.json",
+    "jobs/job-h200-vllm/diagnosis/failure_classification.json",
+    "jobs/job-h200-vllm/launch/healthcheck.json",
+    "jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl",
+    "jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl",
+    "jobs/job-h200-vllm/metrics/metrics_summary.json",
+    "jobs/job-h200-vllm/operator_profile.json",
+    "jobs/job-h200-vllm/preflight/ib_state.txt",
+    "jobs/job-h200-vllm/request_profile/requests_profile.jsonl",
+    "jobs/job-h200-vllm/request_profile/requests_summary.json",
+    "matrix_plan.json",
+    "validation_report.json"
+  ],
+  "executive_verdict": "recommend B200 on sglang for the measured workload",
+  "executive_verdict_status": "live_complete",
+  "failure_summary": {
+    "claim_status": "measured",
+    "top_class": "none"
+  },
+  "gb200_justification": {
+    "claim_status": "not_proven",
+    "reason": "not_proven \u2014 see jobs/*/preflight/ib_state.txt, jobs/*/preflight/nccl_all_reduce.txt, jobs/*/preflight/nvidia_smi_topo.txt",
+    "value": "not_proven"
+  },
+  "lmcache_verdict": {
+    "claim_status": "not_proven",
+    "reason": "not_proven \u2014 see jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl, jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/metrics_summary.json",
+    "value": null
+  },
+  "operator_brief_extension": {
+    "measured_vs_inferred": [
+      {
+        "claim": "LMCache improved TTFT",
+        "evidence": "requires matching baseline/LMCache cells and live LMCache metrics",
+        "status": "not_proven"
+      },
+      {
+        "claim": "eviction occurred",
+        "evidence": "no lmcache_eviction_count metric present",
+        "status": "inferred_without_engine_metrics"
+      },
+      {
+        "claim": "tier residency observed",
+        "evidence": "no LMCache tier byte metrics present",
+        "status": "inferred_without_engine_metrics"
+      },
+      {
+        "claim": "cross-tenant isolation",
+        "evidence": "requires cache_salt engine evidence; workload shape alone is not proof",
+        "status": "not_proven"
+      },
+      {
+        "claim": "CacheBlend/CacheGen/MP mode detected",
+        "evidence": "no mode metrics exposed",
+        "status": "not_proven"
+      },
+      {
+        "claim": "artifact completeness",
+        "evidence": "report artifacts and raw paths present",
+        "status": "measured"
+      }
+    ],
+    "raw_artifact_paths": [
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/inferguard_report/report.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/diagnosis/failure_classification.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/launch/healthcheck.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/metrics/metrics_summary.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/operator_profile.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/preflight/ib_state.txt",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/request_profile/requests_profile.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-b200-sglang/request_profile/requests_summary.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/diagnosis/bottleneck_diagnosis.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/diagnosis/failure_classification.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/launch/healthcheck.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/metrics/metrics_summary.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/operator_profile.json",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/preflight/ib_state.txt",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/request_profile/requests_profile.jsonl",
+      "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete_with_artifacts/jobs/job-h200-vllm/request_profile/requests_summary.json"
+    ],
+    "recommended_engine_config": "unknown-hardware unknown-engine conc=None",
+    "schema_version": "inferguard-operator-brief/v1",
+    "summary": {
+      "cost": {},
+      "recommended_engine_config": "unknown-hardware unknown-engine conc=None",
+      "total_cells": 2,
+      "workload_classes": [
+        "unknown"
+      ]
+    }
+  },
+  "recommended_next_run": "Run find-cliffs to establish max concurrency and max context before operator sign-off.",
+  "refusals": [
+    {
+      "claim_id": "capacity_envelope",
+      "evidence_paths": [
+        "capacity_cliffs.json"
+      ],
+      "reason": "capacity_cliffs_missing"
+    },
+    {
+      "claim_id": "cost_notes",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/request_profile/requests_profile.jsonl",
+        "jobs/job-b200-sglang/request_profile/requests_summary.json",
+        "jobs/job-h200-vllm/request_profile/requests_profile.jsonl",
+        "jobs/job-h200-vllm/request_profile/requests_summary.json"
+      ],
+      "reason": "cost_input_missing"
+    },
+    {
+      "claim_id": "lmcache_verdict",
+      "evidence_paths": [
+        "jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl",
+        "jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl",
+        "jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl",
+        "jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl",
+        "jobs/job-h200-vllm/metrics/metrics_summary.json"
+      ],
+      "reason": "live_lmcache_metrics_missing"
+    },
+    {
+      "claim_id": "gb200_justification",
+      "evidence_paths": [],
+      "reason": "gb200_topology_nccl_rdma_missing"
+    }
+  ],
+  "schema_version": "inferguard-operator-recommendation/v1",
+  "sections": [
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] recommend B200 on sglang for the measured workload Evidence: validation_report.json, matrix_plan.json, expected_artifact_contract.json"
+      ],
+      "title": "Executive verdict"
+    },
+    {
+      "claim_status": "not_proven",
+      "lines": [
+        "| Claim | Label | Evidence |",
+        "|---|---|---|",
+        "| executive_verdict | [measured] | validation_report.json, matrix_plan.json, expected_artifact_contract.json |",
+        "| best_gpu_sku | [measured] | jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json |",
+        "| best_engine | [measured] | jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json |",
+        "| best_model_config | [inferred] | jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json |",
+        "| bottleneck | [measured] | jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json |",
+        "| capacity_envelope | [not_proven] | not_proven evidence gate |",
+        "| failure_summary | [measured] | jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-h200-vllm/diagnosis/failure_classification.json |",
+        "| cost_notes | [not_proven] | jobs/job-b200-sglang/request_profile/requests_summary.json, jobs/job-h200-vllm/request_profile/requests_summary.json, jobs/job-b200-sglang/request_profile/requests_profile.jsonl, jobs/job-h200-vllm/request_profile/requests_profile.jsonl |",
+        "| lmcache_verdict | [not_proven] | jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-h200-vllm/metrics/metrics_summary.json, jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl, jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl, jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl |",
+        "| gb200_justification | [not_proven] | not_proven evidence gate |"
+      ],
+      "title": "Measured vs inferred vs synthetic"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] B200 has the strongest measured score among comparable SKUs. Evidence: jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "title": "Best GPU SKU"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] sglang has the strongest measured score among comparable engines. Evidence: jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "title": "Best engine"
+    },
+    {
+      "claim_status": "inferred",
+      "lines": [
+        "[inferred] Config is inferred from the measured decode_bound bottleneck and launch/profile artifacts. Evidence: jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "title": "Best model config"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] Bottleneck verdict: decode_bound. Evidence: jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json, jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-b200-sglang/launch/healthcheck.json, jobs/job-b200-sglang/metrics/metrics_summary.json, jobs/job-b200-sglang/operator_profile.json, jobs/job-b200-sglang/request_profile/requests_summary.json"
+      ],
+      "title": "Bottleneck"
+    },
+    {
+      "claim_status": "not_proven",
+      "lines": [
+        "[not_proven] No capacity envelope: not_proven \u2014 see capacity_cliffs.json"
+      ],
+      "title": "Capacity envelope"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] Top failure class: none. Evidence: jobs/job-b200-sglang/diagnosis/failure_classification.json, jobs/job-h200-vllm/diagnosis/failure_classification.json"
+      ],
+      "title": "Failure summary"
+    },
+    {
+      "claim_status": "not_proven",
+      "lines": [
+        "[not_proven] No cost claim: not_proven \u2014 cost input not supplied"
+      ],
+      "title": "Cost notes"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] Run find-cliffs to establish max concurrency and max context before operator sign-off. Evidence: validation_report.json, matrix_plan.json, expected_artifact_contract.json"
+      ],
+      "title": "Recommended next run"
+    },
+    {
+      "claim_status": "measured",
+      "lines": [
+        "[measured] expected_artifact_contract.json Evidence: expected_artifact_contract.json",
+        "[measured] jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json Evidence: jobs/job-b200-sglang/diagnosis/bottleneck_diagnosis.json",
+        "[measured] jobs/job-b200-sglang/diagnosis/failure_classification.json Evidence: jobs/job-b200-sglang/diagnosis/failure_classification.json",
+        "[measured] jobs/job-b200-sglang/launch/healthcheck.json Evidence: jobs/job-b200-sglang/launch/healthcheck.json",
+        "[measured] jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl Evidence: jobs/job-b200-sglang/metrics/engine_metrics_timeline.jsonl",
+        "[measured] jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl Evidence: jobs/job-b200-sglang/metrics/gpu_metrics_timeline.jsonl",
+        "[measured] jobs/job-b200-sglang/metrics/metrics_summary.json Evidence: jobs/job-b200-sglang/metrics/metrics_summary.json",
+        "[measured] jobs/job-b200-sglang/operator_profile.json Evidence: jobs/job-b200-sglang/operator_profile.json",
+        "[measured] jobs/job-b200-sglang/preflight/ib_state.txt Evidence: jobs/job-b200-sglang/preflight/ib_state.txt",
+        "[measured] jobs/job-b200-sglang/request_profile/requests_profile.jsonl Evidence: jobs/job-b200-sglang/request_profile/requests_profile.jsonl",
+        "[measured] jobs/job-b200-sglang/request_profile/requests_summary.json Evidence: jobs/job-b200-sglang/request_profile/requests_summary.json",
+        "[measured] jobs/job-h200-vllm/diagnosis/bottleneck_diagnosis.json Evidence: jobs/job-h200-vllm/diagnosis/bottleneck_diagnosis.json",
+        "[measured] jobs/job-h200-vllm/diagnosis/failure_classification.json Evidence: jobs/job-h200-vllm/diagnosis/failure_classification.json",
+        "[measured] jobs/job-h200-vllm/launch/healthcheck.json Evidence: jobs/job-h200-vllm/launch/healthcheck.json",
+        "[measured] jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl Evidence: jobs/job-h200-vllm/metrics/engine_metrics_timeline.jsonl",
+        "[measured] jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl Evidence: jobs/job-h200-vllm/metrics/gpu_metrics_timeline.jsonl",
+        "[measured] jobs/job-h200-vllm/metrics/metrics_summary.json Evidence: jobs/job-h200-vllm/metrics/metrics_summary.json",
+        "[measured] jobs/job-h200-vllm/operator_profile.json Evidence: jobs/job-h200-vllm/operator_profile.json",
+        "[measured] jobs/job-h200-vllm/preflight/ib_state.txt Evidence: jobs/job-h200-vllm/preflight/ib_state.txt",
+        "[measured] jobs/job-h200-vllm/request_profile/requests_profile.jsonl Evidence: jobs/job-h200-vllm/request_profile/requests_profile.jsonl",
+        "[measured] jobs/job-h200-vllm/request_profile/requests_summary.json Evidence: jobs/job-h200-vllm/request_profile/requests_summary.json",
+        "[measured] matrix_plan.json Evidence: matrix_plan.json",
+        "[measured] validation_report.json Evidence: validation_report.json"
+      ],
+      "title": "Evidence artifacts"
+    }
+  ]
+}

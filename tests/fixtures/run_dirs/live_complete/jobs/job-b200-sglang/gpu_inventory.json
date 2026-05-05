@@ -1,0 +1,13 @@
+{
+  "gpus": [
+    "B200",
+    "B200",
+    "B200",
+    "B200",
+    "B200",
+    "B200",
+    "B200",
+    "B200"
+  ],
+  "schema_version": "inferguard-gpu-inventory/v1"
+}

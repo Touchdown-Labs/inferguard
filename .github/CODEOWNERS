@@ -1,0 +1,9 @@
+# Default code owners — single-point-of-failure today; expand with co-maintainers as the project grows.
+* @OCWC22
+
+# Critical surfaces require explicit review
+/.github/                @OCWC22
+/src/inferguard/validate/ @OCWC22
+/src/inferguard/cli.py    @OCWC22
+/pyproject.toml           @OCWC22
+/CHANGELOG.md             @OCWC22

@@ -1,0 +1,32 @@
+name: Release Tag Gate
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  live-complete-proof-bundle:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package + dev deps
+        run: pip install -e .[dev,mcp]
+
+      - name: Verify live-complete release proof bundle
+        run: python scripts/scan_release_bundle.py "release_proofs/${GITHUB_REF_NAME}"

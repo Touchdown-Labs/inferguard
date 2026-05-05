@@ -1,0 +1,2 @@
+request_id,total_tokens,prompt_tokens,completion_tokens,latency_ms,success
+req-no-marker-1,110,100,10,1000,true

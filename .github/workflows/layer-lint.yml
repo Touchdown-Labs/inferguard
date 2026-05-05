@@ -1,0 +1,37 @@
+name: Layer Lint
+
+on:
+  pull_request:
+
+jobs:
+  layer-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check forbidden imports in OSS boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGETS=(
+            "src/inferguard/disagg"
+            "src/inferguard/bench"
+            "src/inferguard/schemas"
+            "src/inferguard/utils"
+            "src/inferguard/analyze"
+            "src/inferguard/cli.py"
+            "src/inferguard/mcp_server.py"
+          )
+
+          FORBIDDEN='agent|brain_client|diagnosis|memory|executor|replay_validation|safe_actions|remediation|blaxel_agent'
+
+          MATCHES=$(grep -RInE "(^|[[:space:]])(from|import)[[:space:]].*(${FORBIDDEN})" "${TARGETS[@]}" || true)
+
+          if [[ -n "${MATCHES}" ]]; then
+            echo "Forbidden imports found:"
+            echo "${MATCHES}"
+            exit 1
+          fi
+
+          echo "Layer lint passed."

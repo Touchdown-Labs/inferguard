@@ -1,0 +1,19 @@
+# HELP sglang:token_usage Token slots in use.
+# TYPE sglang:token_usage gauge
+sglang:token_usage 0.61
+sglang:num_running_reqs 9
+sglang:num_queue_reqs 2
+sglang:num_preemptions_total 0
+sglang:kv_transfer_sent_bytes_total{connector="mooncake"} 1048576
+sglang:kv_transfer_recv_bytes_total{connector="mooncake"} 2097152
+sglang:kv_transfer_errors_total{connector="mooncake"} 0
+sglang:hicache_l1_hit_count_total 900
+sglang:hicache_l2_hit_count_total 120
+sglang:hicache_l3_hit_count_total 30
+sglang:hicache_lookup_count_total 1100
+sglang:hicache_l2_bytes 4294967296
+sglang:hicache_l3_bytes 8589934592
+sglang:time_to_first_token_seconds_sum 1.2
+sglang:time_to_first_token_seconds_count 20
+sglang:time_per_output_token_seconds_sum 0.6
+sglang:time_per_output_token_seconds_count 80

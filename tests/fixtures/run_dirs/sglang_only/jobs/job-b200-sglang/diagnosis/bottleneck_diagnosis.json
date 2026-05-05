@@ -1,0 +1,11 @@
+{
+  "claim_status": "measured",
+  "confidence": 0.86,
+  "evidence_paths": [
+    "request_profile/requests_summary.json",
+    "metrics/metrics_summary.json"
+  ],
+  "job_id": "job-b200-sglang",
+  "schema_version": "inferguard-bottleneck-diagnosis/v1",
+  "verdict": "decode_bound"
+}

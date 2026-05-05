@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "engine": "vllm",
+      "job_id": "job-gb200-vllm",
+      "output_dir": "jobs/job-gb200-vllm",
+      "sku": "GB200"
+    }
+  ],
+  "provider": "gmi_cloud",
+  "schema_version": "inferguard-gmi-profile-summary/v1",
+  "total_jobs": 1
+}

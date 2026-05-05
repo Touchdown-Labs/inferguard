@@ -1,0 +1,7 @@
+{
+  "claim_status": "measured",
+  "failures": [],
+  "job_id": "cell-c8",
+  "schema_version": "inferguard-failure-classification/v1",
+  "top_class": "none"
+}

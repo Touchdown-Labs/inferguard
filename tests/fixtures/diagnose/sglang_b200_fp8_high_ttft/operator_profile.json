@@ -1,0 +1,6 @@
+{
+  "engine": "sglang",
+  "hardware": "B200",
+  "job_id": "job-diagnose",
+  "node_count": 1
+}

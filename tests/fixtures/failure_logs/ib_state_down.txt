@@ -1,0 +1,4 @@
+CA mlx5_0
+	Port 1:
+		State: Down
+		Physical state: Polling

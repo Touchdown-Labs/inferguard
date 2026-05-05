@@ -1,0 +1,5 @@
+{
+  "claim_status": "measured",
+  "preexisting_artifact": true,
+  "schema_version": "inferguard-operator-recommendation/v1"
+}

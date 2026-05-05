@@ -1,0 +1,32 @@
+# HELP lmcache_enabled Synthetic LMCache enablement gauge.
+# TYPE lmcache_enabled gauge
+lmcache_enabled 1
+lmcache_hit_count 90
+lmcache_miss_count 10
+lmcache:num_hit_tokens 90
+lmcache:num_lookup_hits 88
+lmcache:retrieve_hit_rate 0.9
+lmcache:lookup_hit_rate 0.88
+lmcache:lookup_0_hit_requests 2
+lmcache:local_cpu_evict_count 3
+lmcache:local_cpu_evict_keys_count 6
+lmcache:local_cpu_evict_failed_count 0
+lmcache:local_cache_usage 2147483648
+lmcache:remote_cache_usage 536870912
+lmcache:local_storage_usage 3221225472
+lmcache:local_cpu_hot_cache_count 12
+lmcache_evictions_total 3
+lmcache_saves_total 75
+lmcache_retrieves_total 100
+lmcache_tier_usage_bytes{tier="hbm"} 1073741824
+lmcache_tier_usage_bytes{tier="cpu"} 2147483648
+lmcache_tier_usage_bytes{tier="disk"} 3221225472
+lmcache_tier_usage_bytes{tier="remote"} 536870912
+lmcache_offload_bytes_total 268435456
+lmcache_retrieve_latency_ms{quantile="0.5"} 1.5
+lmcache_retrieve_latency_ms{quantile="0.95"} 8.25
+lmcache_retrieve_latency_ms{quantile="0.99"} 12.5
+lmcache_nixl_transfer_bytes_total 67108864
+lmcache_nixl_transfer_latency_seconds 0.004
+lmcache:connector_info{connector="LMCacheConnectorV1"} 1
+lmcache_config_info{connector="nixl",cacheblend="true",cachegen="false",mp_mode="true",cache_salt="true",enabled="true"} 1

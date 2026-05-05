@@ -1,0 +1,4 @@
+request_id,total_tokens,prompt_tokens,completion_tokens,latency_ms,throughput_tokens_per_sec,gpu_utilization_percent,memory_utilization_gb,power_consumption_watts,success
+req-full-1,1050,1000,50,2500,20.0,72.5,61.25,550.0,true
+req-full-2,2080,2000,80,4000,20.0,81.0,63.5,575.0,true
+req-full-3,1560,1500,60,3000,20.0,77.0,62.0,560.0,true

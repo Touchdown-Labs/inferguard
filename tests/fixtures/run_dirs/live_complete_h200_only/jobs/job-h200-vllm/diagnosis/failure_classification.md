@@ -1,0 +1,3 @@
+# Failure classification
+
+- [measured] none

@@ -1,0 +1,1 @@
+{"schema_version": "inferguard-request-profile/v1", "request_id": "job-b200-sglang-1", "success": true, "engine": "sglang", "ttft_ms": 180, "e2e_latency_ms": 640, "completion_tokens": 3000, "claim_status": "measured"}

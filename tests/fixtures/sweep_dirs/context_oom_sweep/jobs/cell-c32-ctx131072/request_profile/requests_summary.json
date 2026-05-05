@@ -1,0 +1,39 @@
+{
+  "claim_status": "measured",
+  "completion_tokens_total": 1000,
+  "concurrency": 32,
+  "context_length": 131072,
+  "decode_tokens_per_sec": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+  },
+  "e2e_latency_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+  },
+  "engine": "vllm",
+  "failure_breakdown": {
+    "oom_hbm_exhaustion": 10
+  },
+  "failure_count": 10,
+  "job_id": "cell-c32-ctx131072",
+  "prompt_tokens_total": 131072,
+  "request_count": 10,
+  "schema_version": "inferguard-request-profile-summary/v1",
+  "success_count": 0,
+  "success_rate": 0.0,
+  "tokens_per_sec_aggregate": null,
+  "tpot_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+  },
+  "ttft_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null
+  },
+  "workload_label": "find-cliffs-fixture"
+}

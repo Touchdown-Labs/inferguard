@@ -1,0 +1,100 @@
+{
+  "dcgm_sample_count": 12,
+  "decode": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:generation_tokens_total"
+    ],
+    "tpot_seconds": {
+      "p95": 0.025
+    }
+  },
+  "duration_seconds": 180.0,
+  "engine": "vllm",
+  "generated_at": "2026-05-04T00:00:00Z",
+  "gpu_util": {
+    "claim_status": "measured",
+    "p95": 78.0,
+    "source_metrics": [
+      "DCGM_FI_DEV_GPU_UTIL"
+    ]
+  },
+  "hbm": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "DCGM_FI_DEV_FB_USED"
+    ],
+    "used_mib": {
+      "p95": 51200
+    }
+  },
+  "kv_cache": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:kv_cache_usage_perc"
+    ],
+    "usage_fraction": {
+      "p95": 0.42
+    }
+  },
+  "lmcache": {
+    "claim_status": "measured",
+    "lookup_hit_rate": 0.22,
+    "metrics": {
+      "lmcache:lookup_hit_rate": 0.22,
+      "lmcache:retrieve_hit_rate": 0.22
+    },
+    "retrieve_hit_rate": 0.22,
+    "source_metrics": [
+      "lmcache:retrieve_hit_rate",
+      "lmcache:lookup_hit_rate"
+    ]
+  },
+  "nvlink": {
+    "claim_status": "measured",
+    "rx_bytes": {
+      "p95": 1000
+    },
+    "tx_bytes": {
+      "p95": 1000
+    }
+  },
+  "pcie": {
+    "claim_status": "not_proven"
+  },
+  "power": {
+    "claim_status": "measured",
+    "watts": {
+      "p95": 620
+    }
+  },
+  "prefill": {
+    "claim_status": "measured",
+    "p95_seconds": 0.18,
+    "source_metrics": [
+      "vllm:prompt_tokens_total"
+    ]
+  },
+  "prefix_cache": {
+    "claim_status": "measured",
+    "hit_rate": 0.31,
+    "source_metrics": [
+      "vllm:prefix_cache_hits"
+    ]
+  },
+  "queue": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:num_requests_running"
+    ],
+    "waiting_ratio": {
+      "p95": 0.05
+    }
+  },
+  "sample_count": 12,
+  "schema_version": "inferguard-metrics-summary/v1",
+  "xid_ecc": {
+    "claim_status": "measured",
+    "xid_errors": 0
+  }
+}

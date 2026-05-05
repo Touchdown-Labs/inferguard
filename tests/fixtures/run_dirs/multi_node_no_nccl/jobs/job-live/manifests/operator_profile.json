@@ -1,0 +1,4 @@
+{
+  "engine": "vllm",
+  "node_count": 2
+}

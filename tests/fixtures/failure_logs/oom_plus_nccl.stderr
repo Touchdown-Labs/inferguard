@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "serve.py", line 42, in <module>
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.50 GiB. GPU 0 has 1.42 GiB free.
+NCCL ABORT rank 1 after upstream worker failed.

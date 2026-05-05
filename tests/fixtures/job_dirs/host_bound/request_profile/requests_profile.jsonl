@@ -1,0 +1,3 @@
+{"claim_status": "measured", "e2e_latency_ms": 1801, "job_id": "job-diagnose", "request_id": "req-1", "schema_version": "inferguard-request-profile/v1", "success": true, "tpot_ms": 25, "ttft_ms": 181}
+{"claim_status": "measured", "e2e_latency_ms": 1802, "job_id": "job-diagnose", "request_id": "req-2", "schema_version": "inferguard-request-profile/v1", "success": true, "tpot_ms": 25, "ttft_ms": 182}
+{"claim_status": "measured", "e2e_latency_ms": 1803, "job_id": "job-diagnose", "request_id": "req-3", "schema_version": "inferguard-request-profile/v1", "success": true, "tpot_ms": 25, "ttft_ms": 183}

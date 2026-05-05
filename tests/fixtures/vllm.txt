@@ -1,0 +1,34 @@
+# HELP vllm:gpu_cache_usage_perc KV cache usage ratio.
+# TYPE vllm:gpu_cache_usage_perc gauge
+vllm:gpu_cache_usage_perc 0.82
+vllm:prompt_tokens_total 65536
+vllm:generation_tokens_total 8192
+vllm:request_success_total{finished_reason="stop"} 31
+vllm:num_requests_running 24
+vllm:num_requests_waiting 8
+vllm:request_queue_time_seconds_sum 1.2
+vllm:request_queue_time_seconds_count 24
+vllm:request_prefill_time_seconds_sum 2.4
+vllm:request_prefill_time_seconds_count 24
+vllm:request_decode_time_seconds_sum 3.6
+vllm:request_decode_time_seconds_count 24
+vllm:num_requests_swapped 0
+vllm:num_preemptions_total 3
+vllm:kv_transfer_sent_bytes_total{connector="nixl"} 104857600
+vllm:kv_transfer_recv_bytes_total{connector="nixl"} 104857600
+vllm:kv_transfer_errors_total{connector="nixl"} 0
+vllm:prefix_cache_hits_total 42
+vllm:prefix_cache_queries_total 56
+vllm:prefix_cache_hits 42
+vllm:prefix_cache_queries 56
+vllm:cpu_prefix_cache_hits_total 7
+vllm:cpu_prefix_cache_queries_total 14
+vllm:kv_offload_bytes_gpu_to_cpu 1024
+vllm:kv_offload_bytes_cpu_to_gpu 512
+vllm:kv_offload_time_gpu_to_cpu 0.25
+vllm:kv_offload_time_cpu_to_gpu 0.125
+vllm:cpu_kv_cache_usage_pct 0.35
+vllm:time_to_first_token_seconds_sum 2.7
+vllm:time_to_first_token_seconds_count 35
+vllm:time_per_output_token_seconds_sum 0.9
+vllm:time_per_output_token_seconds_count 100

@@ -1,0 +1,36 @@
+{
+  "claim_status": "measured",
+  "completion_tokens_total": 1200,
+  "concurrency": 1,
+  "decode_tokens_per_sec": {
+    "p50": 40,
+    "p95": 45,
+    "p99": 48
+  },
+  "e2e_latency_ms": {
+    "p50": 700,
+    "p95": 1800,
+    "p99": 1900
+  },
+  "engine": "vllm",
+  "failure_breakdown": {},
+  "failure_count": 0,
+  "job_id": "job-diagnose",
+  "prompt_tokens_total": 30000,
+  "request_count": 3,
+  "schema_version": "inferguard-request-profile-summary/v1",
+  "success_count": 3,
+  "success_rate": 1.0,
+  "tokens_per_sec_aggregate": 40,
+  "tpot_ms": {
+    "p50": 20,
+    "p95": 25,
+    "p99": 27.500000000000004
+  },
+  "ttft_ms": {
+    "p50": 1000.0,
+    "p95": 1250,
+    "p99": 1312.5
+  },
+  "workload_label": "diagnose-fixture"
+}

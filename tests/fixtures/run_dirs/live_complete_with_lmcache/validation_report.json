@@ -1,0 +1,23 @@
+{
+  "artifact_contract_ref": "oss/inferguard/tests/fixtures/run_dirs/live_complete_with_lmcache/expected_artifact_contract.json",
+  "harness_version": "0.5.0",
+  "jobs": [
+    {
+      "claim_status": "measured",
+      "downgrades": [],
+      "job_id": "job-h200-vllm-lmcache",
+      "required_paths_missing": [],
+      "required_paths_present": [],
+      "status": "live_complete",
+      "synthetic_markers": []
+    }
+  ],
+  "matrix_plan_ref": "oss/inferguard/tests/fixtures/run_dirs/live_complete_with_lmcache/matrix_plan.json",
+  "results_root": "oss/inferguard/tests/fixtures/run_dirs/live_complete_with_lmcache",
+  "schema_version": "inferguard-validation-report/v1",
+  "status": "live_complete",
+  "summary": {
+    "live_complete": 1
+  },
+  "validated_at": "2026-05-04T00:00:00Z"
+}

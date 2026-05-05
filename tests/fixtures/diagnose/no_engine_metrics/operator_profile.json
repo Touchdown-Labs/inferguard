@@ -1,0 +1,6 @@
+{
+  "engine": "vllm",
+  "hardware": "H200",
+  "job_id": "job-diagnose",
+  "node_count": 1
+}

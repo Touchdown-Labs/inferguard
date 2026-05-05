@@ -1,0 +1,3 @@
+NCCL WARN Cuda failure operation not supported
+NCCL ABORT rank 0 fatal collective failure
+ncclSystemError: System call failed.

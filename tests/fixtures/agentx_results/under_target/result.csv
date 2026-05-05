@@ -1,0 +1,2 @@
+request_id,total_tokens,prompt_tokens,completion_tokens,latency_ms,throughput_tokens_per_sec,success
+req-under-1,910,900,10,1000,10.0,true

@@ -1,0 +1,17 @@
+{
+  "claim_status": "measured",
+  "failures": [
+    {
+      "claim_status": "measured",
+      "class": "oom_hbm_exhaustion",
+      "confidence": 0.95,
+      "evidence_paths": [
+        "launch/stderr.log"
+      ],
+      "rank": 1
+    }
+  ],
+  "job_id": "cell-c32-ctx131072",
+  "schema_version": "inferguard-failure-classification/v1",
+  "top_class": "oom_hbm_exhaustion"
+}

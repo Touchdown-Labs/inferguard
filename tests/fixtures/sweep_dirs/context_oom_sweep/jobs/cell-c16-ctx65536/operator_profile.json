@@ -1,0 +1,9 @@
+{
+  "concurrency": 16,
+  "context_length": 65536,
+  "engine": "vllm",
+  "hardware": "H200",
+  "job_id": "cell-c16-ctx65536",
+  "max_model_len": 65536,
+  "tensor_parallel_size": 8
+}

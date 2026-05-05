@@ -1,0 +1,11 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-synthetic",
+      "output_dir": "jobs/job-synthetic"
+    }
+  ],
+  "provider": "gmi_cloud",
+  "schema_version": "inferguard-gmi-profile-summary/v1",
+  "total_jobs": 1
+}

@@ -1,0 +1,1 @@
+{"schema_version": "inferguard-request-profile/v1", "request_id": "job-live-1", "success": true, "engine": "vllm", "claim_status": "measured", "ttft_ms": 240, "e2e_latency_ms": 920}

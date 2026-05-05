@@ -1,0 +1,5 @@
+{
+  "generated_at_unix": 0,
+  "schema_version": "inferguard-neocloud-gpu-mimic-artifact/v1",
+  "simulation_mode": "synthetic_gpu_mimic"
+}
