@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added regressions for cost/cliff measured-output downgrades when `validation_report.status != live_complete`.
 - Added vLLM DP argv and process-group SIGTERM cleanup regression tests.
 - Added release workflow gates for pytest and `pyproject.toml` ↔ `inferguard.__version__` matching.
-- Commit: direct `main` fix-up commit for v0.7.1 (short SHA reported by the release/agent final output).
+- Import/fix-up commit for the v0.7.1 baseline: `dbc128d`.
 
 ## [0.7.0] - 2026-05-04
 

@@ -1,17 +1,55 @@
-# Contributing
+# Contributing to InferGuard
 
-Thanks for contributing to InferGuard OSS.
+Thanks for contributing to InferGuard.
 
-## Required before opening a PR
+InferGuard is an OSS diagnostics package for inference operators. The best contributions preserve the project's core contract: read-only by default, evidence before recommendation, and no private/pro-tier imports in the OSS tree.
 
-1. Sign commits with DCO (`git commit -s ...`).
-2. Run quality checks locally:
-   - `ruff check .`
-   - `pytest --strict-markers`
-3. Ensure CI is green before requesting review.
-4. Do not merge or request merge with failing CI.
+## Development setup
 
-## Layering rule (OSS boundary)
+```bash
+git clone git@github.com:OCWC22/inferguard.git
+cd inferguard
+python3 -m venv venv
+source venv/bin/activate
+pip install -e '.[dev,mcp]'
+```
+
+If you only need the CLI and test suite, `pip install -e '.[dev]'` is enough.
+
+## Running tests
+
+```bash
+pytest --strict-markers
+```
+
+Useful narrower loops:
+
+```bash
+pytest tests/test_validate_completed.py --strict-markers
+pytest tests/test_request_profile.py --strict-markers
+pytest tests/test_collect_metrics.py --strict-markers
+pytest tests/test_launch_engine.py --strict-markers
+```
+
+## Code style
+
+- Ruff is used for linting and formatting.
+- The project line limit is 100 characters.
+- Keep generated artifacts out of commits unless they are small, intentional fixtures.
+
+```bash
+ruff check .
+ruff format .
+```
+
+If pre-commit hooks are available in your environment:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+## Architecture boundaries (layer-lint)
 
 Changes in OSS files must not import from private/pro-tier modules. In this OSS tree, do not introduce imports from outside the OSS layer-lint allowlist, including forbidden modules such as:
 
@@ -27,9 +65,57 @@ Changes in OSS files must not import from private/pro-tier modules. In this OSS 
 
 CI enforces this boundary via `.github/workflows/layer-lint.yml`.
 
+## Documentation expectations
+
+Update documentation whenever behavior visible to operators changes:
+
+- command flags or output files: update `docs/CLI_REFERENCE.md` and examples as needed;
+- artifact schemas or evidence gates: update `docs/ARCHITECTURE.md`, `docs/SCHEMAS.md`, or `docs/SPEC.md` as appropriate;
+- hardware support or template status: update `docs/HARDWARE_COVERAGE.md`;
+- user-facing behavior: update `CHANGELOG.md`.
+
+Do not claim a configuration is `measured` unless the artifact set can pass `inferguard validate-completed --strict` as `live_complete`.
+
+## Submitting changes
+
+1. Fork the repo.
+2. Create a feature branch: `git checkout -b feat/your-change`.
+3. Make changes and add or update tests.
+4. Sign your commits: `git commit -s -m "type(scope): specific outcome"`.
+5. Push to your fork and open a PR against `main`.
+6. Wait for CI to pass and maintainer review.
+
 ## PR checklist
 
 - [ ] DCO sign-off present on all commits.
 - [ ] `ruff check .` passes.
-- [ ] `pytest --strict-markers` passes.
+- [ ] `ruff format .` has been run or intentionally skipped with explanation.
+- [ ] `pytest --strict-markers` passes, or the PR explains the skipped environment requirement.
 - [ ] `CHANGELOG.md` updated when user-facing behavior changes.
+- [ ] Documentation updated for command, artifact, or schema changes.
+
+## Reporting bugs
+
+Use the GitHub issue templates and include:
+
+- InferGuard version (`inferguard --version`);
+- Python version and OS;
+- serving engine and version when relevant;
+- the exact command run;
+- redacted `validation_report.json`, `requests_summary.json`, or log snippets when available.
+
+For security issues, do not open a public issue. See [SECURITY.md](SECURITY.md).
+
+## Discussion
+
+Use GitHub Issues for bugs and concrete feature requests. If GitHub Discussions are enabled later, maintainers may redirect design discussions there.
+
+## DCO sign-off
+
+Every commit MUST be signed off with `git commit -s`. This adds a line like:
+
+```text
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+The sign-off certifies the [Developer Certificate of Origin](https://developercertificate.org/).

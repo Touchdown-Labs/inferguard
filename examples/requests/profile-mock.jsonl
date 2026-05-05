@@ -1,0 +1,2 @@
+{"request_id":"doc-001","messages":[{"role":"user","content":"Reply with one short sentence about InferGuard."}],"max_tokens":24}
+{"request_id":"doc-002","messages":[{"role":"user","content":"Name one GPU metric operators should capture."}],"max_tokens":24}
