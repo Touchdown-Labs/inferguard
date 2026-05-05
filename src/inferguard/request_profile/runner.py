@@ -8,11 +8,12 @@ import os
 import time
 import uuid
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from statistics import mean
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 import httpx
 
@@ -357,7 +358,9 @@ async def _run_one_request(
     result = await client.stream_chat(
         http,
         messages=spec.messages,
-        output_tokens=spec.expected_output_tokens or _metadata_int(spec.metadata, "max_tokens") or 16,
+        output_tokens=spec.expected_output_tokens
+        or _metadata_int(spec.metadata, "max_tokens")
+        or 16,
         metadata=_request_metadata(spec),
     )
     tokens_per_second = None
@@ -428,16 +431,23 @@ def _row_from_metric(
     claim_status = _row_claim_status(prompt_source, cached_status)
     claim_status_per_field: dict[str, ClaimStatus] = {
         "prompt_tokens": "measured" if prompt_source == "server" else claim_status,
-        "completion_tokens": "measured" if metric.output_tokens_source == "api_usage" else claim_status,
+        "completion_tokens": "measured"
+        if metric.output_tokens_source == "api_usage"
+        else claim_status,
         "cached_tokens": cached_status,
     }
     ttft_ms = metric.ttft_seconds * 1000.0 if metric.ttft_seconds is not None else None
     e2e_ms = metric.latency_seconds * 1000.0
     decoder_seconds = _decoder_seconds(metric)
-    tpot_ms = (decoder_seconds * 1000.0 / metric.output_tokens) if metric.output_tokens > 0 else None
-    content_offsets = [float(item) for item in metric.metadata.get("content_token_offsets_seconds") or []]
+    tpot_ms = (
+        (decoder_seconds * 1000.0 / metric.output_tokens) if metric.output_tokens > 0 else None
+    )
+    content_offsets = [
+        float(item) for item in metric.metadata.get("content_token_offsets_seconds") or []
+    ]
     itl_ms = [
-        (right - left) * 1000.0 for left, right in zip(content_offsets, content_offsets[1:], strict=False)
+        (right - left) * 1000.0
+        for left, right in zip(content_offsets, content_offsets[1:], strict=False)
     ]
     if not itl_ms and tpot_ms is not None and options.stream:
         itl_ms = [tpot_ms]
@@ -454,7 +464,9 @@ def _row_from_metric(
         completion_tokens=metric.output_tokens,
         prompt_tokens_source=prompt_source,
         send_ts=_iso_from_perf(wall_start, perf_start, metric.start_time),
-        first_token_ts=_iso_from_perf(wall_start, perf_start, metric.start_time + metric.ttft_seconds)
+        first_token_ts=_iso_from_perf(
+            wall_start, perf_start, metric.start_time + metric.ttft_seconds
+        )
         if options.stream and metric.ttft_seconds is not None
         else None,
         done_ts=_iso_from_perf(wall_start, perf_start, metric.end_time),
@@ -488,7 +500,9 @@ def _summary_from_rows(
     prompt_total = sum(row.prompt_tokens for row in rows)
     completion_total = sum(row.completion_tokens for row in rows)
     runtime_seconds = _wall_runtime_seconds(rows)
-    decode_tps = [row.decode_tokens_per_sec for row in successes if row.decode_tokens_per_sec is not None]
+    decode_tps = [
+        row.decode_tokens_per_sec for row in successes if row.decode_tokens_per_sec is not None
+    ]
     return RequestProfileSummary(
         job_id=str(options.job_id),
         workload_label=options.workload_label,
@@ -507,7 +521,9 @@ def _summary_from_rows(
         },
         prompt_tokens_total=prompt_total,
         completion_tokens_total=completion_total,
-        tokens_per_sec_aggregate=(completion_total / runtime_seconds) if runtime_seconds > 0 else None,
+        tokens_per_sec_aggregate=(completion_total / runtime_seconds)
+        if runtime_seconds > 0
+        else None,
         failure_breakdown=dict(Counter(row.error_type or "unknown" for row in failures)),
         claim_status=_summary_claim_status(rows),
         success_rate=(len(successes) / len(rows)) if rows else 0.0,
@@ -549,10 +565,12 @@ def _spec_from_json(data: dict[str, Any], *, line_no: int) -> RequestSpec:
         "input_schema_version": data.get("schema_version"),
         "max_tokens": max_tokens,
     }
-    workload_class = str(data.get("workload_class") or metadata.get("workload_class") or "openai-chat")
-    expected_input = _first_int(data, "expected_input_tokens", "context_length", "prompt_tokens") or _first_int(
-        request, "expected_input_tokens", "context_length", "prompt_tokens"
+    workload_class = str(
+        data.get("workload_class") or metadata.get("workload_class") or "openai-chat"
     )
+    expected_input = _first_int(
+        data, "expected_input_tokens", "context_length", "prompt_tokens"
+    ) or _first_int(request, "expected_input_tokens", "context_length", "prompt_tokens")
     expected_output = _first_int(data, "expected_output_tokens", "max_tokens") or _first_int(
         request, "expected_output_tokens", "max_tokens"
     )
@@ -707,7 +725,11 @@ def _summary_claim_status(rows: list[RequestProfileRow]) -> ClaimStatus:
 
 
 def _percentile_block(values: list[float]) -> dict[str, float | None]:
-    return {"p50": _percentile(values, 50), "p95": _percentile(values, 95), "p99": _percentile(values, 99)}
+    return {
+        "p50": _percentile(values, 50),
+        "p95": _percentile(values, 95),
+        "p99": _percentile(values, 99),
+    }
 
 
 def _percentile(values: list[float | None], pct: int) -> float | None:

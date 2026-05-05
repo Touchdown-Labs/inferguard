@@ -21,7 +21,11 @@ def test_eviction_probe_warms_pressures_and_retests_prefix() -> None:
         "eviction_retest",
     ]
     assert specs[0].prefix_group == specs[-1].prefix_group
-    assert {spec.workload_class for spec in specs} >= {"prefix-reuse", "kv-pressure", "session-resume"}
+    assert {spec.workload_class for spec in specs} >= {
+        "prefix-reuse",
+        "kv-pressure",
+        "session-resume",
+    }
 
 
 def test_fragmentation_probe_interleaves_short_mid_and_long_requests() -> None:
@@ -35,7 +39,11 @@ def test_fragmentation_probe_interleaves_short_mid_and_long_requests() -> None:
         "fragment_mid_resume",
         "fragment_long_after",
     ]
-    assert {spec.workload_class for spec in specs} >= {"agent-chat", "kv-pressure", "session-resume"}
+    assert {spec.workload_class for spec in specs} >= {
+        "agent-chat",
+        "kv-pressure",
+        "session-resume",
+    }
     prompt_lengths = [len(spec.messages[-1]["content"]) for spec in specs]
     assert prompt_lengths[0] < prompt_lengths[1]
     assert prompt_lengths[2] < prompt_lengths[3]
@@ -43,11 +51,19 @@ def test_fragmentation_probe_interleaves_short_mid_and_long_requests() -> None:
 
 def test_long_context_bands_generate_without_materializing_huge_test_state() -> None:
     specs = generate_kv_stress_specs(
-        context_lengths=[524288, 1048576], output_tokens=1, requests_per_level=1, mode="cold-pressure"
+        context_lengths=[524288, 1048576],
+        output_tokens=1,
+        requests_per_level=1,
+        mode="cold-pressure",
     )
 
     assert [spec.expected_input_tokens for spec in specs] == [524288, 1048576]
-    assert all(spec.messages[-1]["content"].endswith(f"FINAL_MARKER_cold-pressure_{spec.expected_input_tokens}_0") for spec in specs)
+    assert all(
+        spec.messages[-1]["content"].endswith(
+            f"FINAL_MARKER_cold-pressure_{spec.expected_input_tokens}_0"
+        )
+        for spec in specs
+    )
 
 
 def test_poisson_offsets_are_deterministic_and_increasing() -> None:
@@ -84,5 +100,8 @@ def test_kvcast_poisson_runs_end_to_end_against_mock_vllm(tmp_path) -> None:
     assert result["summary"]["request_counts"]["success"] == 2
     config = json.loads((tmp_path / "out" / "config.json").read_text(encoding="utf-8"))
     assert config["arrival_mode"] == "poisson"
-    rows = [json.loads(line) for line in (tmp_path / "out" / "metrics.jsonl").read_text(encoding="utf-8").splitlines()]
+    rows = [
+        json.loads(line)
+        for line in (tmp_path / "out" / "metrics.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
     assert all("scheduled_arrival_time" in row["metadata"] for row in rows)

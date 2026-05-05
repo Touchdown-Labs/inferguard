@@ -35,6 +35,7 @@ from inferguard.schemas.agent_trace import (
 TRACE_FILENAME = "agent-trace.jsonl"
 PROMPTS_FILENAME = "prompts-local.jsonl"
 DEFAULT_PROXY_HOST = "127.0.0.1"
+PROXY_FORWARD_TIMEOUT = httpx.Timeout(300.0, connect=10.0, write=30.0, pool=10.0)
 FRAMEWORK_HOOK_STUBS = {"crewai", "autogen", "claude_code", "cursor_sdk"}
 FRAMEWORK_STUB_MESSAGE = (
     "Framework hook only available for LangGraph in v0.5; raw_openai HTTP-proxy mode "
@@ -134,7 +135,7 @@ class AgentTracer:
                 headers: dict[str, str] = {}
                 try:
                     forward_url = _forward_url(target_endpoint, self.path)
-                    with httpx.Client(timeout=None) as client:
+                    with httpx.Client(timeout=PROXY_FORWARD_TIMEOUT) as client:
                         with client.stream(
                             "POST",
                             forward_url,
@@ -169,7 +170,9 @@ class AgentTracer:
                         status_code=status_code,
                         timestamp_start=timestamp_start,
                         timestamp_end=timestamp_start + (end - start),
-                        ttft_seconds=(first_byte_at - start) if first_byte_at is not None else end - start,
+                        ttft_seconds=(first_byte_at - start)
+                        if first_byte_at is not None
+                        else end - start,
                     )
 
             def log_message(self, _format: str, *args: Any) -> None:
@@ -215,7 +218,10 @@ class AgentTracer:
                 list(command), cwd=cwd, env=child_env, timeout=timeout, check=False
             )
         status = "success" if completed.returncode == 0 else "error"
-        self.finalize(exit_status=status, error_message=None if completed.returncode == 0 else "subprocess failed")
+        self.finalize(
+            exit_status=status,
+            error_message=None if completed.returncode == 0 else "subprocess failed",
+        )
         return TraceRunResult(
             returncode=completed.returncode,
             trace_path=self.trace_path,
@@ -238,7 +244,9 @@ class AgentTracer:
         parsed = _parse_openai_response(response_body)
         model = str(request_payload.get("model") or parsed.get("model") or "unknown")
         input_tokens = parsed.get("input_tokens") or _estimate_prompt_tokens(request_payload)
-        output_tokens = parsed.get("output_tokens") or _estimate_output_tokens(parsed.get("output_text", ""))
+        output_tokens = parsed.get("output_tokens") or _estimate_output_tokens(
+            parsed.get("output_text", "")
+        )
         stop_reason = parsed.get("stop_reason")
         if status_code >= 400:
             stop_reason = "error"
@@ -250,7 +258,9 @@ class AgentTracer:
             input_tokens_source="api" if parsed.get("input_tokens") is not None else "estimated",
             output_tokens_source="api" if parsed.get("output_tokens") is not None else "estimated",
             ttft_seconds=max(0.0, ttft_seconds),
-            tpot_seconds=_safe_tpot(timestamp_end - timestamp_start, ttft_seconds, int(output_tokens)),
+            tpot_seconds=_safe_tpot(
+                timestamp_end - timestamp_start, ttft_seconds, int(output_tokens)
+            ),
             latency_seconds=max(0.0, timestamp_end - timestamp_start),
             tool_choice=_tool_choice(request_payload.get("tool_choice")),
             stream=bool(request_payload.get("stream", True)),
@@ -416,7 +426,8 @@ class AgentTracer:
             ),
             exit_status=exit_status,  # type: ignore[arg-type]
             error_message=error_message,
-            framework_version=framework_version or ({self.framework: "unknown"} if self.framework else {}),
+            framework_version=framework_version
+            or ({self.framework: "unknown"} if self.framework else {}),
             rig_label=self.rig_label,  # type: ignore[arg-type]
             engine=self.engine,  # type: ignore[arg-type]
             redaction={"prompts_redacted": not self.save_prompts, "tool_args_redacted": True},
@@ -499,7 +510,9 @@ class LangGraphCallback(_BaseCallbackHandler):  # type: ignore[misc]
         )
         usage = _extract_langgraph_usage(response)
         input_tokens = usage.get("input_tokens", span.input_tokens)
-        output_tokens = usage.get("output_tokens", _estimate_output_tokens(_langgraph_output_text(response)))
+        output_tokens = usage.get(
+            "output_tokens", _estimate_output_tokens(_langgraph_output_text(response))
+        )
         input_source = usage.get("input_tokens_source", span.input_tokens_source)
         output_source = usage.get("output_tokens_source", "estimated")
         latency = max(0.0, ended_at - span.started_at)
@@ -822,9 +835,13 @@ def _merge_usage(candidate: Mapping[str, Any], usage: dict[str, Any]) -> None:
     output_tokens = candidate.get("output_tokens") or candidate.get("completion_tokens")
     total_usage = candidate.get("token_usage") or candidate.get("usage")
     if isinstance(total_usage, Mapping):
-        input_tokens = input_tokens or total_usage.get("prompt_tokens") or total_usage.get("input_tokens")
+        input_tokens = (
+            input_tokens or total_usage.get("prompt_tokens") or total_usage.get("input_tokens")
+        )
         output_tokens = (
-            output_tokens or total_usage.get("completion_tokens") or total_usage.get("output_tokens")
+            output_tokens
+            or total_usage.get("completion_tokens")
+            or total_usage.get("output_tokens")
         )
     if input_tokens is not None:
         usage["input_tokens"] = int(input_tokens)

@@ -44,7 +44,9 @@ class DaemonSnapshot:
             "tool_stall_total_seconds": self.tool_stall_total_seconds,
             "tool_stall_pct": self.tool_stall_pct,
             "node_counts": dict(self.node_counts),
-            "kv_by_customer": {customer: dict(values) for customer, values in self.kv_by_customer.items()},
+            "kv_by_customer": {
+                customer: dict(values) for customer, values in self.kv_by_customer.items()
+            },
         }
 
 
@@ -186,7 +188,11 @@ class Daemon:
             # Implements S-21 per-customer KV footprint accounting (see docs/inferguard/24).
             for tier in ("hbm_bytes", "ram_bytes", "ssd_bytes", "evictions"):
                 value = values.get(tier, 0.0)
-                metric = "inferguard_customer_kv_evictions_total" if tier == "evictions" else f"inferguard_customer_kv_{tier}"
+                metric = (
+                    "inferguard_customer_kv_evictions_total"
+                    if tier == "evictions"
+                    else f"inferguard_customer_kv_{tier}"
+                )
                 lines.append(f'{metric}{{customer_id="{label}"}} {value}')
         lines.append("")
         return "\n".join(lines)
@@ -271,7 +277,7 @@ def _accumulate_customer_kv(
 
 
 def _prom_label(value: str) -> str:
-    return value.replace('\\', '\\\\').replace('"', '\\"')
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _percentile(values: list[float], percentile: int) -> float:
@@ -284,4 +290,10 @@ def _percentile(values: list[float], percentile: int) -> float:
     return float(ordered[index])
 
 
-__all__ = ["DEFAULT_DAEMON_HOST", "DEFAULT_DAEMON_PORT", "Daemon", "DaemonSnapshot", "SlidingWindow"]
+__all__ = [
+    "DEFAULT_DAEMON_HOST",
+    "DEFAULT_DAEMON_PORT",
+    "Daemon",
+    "DaemonSnapshot",
+    "SlidingWindow",
+]

@@ -153,7 +153,9 @@ class DcgmCorrelator:
     def collect_once(self, *, observed_at: float | None = None) -> list[dict[str, Any]]:
         """Collect one aligned scrape from both endpoints and return output rows."""
 
-        timestamp = self._align_timestamp(observed_at if observed_at is not None else self._time_fn())
+        timestamp = self._align_timestamp(
+            observed_at if observed_at is not None else self._time_fn()
+        )
         timestamp_iso = _isoformat(timestamp)
         dcgm_samples = parse_prometheus_text(self._fetch_text(self.dcgm_metrics_url, source="DCGM"))
         vllm_samples = parse_prometheus_text(self._fetch_text(self.vllm_metrics_url, source="vLLM"))
@@ -161,7 +163,9 @@ class DcgmCorrelator:
         vllm_fields = parse_vllm_samples(vllm_samples)
 
         if vllm_samples:
-            self.logger.warning("vLLM metrics are aggregate per-engine; correlation joins on time only")
+            self.logger.warning(
+                "vLLM metrics are aggregate per-engine; correlation joins on time only"
+            )
         else:
             self.logger.warning("empty vLLM scrape; emitting rows with null vLLM fields")
         if not dcgm_rows:
@@ -200,7 +204,9 @@ class DcgmCorrelatorError(ValueError):
     """Raised for invalid dcgm-correlated/v1 inputs."""
 
 
-def align_timestamp(timestamp: float, window_seconds: int | float = DEFAULT_INTERVAL_SECONDS) -> float:
+def align_timestamp(
+    timestamp: float, window_seconds: int | float = DEFAULT_INTERVAL_SECONDS
+) -> float:
     """Round a UNIX timestamp down to the nearest scrape window boundary."""
 
     if window_seconds <= 0:
@@ -265,7 +271,10 @@ def parse_dcgm_samples(samples: Iterable[PrometheusSample]) -> list[dict[str, An
             row[field] = float(row[field] or 0.0) + sample.value
         else:
             row[field] = sample.value
-    return sorted(rows.values(), key=lambda row: (row["gpu_index"] is None, row["gpu_index"] or 0, row["gpu_uuid"]))
+    return sorted(
+        rows.values(),
+        key=lambda row: (row["gpu_index"] is None, row["gpu_index"] or 0, row["gpu_uuid"]),
+    )
 
 
 def parse_vllm_samples(samples: Iterable[PrometheusSample]) -> dict[str, float | None]:
@@ -288,7 +297,9 @@ def parse_vllm_samples(samples: Iterable[PrometheusSample]) -> dict[str, float |
             le = _parse_bucket_bound(sample.labels.get("le"))
             if le is None:
                 continue
-            labels_key = tuple(sorted((key, value) for key, value in sample.labels.items() if key != "le"))
+            labels_key = tuple(
+                sorted((key, value) for key, value in sample.labels.items() if key != "le")
+            )
             histogram_buckets[labels_key][le] = sample.value
 
     if fields["vllm_e2e_request_latency_seconds_p99"] is None:
@@ -322,7 +333,9 @@ def detect_partial_gpu_degradation(
     for row in rows:
         if row.get("gpu_uuid") is None and row.get("gpu_index") is None:
             continue
-        snapshots[str(row.get("timestamp") or row.get("observed_at") or "__single_snapshot__")].append(row)
+        snapshots[
+            str(row.get("timestamp") or row.get("observed_at") or "__single_snapshot__")
+        ].append(row)
 
     findings: list[dict[str, Any]] = []
     consecutive: dict[tuple[str, str], int] = {}
@@ -467,7 +480,9 @@ def _aggregate_vllm_field(fields: dict[str, float | None], field: str, value: fl
 def _histogram_quantile(quantile: float, buckets: Mapping[float, float]) -> float | None:
     if not buckets:
         return None
-    finite_buckets = sorted((bound, count) for bound, count in buckets.items() if math.isfinite(bound))
+    finite_buckets = sorted(
+        (bound, count) for bound, count in buckets.items() if math.isfinite(bound)
+    )
     total = buckets.get(math.inf)
     if total is None and finite_buckets:
         total = finite_buckets[-1][1]
@@ -537,11 +552,18 @@ def _build_row(
 
 
 def _isoformat(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.fromtimestamp(timestamp, tz=UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Emit dcgm-correlated/v1 JSONL from vLLM and DCGM metrics.")
+    parser = argparse.ArgumentParser(
+        description="Emit dcgm-correlated/v1 JSONL from vLLM and DCGM metrics."
+    )
     parser.add_argument("--vllm-metrics-url", default=DEFAULT_VLLM_METRICS_URL)
     parser.add_argument("--dcgm-metrics-url", default=DEFAULT_DCGM_METRICS_URL)
     parser.add_argument("--output-dir", required=True)
@@ -553,7 +575,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    logging.basicConfig(level=getattr(logging, str(args.log_level).upper(), logging.INFO), format="%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=getattr(logging, str(args.log_level).upper(), logging.INFO),
+        format="%(levelname)s %(message)s",
+    )
     correlator = DcgmCorrelator(
         vllm_metrics_url=args.vllm_metrics_url,
         dcgm_metrics_url=args.dcgm_metrics_url,

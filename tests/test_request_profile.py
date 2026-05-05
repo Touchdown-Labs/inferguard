@@ -36,7 +36,9 @@ def _run_profile(tmp_path: Path, *, server_kwargs: dict | None = None, **kwargs)
             **kwargs,
         )
         rows = _read_jsonl(output_dir / "requests_profile.jsonl")
-        summary_json = json.loads((output_dir / "requests_summary.json").read_text(encoding="utf-8"))
+        summary_json = json.loads(
+            (output_dir / "requests_summary.json").read_text(encoding="utf-8")
+        )
         return rows, summary_json, summary
     finally:
         handle.teardown()
@@ -178,7 +180,9 @@ def test_poisson_arrival_rate(tmp_path: Path) -> None:
     assert all(row["first_token_ts"] is None for row in rows)
 
 
-def test_jsonl_streaming_survives_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_jsonl_streaming_survives_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     input_path = tmp_path / "requests.jsonl"
     input_path.write_text(
         "\n".join(

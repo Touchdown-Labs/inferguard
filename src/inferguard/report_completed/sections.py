@@ -75,7 +75,9 @@ def measured_vs_inferred_vs_synthetic_table(context: dict[str, Any]) -> Section:
         "|---|---|---|",
     ]
     for claim in rows:
-        evidence = ", ".join(claim.evidence_paths) if claim.evidence_paths else "not_proven evidence gate"
+        evidence = (
+            ", ".join(claim.evidence_paths) if claim.evidence_paths else "not_proven evidence gate"
+        )
         lines.append(f"| {claim.claim_id} | [{claim.status}] | {evidence} |")
     return Section("Measured vs inferred vs synthetic", _aggregate_claim_status(rows), lines)
 
@@ -86,7 +88,9 @@ def best_gpu_sku(context: dict[str, Any]) -> dict[str, Any]:
     evidence = _job_profile_evidence(context) + _validation_evidence(context)
     if not can_recommend_sku(diagnosis, validation):
         status = "synthetic" if _executive_status(context) == "synthetic_only" else "not_proven"
-        reason = "not_proven — see " + _evidence_ref(evidence or _expected_job_paths(context, "operator_profile.json"))
+        reason = "not_proven — see " + _evidence_ref(
+            evidence or _expected_job_paths(context, "operator_profile.json")
+        )
         value = None
         return _claim_result(
             "best_gpu_sku",
@@ -95,7 +99,9 @@ def best_gpu_sku(context: dict[str, Any]) -> dict[str, Any]:
             "Best GPU SKU",
             f"No SKU verdict: {reason}",
             evidence,
-            refusal=Refusal("best_gpu_sku", "missing_live_complete_or_multi_sku_comparator", evidence),
+            refusal=Refusal(
+                "best_gpu_sku", "missing_live_complete_or_multi_sku_comparator", evidence
+            ),
         )
 
     winner = _best_job(context, group_key="sku")
@@ -111,7 +117,9 @@ def best_gpu_sku(context: dict[str, Any]) -> dict[str, Any]:
             refusal=Refusal("best_gpu_sku", "no_scored_sku_run", evidence),
         )
     sku = winner.get("sku")
-    if sku in RACK_SCALE_SKUS and not can_justify_gb200(diagnosis, validation, {"_jobs": context.get("jobs", [])}):
+    if sku in RACK_SCALE_SKUS and not can_justify_gb200(
+        diagnosis, validation, {"_jobs": context.get("jobs", [])}
+    ):
         rack_evidence = _rack_evidence(context)
         reason = "not_proven — see " + _evidence_ref(rack_evidence)
         return _claim_result(
@@ -140,7 +148,9 @@ def best_engine(context: dict[str, Any]) -> dict[str, Any]:
     engines = {job.get("engine") for job in context.get("jobs", []) if job.get("engine")}
     if status != "live_complete" or len(engines) < 2 or _engine_metrics_not_proven(context):
         label = "synthetic" if status == "synthetic_only" else "not_proven"
-        reason = "not_proven — see " + _evidence_ref(evidence or _expected_job_paths(context, "metrics/metrics_summary.json"))
+        reason = "not_proven — see " + _evidence_ref(
+            evidence or _expected_job_paths(context, "metrics/metrics_summary.json")
+        )
         return _claim_result(
             "best_engine",
             {"value": None, "claim_status": label, "reason": reason},
@@ -223,7 +233,9 @@ def bottleneck(context: dict[str, Any]) -> dict[str, Any]:
         label = "not_proven"
         text = "No bottleneck verdict: not_proven — see " + _evidence_ref(evidence)
     else:
-        label = _claim_status_from_payload(winner.get("diagnosis") if winner else {}, default="measured")
+        label = _claim_status_from_payload(
+            winner.get("diagnosis") if winner else {}, default="measured"
+        )
         text = f"Bottleneck verdict: {verdict}."
     return _claim_result(
         "bottleneck",
@@ -232,7 +244,9 @@ def bottleneck(context: dict[str, Any]) -> dict[str, Any]:
         "Bottleneck",
         text,
         _job_evidence(winner) if winner else evidence,
-        refusal=None if label != "not_proven" else Refusal("bottleneck", "diagnosis_missing", evidence),
+        refusal=None
+        if label != "not_proven"
+        else Refusal("bottleneck", "diagnosis_missing", evidence),
     )
 
 
@@ -243,12 +257,19 @@ def capacity_envelope(context: dict[str, Any]) -> dict[str, Any]:
         reason = "not_proven — see " + _evidence_ref(evidence or ["capacity_cliffs.json"])
         return _claim_result(
             "capacity_envelope",
-            {"max_concurrency": None, "max_context": None, "claim_status": "not_proven", "reason": reason},
+            {
+                "max_concurrency": None,
+                "max_context": None,
+                "claim_status": "not_proven",
+                "reason": reason,
+            },
             "not_proven",
             "Capacity envelope",
             f"No capacity envelope: {reason}",
             evidence,
-            refusal=Refusal("capacity_envelope", "capacity_cliffs_missing", evidence or ["capacity_cliffs.json"]),
+            refusal=Refusal(
+                "capacity_envelope", "capacity_cliffs_missing", evidence or ["capacity_cliffs.json"]
+            ),
         )
     summary = capacity.get("summary") if isinstance(capacity.get("summary"), dict) else capacity
     value = {
@@ -256,8 +277,12 @@ def capacity_envelope(context: dict[str, Any]) -> dict[str, Any]:
         "max_context": _int_or_none(summary.get("max_context")),
         "claim_status": _claim_status_from_payload(summary, default="measured"),
     }
-    text = f"Capacity envelope: concurrency={value['max_concurrency']} context={value['max_context']}."
-    return _claim_result("capacity_envelope", value, value["claim_status"], "Capacity envelope", text, evidence)
+    text = (
+        f"Capacity envelope: concurrency={value['max_concurrency']} context={value['max_context']}."
+    )
+    return _claim_result(
+        "capacity_envelope", value, value["claim_status"], "Capacity envelope", text, evidence
+    )
 
 
 def failure_summary(context: dict[str, Any]) -> dict[str, Any]:
@@ -281,7 +306,9 @@ def failure_summary(context: dict[str, Any]) -> dict[str, Any]:
         "Failure summary",
         text,
         evidence,
-        refusal=None if label != "not_proven" else Refusal("failure_summary", "failure_classification_missing", evidence),
+        refusal=None
+        if label != "not_proven"
+        else Refusal("failure_summary", "failure_classification_missing", evidence),
     )
 
 
@@ -362,12 +389,18 @@ def recommended_next_run(context: dict[str, Any]) -> dict[str, Any]:
     elif computed.get("best_engine", {}).get("claim_status") == "not_proven":
         text = "Run a live vLLM versus SGLang comparator on the selected SKU."
     elif computed.get("capacity_envelope", {}).get("claim_status") == "not_proven":
-        text = "Run find-cliffs to establish max concurrency and max context before operator sign-off."
+        text = (
+            "Run find-cliffs to establish max concurrency and max context before operator sign-off."
+        )
     elif computed.get("cost_notes", {}).get("claim_status") == "not_proven":
         text = "Re-run report-completed with --cost-input after rates are approved."
     else:
-        text = "Repeat the winning SKU and engine once to confirm stability before customer handoff."
-    section = Section("Recommended next run", label, [_claim_line(label, text, _validation_evidence(context))])
+        text = (
+            "Repeat the winning SKU and engine once to confirm stability before customer handoff."
+        )
+    section = Section(
+        "Recommended next run", label, [_claim_line(label, text, _validation_evidence(context))]
+    )
     return {"value": text, "section": section}
 
 
@@ -386,7 +419,9 @@ def lmcache_verdict(context: dict[str, Any]) -> dict[str, Any]:
     metrics = {"_summaries": [job.get("metrics_summary", {}) for job in context.get("jobs", [])]}
     evidence = _job_metrics_evidence(context)
     if not can_claim_lmcache_benefit(metrics):
-        reason = "not_proven — see " + _evidence_ref(evidence or _expected_job_paths(context, "metrics/metrics_summary.json"))
+        reason = "not_proven — see " + _evidence_ref(
+            evidence or _expected_job_paths(context, "metrics/metrics_summary.json")
+        )
         return _claim_result(
             "lmcache_verdict",
             {"value": None, "claim_status": "not_proven", "reason": reason},
@@ -396,7 +431,9 @@ def lmcache_verdict(context: dict[str, Any]) -> dict[str, Any]:
             evidence,
             refusal=Refusal("lmcache_verdict", "live_lmcache_metrics_missing", evidence),
         )
-    hit_rates = [_lmcache_hit_rate(job.get("metrics_summary", {})) for job in context.get("jobs", [])]
+    hit_rates = [
+        _lmcache_hit_rate(job.get("metrics_summary", {})) for job in context.get("jobs", [])
+    ]
     hit_rates = [value for value in hit_rates if value is not None]
     verdict = "helpful" if hit_rates and max(hit_rates) >= 0.05 else "harmful"
     text = f"LMCache verdict: {verdict} from live lmcache:* metrics."
@@ -477,14 +514,25 @@ def _evidence_ref(evidence: list[str]) -> str:
 
 
 def _validation_evidence(context: dict[str, Any]) -> list[str]:
-    return _paths(context, "validation") + _paths(context, "matrix_plan") + _paths(context, "artifact_contract")
+    return (
+        _paths(context, "validation")
+        + _paths(context, "matrix_plan")
+        + _paths(context, "artifact_contract")
+    )
 
 
 def _job_evidence(job: dict[str, Any] | None) -> list[str]:
     if not job:
         return []
     evidence = []
-    for key in ("request_summary", "metrics_summary", "diagnosis", "failure", "operator_profile", "healthcheck"):
+    for key in (
+        "request_summary",
+        "metrics_summary",
+        "diagnosis",
+        "failure",
+        "operator_profile",
+        "healthcheck",
+    ):
         path = job.get("paths", {}).get(key)
         if path:
             evidence.append(path)
@@ -496,7 +544,11 @@ def _job_profile_evidence(context: dict[str, Any]) -> list[str]:
 
 
 def _job_metrics_evidence(context: dict[str, Any]) -> list[str]:
-    return _job_paths(context, "metrics_summary") + _job_paths(context, "engine_timeline") + _job_paths(context, "gpu_timeline")
+    return (
+        _job_paths(context, "metrics_summary")
+        + _job_paths(context, "engine_timeline")
+        + _job_paths(context, "gpu_timeline")
+    )
 
 
 def _job_request_evidence(context: dict[str, Any]) -> list[str]:
@@ -551,7 +603,11 @@ def _expected_job_paths(context: dict[str, Any], suffix: str) -> list[str]:
 def _expected_rack_paths(context: dict[str, Any]) -> list[str]:
     jobs = [job for job in context.get("jobs", []) if job.get("sku") in RACK_SCALE_SKUS]
     if not jobs:
-        return ["jobs/*/preflight/nccl_all_reduce.txt", "jobs/*/preflight/nvidia_smi_topo.txt", "jobs/*/preflight/ib_state.txt"]
+        return [
+            "jobs/*/preflight/nccl_all_reduce.txt",
+            "jobs/*/preflight/nvidia_smi_topo.txt",
+            "jobs/*/preflight/ib_state.txt",
+        ]
     return [
         path
         for job in jobs
@@ -638,14 +694,21 @@ def _model_config(job: dict[str, Any]) -> dict[str, Any]:
     return {
         "sku": job.get("sku"),
         "engine": job.get("engine"),
-        "model": profile.get("model") or profile.get("model_path") or request.get("model") or job.get("model"),
+        "model": profile.get("model")
+        or profile.get("model_path")
+        or request.get("model")
+        or job.get("model"),
         "model_profile": profile.get("model_profile") or request.get("model_profile"),
         "quantization": profile.get("quantization") or config.get("quantization"),
         "kv_cache_dtype": profile.get("kv_cache_dtype") or config.get("kv_cache_dtype"),
-        "tensor_parallel_size": _int_or_none(profile.get("tensor_parallel_size") or profile.get("tp")),
+        "tensor_parallel_size": _int_or_none(
+            profile.get("tensor_parallel_size") or profile.get("tp")
+        ),
         "max_model_len": _int_or_none(profile.get("max_model_len") or config.get("max_model_len")),
         "concurrency": _int_or_none(request.get("concurrency") or profile.get("concurrency")),
-        "context_length": _int_or_none(request.get("context_length") or profile.get("context_length")),
+        "context_length": _int_or_none(
+            request.get("context_length") or profile.get("context_length")
+        ),
     }
 
 
@@ -653,7 +716,9 @@ def _bottleneck_verdict(job: dict[str, Any] | None) -> str:
     if not job:
         return "not_enough_evidence"
     diagnosis = job.get("diagnosis") or {}
-    verdict = diagnosis.get("verdict") or diagnosis.get("bottleneck") or diagnosis.get("top_bottleneck")
+    verdict = (
+        diagnosis.get("verdict") or diagnosis.get("bottleneck") or diagnosis.get("top_bottleneck")
+    )
     return str(verdict or "not_enough_evidence")
 
 

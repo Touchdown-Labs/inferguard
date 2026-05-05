@@ -41,7 +41,9 @@ def _write_native_bench_fixture(root):
         {"session_id": "s1", "turn_index": 1, "success": True},
         {"session_id": "s2", "turn_index": 0, "success": True},
     ]
-    (run_dir / "metrics.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+    (run_dir / "metrics.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
     (run_dir / "requests.jsonl").write_text("{}\n", encoding="utf-8")
     (run_dir / "run.json").write_text("{}\n", encoding="utf-8")
     (run_dir / "config.json").write_text("{}\n", encoding="utf-8")
@@ -142,7 +144,14 @@ def test_analyze_timeline_finding_is_included_and_markdown_written(tmp_path) -> 
     cell_dir = tmp_path / "gb200" / "recipe"
     cell_dir.mkdir(parents=True)
     (cell_dir / "agg_recipe.json").write_text(
-        json.dumps({"cell_id": "gb200-recipe", "hw": "gb200", "num_requests_total": 1, "num_requests_successful": 1}),
+        json.dumps(
+            {
+                "cell_id": "gb200-recipe",
+                "hw": "gb200",
+                "num_requests_total": 1,
+                "num_requests_successful": 1,
+            }
+        ),
         encoding="utf-8",
     )
     (cell_dir / "inferguard_timeline.jsonl").write_text(
@@ -151,7 +160,12 @@ def test_analyze_timeline_finding_is_included_and_markdown_written(tmp_path) -> 
                 "schema_version": "inferguard-timeline/v1",
                 "observed_at": "2026-04-29T22:01:30Z",
                 "sequence": 0,
-                "capabilities": {"diagnosis": "on", "actuation": "off", "replay": "off", "recall": "off"},
+                "capabilities": {
+                    "diagnosis": "on",
+                    "actuation": "off",
+                    "replay": "off",
+                    "recall": "off",
+                },
                 "disagg_status": {
                     "schema_version": "disagg-status/v1",
                     "prefill": {},
@@ -171,7 +185,9 @@ def test_analyze_timeline_finding_is_included_and_markdown_written(tmp_path) -> 
         encoding="utf-8",
     )
 
-    result = CliRunner().invoke(app, ["analyze", str(tmp_path), "--format", "both", "--fail-on", "never"])
+    result = CliRunner().invoke(
+        app, ["analyze", str(tmp_path), "--format", "both", "--fail-on", "never"]
+    )
 
     assert result.exit_code == 0
     report = json.loads((tmp_path / "inferguard_report" / "report.json").read_text())
@@ -188,7 +204,9 @@ def test_analyze_fail_on_critical_exits_2(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    result = CliRunner().invoke(app, ["analyze", str(tmp_path), "--format", "json", "--fail-on", "critical"])
+    result = CliRunner().invoke(
+        app, ["analyze", str(tmp_path), "--format", "json", "--fail-on", "critical"]
+    )
 
     assert result.exit_code == 2
     report = json.loads((tmp_path / "inferguard_report" / "report.json").read_text())

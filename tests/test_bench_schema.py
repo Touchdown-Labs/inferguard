@@ -94,4 +94,9 @@ def test_kvcast_mixed_agent_includes_multiple_workload_classes() -> None:
         context_lengths=[128], output_tokens=8, requests_per_level=10, mode="mixed-agent"
     )
 
-    assert {spec.workload_class for spec in specs} >= {"prefix-reuse", "kv-pressure", "session-resume", "tool-heavy"}
+    assert {spec.workload_class for spec in specs} >= {
+        "prefix-reuse",
+        "kv-pressure",
+        "session-resume",
+        "tool-heavy",
+    }

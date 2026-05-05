@@ -89,7 +89,14 @@ async def _replay_writes_native_artifacts(monkeypatch, tmp_path) -> None:
     )
 
     assert result["summary"]["schema_version"] == "inferguard-bench-summary/v1"
-    for name in ["run.json", "config.json", "requests.jsonl", "metrics.jsonl", "summary.json", "report.md"]:
+    for name in [
+        "run.json",
+        "config.json",
+        "requests.jsonl",
+        "metrics.jsonl",
+        "summary.json",
+        "report.md",
+    ]:
         assert (out / name).exists()
     metrics = [json.loads(line) for line in (out / "metrics.jsonl").read_text().splitlines()]
     assert {row["concurrency"] for row in metrics} == {1, 2}
@@ -151,7 +158,9 @@ async def _replay_writes_metrics_timeline(monkeypatch, tmp_path) -> None:
         )
     )
 
-    timeline = [json.loads(line) for line in (out / "metrics_timeline.jsonl").read_text().splitlines()]
+    timeline = [
+        json.loads(line) for line in (out / "metrics_timeline.jsonl").read_text().splitlines()
+    ]
     assert len(timeline) >= 1
     assert timeline[0]["schema_version"] == "inferguard-metrics-timeline/v1"
     assert timeline[0]["disagg_snapshot"]["kv_cache_usage"] == 0.42
@@ -215,7 +224,9 @@ def test_analyzer_reads_native_bench_output(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    report = analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json"))
+    report = analyze_results(
+        tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json")
+    )
 
     assert report["cells"][0]["source_format"] == "inferguard-bench-native"
     assert report["cells"][0]["metrics"]["p99_ttft"] == 0.06

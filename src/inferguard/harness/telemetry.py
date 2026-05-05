@@ -209,7 +209,11 @@ class TelemetryClient:
     def write_pending_payload(self, payload: TelemetryPayload | dict[str, Any]) -> Path:
         if not self.can_upload():
             raise PermissionError("telemetry is not enabled with consent")
-        normalized = payload.as_dict() if isinstance(payload, TelemetryPayload) else validate_telemetry_payload(payload).as_dict()
+        normalized = (
+            payload.as_dict()
+            if isinstance(payload, TelemetryPayload)
+            else validate_telemetry_payload(payload).as_dict()
+        )
         normalized = sanitize_for_telemetry(normalized, strict=self.strict)
         _ensure_private_dir(self.uploads_pending_dir)
         output_path = self.uploads_pending_dir / f"{int(time.time())}-{uuid.uuid4().hex}.json"
@@ -217,7 +221,9 @@ class TelemetryClient:
             output_path,
             json.dumps(normalized, indent=2, sort_keys=True) + "\n",
         )
-        self.ring_buffer.append({"queued_at": _now_iso(), "path": str(output_path), "payload": normalized})
+        self.ring_buffer.append(
+            {"queued_at": _now_iso(), "path": str(output_path), "payload": normalized}
+        )
         return output_path
 
     def queue_payload(

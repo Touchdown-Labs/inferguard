@@ -119,7 +119,9 @@ def test_profile_help_lists_live_command() -> None:
     "profile_server",
     [
         [
-            MetricFrame(kv=0.91, running=1, waiting=3, preemptions=0, prefix_hits=0, prefix_queries=100),
+            MetricFrame(
+                kv=0.91, running=1, waiting=3, preemptions=0, prefix_hits=0, prefix_queries=100
+            ),
             MetricFrame(
                 kv=0.96,
                 running=1,

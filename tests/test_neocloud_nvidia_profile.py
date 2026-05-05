@@ -94,9 +94,14 @@ def test_neocloud_profile_doctor_uses_readiness_gate(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0, completed.stderr
-    report = json.loads((out / "doctor" / "gmi_dsv4_readiness_report.json").read_text(encoding="utf-8"))
+    report = json.loads(
+        (out / "doctor" / "gmi_dsv4_readiness_report.json").read_text(encoding="utf-8")
+    )
     assert report["schema_version"] == "inferguard-gmi-dsv4-readiness/v1"
-    assert any(check["name"] == "render.parade_runner" and check["status"] == "pass" for check in report["checks"])
+    assert any(
+        check["name"] == "render.parade_runner" and check["status"] == "pass"
+        for check in report["checks"]
+    )
 
 
 def test_neocloud_profile_simulate_generates_gpu_mimic_artifacts(tmp_path: Path) -> None:
@@ -136,11 +141,15 @@ def test_neocloud_profile_simulate_generates_gpu_mimic_artifacts(tmp_path: Path)
     assert summary["simulation_mode"] == "synthetic_gpu_mimic"
     plan = json.loads((out / "matrix_plan.json").read_text(encoding="utf-8"))
     job_dir = Path(plan["jobs"][0]["output_dir"])
-    manifest = json.loads((job_dir / "synthetic" / "simulation_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (job_dir / "synthetic" / "simulation_manifest.json").read_text(encoding="utf-8")
+    )
     assert manifest["simulation_mode"] == "synthetic_gpu_mimic"
     assert "not publishable benchmark evidence" in manifest["claim_boundary"]
     assert "NVIDIA B200" in (job_dir / "preflight" / "nvidia_smi.txt").read_text(encoding="utf-8")
-    assert "DCGM_FI_DEV_GPU_UTIL" in (job_dir / "dcgm" / "dcgm_metrics.prom").read_text(encoding="utf-8")
+    assert "DCGM_FI_DEV_GPU_UTIL" in (job_dir / "dcgm" / "dcgm_metrics.prom").read_text(
+        encoding="utf-8"
+    )
     bench = json.loads((job_dir / "inferguard_bench" / "summary.json").read_text(encoding="utf-8"))
     assert bench["metrics"]["synthetic_ttft_ms"] > 0
 
@@ -202,7 +211,10 @@ def test_gmi_cloud_catalog_has_verified_public_sources() -> None:
     catalog_path = REPO_ROOT / "configs" / "gmi_cloud_model_catalog.yaml"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     assert catalog["schema_version"] == "inferguard-gmi-cloud-model-catalog/v1"
-    assert catalog["sources"]["gmi_serverless_pricing"] == "https://docs.gmicloud.ai/inference-engine/billing/price"
+    assert (
+        catalog["sources"]["gmi_serverless_pricing"]
+        == "https://docs.gmicloud.ai/inference-engine/billing/price"
+    )
     assert catalog["sources"]["gmi_dedicated_gpu_pricing"] == "https://www.gmicloud.ai/en/pricing"
     assert {gpu["sku"] for gpu in catalog["dedicated_gpu_catalog"]} >= {
         "h100",

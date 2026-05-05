@@ -64,7 +64,9 @@ def _pure_reexport_init(path: Path) -> bool:
         return False
     if len(lines) >= 50:
         return False
-    code_lines = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    code_lines = [
+        line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")
+    ]
     if not code_lines:
         return False
     return all(PURE_REEXPORT_RE.fullmatch(line) for line in code_lines)
@@ -94,7 +96,9 @@ def _scan_tokens(path: Path, text: str, lines: list[str]) -> list[Violation]:
                 if word in token_text:
                     violations.append(Violation(path, line_no, word, f"blocked marker {word!r}"))
         elif token_type == tokenize.NAME and token_text in BLOCKED_CODE_NAMES:
-            violations.append(Violation(path, line_no, token_text, f"blocked code name {token_text!r}"))
+            violations.append(
+                Violation(path, line_no, token_text, f"blocked code name {token_text!r}")
+            )
     return violations
 
 

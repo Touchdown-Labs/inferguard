@@ -235,7 +235,9 @@ def is_prefill_bound(
         claim_status=_claim_status(bundle, "prefill", "queue"),
         primary_evidence=[
             Evidence("request.ttft_ms", _source(bundle, "requests_summary"), value_p95=ttft_p95),
-            Evidence("request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p95),
+            Evidence(
+                "request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p95
+            ),
             Evidence(
                 "vllm:request_prefill_time_seconds",
                 _source(bundle, "metrics_summary"),
@@ -371,7 +373,9 @@ def is_queue_bound(
                 value=running,
                 claim_status=_group_status(bundle, "queue"),
             ),
-            Evidence("request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p99),
+            Evidence(
+                "request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p99
+            ),
         ],
         secondary_evidence=[],
         rule_fired="queue_bound",
@@ -437,11 +441,15 @@ def is_kv_bound(
             ],
         )
     prefix_hit = _number(prefix.get("hit_rate"))
-    idle_before_evict = _group_value(bundle, "kv_cache", "kv_block_idle_before_evict_seconds", "p95")
+    idle_before_evict = _group_value(
+        bundle, "kv_cache", "kv_block_idle_before_evict_seconds", "p95"
+    )
     lmcache_evict = _group_value(bundle, "lmcache", "local_cpu_evict_count", "p95")
     low_prefix = prefix_hit is not None and prefix_hit < thresholds["prefix_cache_expected_floor"]
     eviction_pressure = _trend(kv, "kv_block_idle_before_evict_seconds") == "rising"
-    eviction_pressure = eviction_pressure or (idle_before_evict is not None and idle_before_evict > 0)
+    eviction_pressure = eviction_pressure or (
+        idle_before_evict is not None and idle_before_evict > 0
+    )
     eviction_pressure = eviction_pressure or (lmcache_evict is not None and lmcache_evict > 0)
     if low_prefix and eviction_pressure:
         return _kv_result(
@@ -610,8 +618,12 @@ def is_host_bound(
                 value_p95=gpu_util,
                 claim_status=_group_status(bundle, "gpu_util"),
             ),
-            Evidence("request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p99),
-            Evidence("cpu_trace.saturated_core", cpu_source, value=cpu_metric, claim_status="measured"),
+            Evidence(
+                "request.e2e_latency_ms", _source(bundle, "requests_summary"), value_p95=e2e_p99
+            ),
+            Evidence(
+                "cpu_trace.saturated_core", cpu_source, value=cpu_metric, claim_status="measured"
+            ),
         ],
         secondary_evidence=[],
         rule_fired="host_bound",
@@ -721,7 +733,11 @@ def _sglang_chunked_prefill_bug_downgrade(
             "SGLang on B200 with FP8 can force chunked-prefill behavior, so high TTFT "
             "alone is downgraded instead of emitted as prefill_bound."
         ),
-        metric_values={"ttft_e2e_ratio": ratio, "engine": "sglang", "hardware": _hardware_label(bundle)},
+        metric_values={
+            "ttft_e2e_ratio": ratio,
+            "engine": "sglang",
+            "hardware": _hardware_label(bundle),
+        },
         claim_status="inferred",
         downgrades=[
             Downgrade(
@@ -900,7 +916,9 @@ def _claim_status(bundle: EvidenceBundle, *groups: str) -> str:
     return "not_proven"
 
 
-def _group_value(bundle: EvidenceBundle, group_name: str, field_name: str, stat: str) -> float | None:
+def _group_value(
+    bundle: EvidenceBundle, group_name: str, field_name: str, stat: str
+) -> float | None:
     group = _group(bundle, group_name)
     return _field_value(group, field_name, stat)
 
@@ -916,7 +934,11 @@ def _field_value(group: Mapping[str, Any], field_name: str, stat: str) -> float 
     if isinstance(stats, Mapping):
         field_stats = stats.get(field_name)
         if isinstance(field_stats, Mapping):
-            return _number(field_stats.get(stat) if field_stats.get(stat) is not None else field_stats.get("value"))
+            return _number(
+                field_stats.get(stat)
+                if field_stats.get(stat) is not None
+                else field_stats.get("value")
+            )
     return _number(group.get(f"{field_name}_{stat}"))
 
 
@@ -1028,7 +1050,9 @@ def _trend(group: Mapping[str, Any], field_name: str) -> str:
 def _node_count(bundle: EvidenceBundle) -> int:
     for source in (
         bundle.operator_profile,
-        bundle.metrics_summary.get("labels") if isinstance(bundle.metrics_summary.get("labels"), Mapping) else {},
+        bundle.metrics_summary.get("labels")
+        if isinstance(bundle.metrics_summary.get("labels"), Mapping)
+        else {},
     ):
         if not isinstance(source, Mapping):
             continue
@@ -1056,7 +1080,9 @@ def _nvlink_saturated(
     if saturation is not None:
         return saturation >= thresholds["network_nvlink_saturation_fraction"], values
     byte_threshold = thresholds["network_nvlink_bytes_p95"]
-    return bool(tx is not None and rx is not None and tx >= byte_threshold and rx >= byte_threshold), values
+    return bool(
+        tx is not None and rx is not None and tx >= byte_threshold and rx >= byte_threshold
+    ), values
 
 
 def _nccl_busbw(bundle: EvidenceBundle) -> tuple[float | None, float | None]:

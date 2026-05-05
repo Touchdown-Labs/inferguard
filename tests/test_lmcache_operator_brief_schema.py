@@ -47,7 +47,9 @@ def test_operator_brief_includes_lmcache_and_measured_vs_inferred_tables(tmp_pat
                 "topology": {"cache_mode": "lmcache-cpu", "slurm_job_id": "123"},
                 "completion": {"success_rate": 1.0},
                 "metrics": {"p99_ttft": 1.1},
-                "artifacts": {"inferguard_bench_metrics_timeline_jsonl": "runs/lmcache/metrics_timeline.jsonl"},
+                "artifacts": {
+                    "inferguard_bench_metrics_timeline_jsonl": "runs/lmcache/metrics_timeline.jsonl"
+                },
             },
         ],
         "findings": [],
@@ -59,8 +61,14 @@ def test_operator_brief_includes_lmcache_and_measured_vs_inferred_tables(tmp_pat
 
     assert brief["lmcache_comparison"]["schema_version"] == "inferguard-lmcache-comparison/v1"
     assert brief["lmcache_comparison"]["rows"][0]["claim_status"] == "measured"
-    assert any(row["claim"] == "eviction occurred" and row["status"] == "measured" for row in brief["measured_vs_inferred"])
-    assert any(row["claim"] == "cross-tenant isolation" and row["status"] == "measured" for row in brief["measured_vs_inferred"])
+    assert any(
+        row["claim"] == "eviction occurred" and row["status"] == "measured"
+        for row in brief["measured_vs_inferred"]
+    )
+    assert any(
+        row["claim"] == "cross-tenant isolation" and row["status"] == "measured"
+        for row in brief["measured_vs_inferred"]
+    )
     assert "## LMCache comparison" in md
     assert "## Measured vs inferred" in md
     assert "| Claim | Status | Evidence |" in md

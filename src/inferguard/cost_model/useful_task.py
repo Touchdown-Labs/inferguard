@@ -96,7 +96,9 @@ def load_useful_task_definition(
     )
 
 
-def compute_useful_task_metric(rows: list[dict[str, Any]], definition: UsefulTask) -> UsefulTaskMetric:
+def compute_useful_task_metric(
+    rows: list[dict[str, Any]], definition: UsefulTask
+) -> UsefulTaskMetric:
     request_count = len(rows)
     success_count = sum(1 for row in rows if _truthy(row.get("success")))
     useful_count = sum(1 for row in rows if definition.is_useful(row))

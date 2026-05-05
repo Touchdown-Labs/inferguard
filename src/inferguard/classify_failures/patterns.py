@@ -19,11 +19,11 @@ VLLM_SERVER_CRASH_SOURCE = "https://github.com/vllm-project/vllm/issues/6252"
 VLLM_ENDPOINT_SOURCE = "https://github.com/vllm-project/vllm/issues/17941"
 SGLANG_REASONING_SOURCE = "https://github.com/sgl-project/sglang/issues/6675"
 SGLANG_CONFIG_SOURCE = "https://github.com/sgl-project/sglang/issues/9178"
-NVIDIA_DCGM_XID_SOURCE = "https://docs.nvidia.com/datacenter/dcgm/3.1/dcgm-api/dcgm-api-field-ids.html"
-SLURM_SBATCH_SOURCE = "https://slurm.schedmd.com/sbatch.html"
-RDMA_FACT_PACK_SOURCE = (
-    "prompt-exports/2026-05-04-inferguard-neocloud-prd-probe-2-engine-metric-hardware-fact-pack.md#F.1"
+NVIDIA_DCGM_XID_SOURCE = (
+    "https://docs.nvidia.com/datacenter/dcgm/3.1/dcgm-api/dcgm-api-field-ids.html"
 )
+SLURM_SBATCH_SOURCE = "https://slurm.schedmd.com/sbatch.html"
+RDMA_FACT_PACK_SOURCE = "prompt-exports/2026-05-04-inferguard-neocloud-prd-probe-2-engine-metric-hardware-fact-pack.md#F.1"
 
 
 @dataclass(frozen=True)

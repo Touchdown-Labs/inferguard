@@ -30,10 +30,16 @@ def build_operator_brief(report: dict[str, Any]) -> dict[str, Any]:
     input_root = Path(str(report.get("input_root") or "."))
     cells = list(report.get("cells") or [])
     workload_groups = _group_by_workload(cells)
-    best_stable = [_best_stable_config(workload, group) for workload, group in sorted(workload_groups.items())]
+    best_stable = [
+        _best_stable_config(workload, group) for workload, group in sorted(workload_groups.items())
+    ]
     best_stable = [item for item in best_stable if item is not None]
-    ttft_cliffs = [_ttft_cliff(workload, group) for workload, group in sorted(workload_groups.items())]
-    failure_cliffs = [_failure_cliff(workload, group) for workload, group in sorted(workload_groups.items())]
+    ttft_cliffs = [
+        _ttft_cliff(workload, group) for workload, group in sorted(workload_groups.items())
+    ]
+    failure_cliffs = [
+        _failure_cliff(workload, group) for workload, group in sorted(workload_groups.items())
+    ]
     oom_cliffs = [_oom_cliff(cell, input_root) for cell in cells]
     recommended = _recommended_engine_config(best_stable)
     findings = _operator_findings(report)
@@ -202,12 +208,14 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
                 )
     kv_rows = brief.get("kv_by_customer") or []
     if kv_rows:
-        lines.extend([
-            "",
-            "### KV by customer",
-            "| Customer | HBM bytes | RAM bytes | SSD bytes | Evictions | Eviction rate | Source cell |",
-            "|---|---:|---:|---:|---:|---:|---|",
-        ])
+        lines.extend(
+            [
+                "",
+                "### KV by customer",
+                "| Customer | HBM bytes | RAM bytes | SSD bytes | Evictions | Eviction rate | Source cell |",
+                "|---|---:|---:|---:|---:|---:|---|",
+            ]
+        )
         for row in kv_rows[:5]:
             lines.append(
                 "| {customer} | {hbm} | {ram} | {ssd} | {evictions} | {rate} | `{cell}` |".format(
@@ -222,12 +230,14 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
             )
     customer_cost = brief.get("customer_workload_cost") or []
     if customer_cost:
-        lines.extend([
-            "",
-            "### Cost by customer × workload",
-            "| Customer | Workload | Completed sessions | Cost/session | Input tokens | Output tokens | Cell |",
-            "|---|---|---:|---:|---:|---:|---|",
-        ])
+        lines.extend(
+            [
+                "",
+                "### Cost by customer × workload",
+                "| Customer | Workload | Completed sessions | Cost/session | Input tokens | Output tokens | Cell |",
+                "|---|---|---:|---:|---:|---:|---|",
+            ]
+        )
         for row in customer_cost:
             currency = row.get("currency") or "USD"
             lines.append(
@@ -275,7 +285,9 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
                 )
             )
     else:
-        lines.append("- No live LMCache metric rows observed; any cache-pressure conclusions remain `inferred_without_engine_metrics`.")
+        lines.append(
+            "- No live LMCache metric rows observed; any cache-pressure conclusions remain `inferred_without_engine_metrics`."
+        )
     if lmcache.get("ab_comparisons"):
         lines.extend(
             [
@@ -381,20 +393,24 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
         if item.get("status") == "observed":
             lines.append(
                 f"- {item['workload_class']}: first cliff at conc={item['concurrency']} "
-                f"({ _fmt(item.get('p99_ttft_seconds')) }s vs baseline { _fmt(item.get('baseline_p99_ttft_seconds')) }s)."
+                f"({_fmt(item.get('p99_ttft_seconds'))}s vs baseline {_fmt(item.get('baseline_p99_ttft_seconds'))}s)."
             )
         else:
             lines.append(f"- {item['workload_class']}: {item.get('message')}")
     lines.append("### Failure cliff")
     for item in brief.get("cliff_detection", {}).get("failure", []):
         if item.get("status") == "observed":
-            lines.append(f"- {item['workload_class']}: first success-rate drop below 95% at conc={item['concurrency']}.")
+            lines.append(
+                f"- {item['workload_class']}: first success-rate drop below 95% at conc={item['concurrency']}."
+            )
         else:
             lines.append(f"- {item['workload_class']}: {item.get('message')}")
     lines.append("### OOM cliff")
     for item in brief.get("cliff_detection", {}).get("oom", []):
         if item.get("status") == "observed":
-            lines.append(f"- {item['cell_id']}: {item.get('trigger')} at sample {item.get('sequence')} (`{item.get('path')}`).")
+            lines.append(
+                f"- {item['cell_id']}: {item.get('trigger')} at sample {item.get('sequence')} (`{item.get('path')}`)."
+            )
         else:
             lines.append(f"- {item['cell_id']}: {item.get('message')}")
     hardware = brief.get("hardware_health") or []
@@ -458,7 +474,12 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
     cold_rows = brief.get("cold_start_decomposition") or []
     lines.extend(["", "## Cold-start decomposition"])
     if cold_rows:
-        lines.extend(["| Cell | Model load | CUDA graph capture | First-60s p99 TTFT | Steady p99 TTFT |", "|---|---:|---:|---:|---:|"])
+        lines.extend(
+            [
+                "| Cell | Model load | CUDA graph capture | First-60s p99 TTFT | Steady p99 TTFT |",
+                "|---|---:|---:|---:|---:|",
+            ]
+        )
         for row in cold_rows:
             lines.append(
                 "| `{cell}` | {model_load} | {cudagraph} | {first} | {steady} |".format(
@@ -474,7 +495,12 @@ def render_operator_brief_markdown(brief: dict[str, Any]) -> str:
     crash_rows = brief.get("crash_recovery") or []
     lines.extend(["", "## Crash recovery"])
     if crash_rows:
-        lines.extend(["| Cell | Recovery seconds | In-flight losses | Error signature | Retry successes |", "|---|---:|---:|---|---:|"])
+        lines.extend(
+            [
+                "| Cell | Recovery seconds | In-flight losses | Error signature | Retry successes |",
+                "|---|---:|---:|---|---:|",
+            ]
+        )
         for row in crash_rows:
             lines.append(
                 "| `{cell}` | {recovery} | {losses} | `{signature}` | {retries} |".format(
@@ -547,8 +573,10 @@ def _lmcache_comparison(cells: list[dict[str, Any]], root: Path) -> dict[str, An
         lmcache_metrics = _lmcache_metrics_for_cell(cell, root)
         cache_mode = _cache_mode(cell)
         topology = cell.get("topology") or {}
-        is_lmcache_cell = bool(lmcache_metrics) or "lmcache" in cache_mode.lower() or bool(
-            topology.get("lmcache_enabled")
+        is_lmcache_cell = (
+            bool(lmcache_metrics)
+            or "lmcache" in cache_mode.lower()
+            or bool(topology.get("lmcache_enabled"))
         )
         if not is_lmcache_cell:
             continue
@@ -562,10 +590,14 @@ def _lmcache_comparison(cells: list[dict[str, Any]], root: Path) -> dict[str, An
             "slurm_job_id": topology.get("slurm_job_id") or topology.get("SLURM_JOB_ID"),
             "slurm_nodelist": topology.get("slurm_nodelist") or topology.get("SLURM_NODELIST"),
             "nccl_rdma_smoke": topology.get("nccl_rdma_smoke") or topology.get("rdma_smoke"),
-            "cost_per_completed_session": (cell.get("cost") or {}).get("cost_per_completed_session"),
+            "cost_per_completed_session": (cell.get("cost") or {}).get(
+                "cost_per_completed_session"
+            ),
             "cost_per_token": _cell_cost_per_token(cell),
             "detected_modes": _lmcache_detected_modes(lmcache_metrics),
-            "claim_status": "measured" if _has_live_lmcache_metrics(lmcache_metrics) else "inferred",
+            "claim_status": "measured"
+            if _has_live_lmcache_metrics(lmcache_metrics)
+            else "inferred",
             "claim_caveat": None
             if _has_live_lmcache_metrics(lmcache_metrics)
             else "inferred_without_engine_metrics",
@@ -585,13 +617,25 @@ def _lmcache_metrics_for_cell(cell: dict[str, Any], root: Path) -> dict[str, Any
     metrics = cell.get("metrics") if isinstance(cell.get("metrics"), dict) else {}
     out = _extract_lmcache_dict(metrics)
     nested = metrics.get("lmcache") if isinstance(metrics.get("lmcache"), dict) else {}
-    out.update({key: value for key, value in _extract_lmcache_dict(nested).items() if value is not None})
+    out.update(
+        {key: value for key, value in _extract_lmcache_dict(nested).items() if value is not None}
+    )
     path = _artifact_path(cell, root, "inferguard_bench_metrics_timeline_jsonl")
     if path is not None:
         for record in _read_jsonl(path):
-            snapshot = record.get("disagg_snapshot") if isinstance(record.get("disagg_snapshot"), dict) else record
+            snapshot = (
+                record.get("disagg_snapshot")
+                if isinstance(record.get("disagg_snapshot"), dict)
+                else record
+            )
             if isinstance(snapshot, dict):
-                out.update({key: value for key, value in _extract_lmcache_dict(snapshot).items() if value is not None})
+                out.update(
+                    {
+                        key: value
+                        for key, value in _extract_lmcache_dict(snapshot).items()
+                        if value is not None
+                    }
+                )
     return out
 
 
@@ -624,13 +668,22 @@ def _lmcache_detected_modes(metrics: dict[str, Any]) -> list[str]:
     return modes
 
 
-def _lmcache_ab_comparisons(cells: list[dict[str, Any]], lmcache_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _lmcache_ab_comparisons(
+    cells: list[dict[str, Any]], lmcache_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     baseline_cells: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for cell in cells:
         cache_mode = _cache_mode(cell).lower()
         if "lmcache" in cache_mode:
             continue
-        key = (str(_cell_workload(cell)), str(_first(cell.get("framework"), (cell.get("topology") or {}).get("framework"), "unknown")))
+        key = (
+            str(_cell_workload(cell)),
+            str(
+                _first(
+                    cell.get("framework"), (cell.get("topology") or {}).get("framework"), "unknown"
+                )
+            ),
+        )
         baseline_cells.setdefault(key, []).append(cell)
     comparisons: list[dict[str, Any]] = []
     for row in lmcache_rows:
@@ -638,7 +691,13 @@ def _lmcache_ab_comparisons(cells: list[dict[str, Any]], lmcache_rows: list[dict
         candidates = baseline_cells.get(key) or []
         if not candidates:
             continue
-        baseline = min(candidates, key=lambda cell: (_num((cell.get("metrics") or {}).get("p99_ttft")) is None, _num((cell.get("metrics") or {}).get("p99_ttft")) or 0))
+        baseline = min(
+            candidates,
+            key=lambda cell: (
+                _num((cell.get("metrics") or {}).get("p99_ttft")) is None,
+                _num((cell.get("metrics") or {}).get("p99_ttft")) or 0,
+            ),
+        )
         baseline_p99 = _num((baseline.get("metrics") or {}).get("p99_ttft"))
         lmcache_p99 = _num(row.get("p99_ttft_seconds"))
         comparisons.append(
@@ -649,59 +708,89 @@ def _lmcache_ab_comparisons(cells: list[dict[str, Any]], lmcache_rows: list[dict
                 "lmcache_cell_id": row.get("cell_id"),
                 "baseline_p99_ttft_seconds": baseline_p99,
                 "lmcache_p99_ttft_seconds": lmcache_p99,
-                "delta_p99_ttft_seconds": (lmcache_p99 - baseline_p99) if baseline_p99 is not None and lmcache_p99 is not None else None,
+                "delta_p99_ttft_seconds": (lmcache_p99 - baseline_p99)
+                if baseline_p99 is not None and lmcache_p99 is not None
+                else None,
                 "claim_status": "measured"
-                if row.get("claim_status") == "measured" and baseline_p99 is not None and lmcache_p99 is not None
+                if row.get("claim_status") == "measured"
+                and baseline_p99 is not None
+                and lmcache_p99 is not None
                 else "inferred",
                 "claim_caveat": None
-                if row.get("claim_status") == "measured" and baseline_p99 is not None and lmcache_p99 is not None
+                if row.get("claim_status") == "measured"
+                and baseline_p99 is not None
+                and lmcache_p99 is not None
                 else "inferred_without_engine_metrics",
             }
         )
     return comparisons
 
 
-def _measured_vs_inferred_claims(cells: list[dict[str, Any]], root: Path, lmcache: dict[str, Any]) -> list[dict[str, Any]]:
+def _measured_vs_inferred_claims(
+    cells: list[dict[str, Any]], root: Path, lmcache: dict[str, Any]
+) -> list[dict[str, Any]]:
     rows = lmcache.get("rows") or []
     ab = lmcache.get("ab_comparisons") or []
     has_live = any(row.get("claim_status") == "measured" for row in rows)
     eviction_measured = any(_num(row.get("lmcache_eviction_count")) is not None for row in rows)
     tier_measured = any(
-        any(row.get(key) is not None for key in ("lmcache_tier_hbm_bytes", "lmcache_tier_cpu_bytes", "lmcache_tier_disk_bytes", "lmcache_tier_remote_bytes"))
+        any(
+            row.get(key) is not None
+            for key in (
+                "lmcache_tier_hbm_bytes",
+                "lmcache_tier_cpu_bytes",
+                "lmcache_tier_disk_bytes",
+                "lmcache_tier_remote_bytes",
+            )
+        )
         for row in rows
     )
     salt_measured = any(row.get("lmcache_cache_salt_enabled") is True for row in rows)
     mode_measured = any(row.get("detected_modes") for row in rows)
     artifact_paths = _raw_artifact_paths({"artifact_manifest": []}, root)
-    artifact_evidence = "report artifacts and raw paths present" if artifact_paths else "artifact completeness not assessed"
+    artifact_evidence = (
+        "report artifacts and raw paths present"
+        if artifact_paths
+        else "artifact completeness not assessed"
+    )
     return [
         {
             "claim": "LMCache improved TTFT",
             "status": "measured" if ab and has_live else ("inferred" if ab else "not_proven"),
             "claim_caveat": None if has_live or not ab else "inferred_without_engine_metrics",
-            "evidence": "A/B p99 TTFT cells plus live LMCache metrics" if ab and has_live else "requires matching baseline/LMCache cells and live LMCache metrics",
+            "evidence": "A/B p99 TTFT cells plus live LMCache metrics"
+            if ab and has_live
+            else "requires matching baseline/LMCache cells and live LMCache metrics",
         },
         {
             "claim": "eviction occurred",
             "status": "measured" if eviction_measured else "inferred",
             "claim_caveat": None if eviction_measured else "inferred_without_engine_metrics",
-            "evidence": "lmcache_eviction_count present" if eviction_measured else "no lmcache_eviction_count metric present",
+            "evidence": "lmcache_eviction_count present"
+            if eviction_measured
+            else "no lmcache_eviction_count metric present",
         },
         {
             "claim": "tier residency observed",
             "status": "measured" if tier_measured else "inferred",
             "claim_caveat": None if tier_measured else "inferred_without_engine_metrics",
-            "evidence": "LMCache tier byte metrics present" if tier_measured else "no LMCache tier byte metrics present",
+            "evidence": "LMCache tier byte metrics present"
+            if tier_measured
+            else "no LMCache tier byte metrics present",
         },
         {
             "claim": "cross-tenant isolation",
             "status": "measured" if salt_measured else "not_proven",
-            "evidence": "cache_salt metric exposed" if salt_measured else "requires cache_salt engine evidence; workload shape alone is not proof",
+            "evidence": "cache_salt metric exposed"
+            if salt_measured
+            else "requires cache_salt engine evidence; workload shape alone is not proof",
         },
         {
             "claim": "CacheBlend/CacheGen/MP mode detected",
             "status": "measured" if mode_measured else "not_proven",
-            "evidence": "mode/connector metrics exposed" if mode_measured else "no mode metrics exposed",
+            "evidence": "mode/connector metrics exposed"
+            if mode_measured
+            else "no mode metrics exposed",
         },
         {
             "claim": "artifact completeness",
@@ -726,7 +815,9 @@ def _cell_cost_per_token(cell: dict[str, Any]) -> float | None:
     cost = cell.get("cost") or {}
     compute = _num(cost.get("compute_cost"))
     metrics = cell.get("metrics") or {}
-    tokens = (_num(metrics.get("input_tokens")) or 0.0) + (_num(metrics.get("output_tokens_actual")) or 0.0)
+    tokens = (_num(metrics.get("input_tokens")) or 0.0) + (
+        _num(metrics.get("output_tokens_actual")) or 0.0
+    )
     if compute is None or tokens <= 0:
         return None
     return compute / tokens
@@ -802,7 +893,9 @@ def _tokenizer_drift(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
-def _quality_regression(findings: list[dict[str, Any]], cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _quality_regression(
+    findings: list[dict[str, Any]], cells: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for finding in findings:
@@ -810,15 +903,23 @@ def _quality_regression(findings: list[dict[str, Any]], cells: list[dict[str, An
             continue
         evidence = finding.get("evidence") if isinstance(finding.get("evidence"), dict) else {}
         cell_id = str(finding.get("cell_id"))
-        rows.append({"cell_id": finding.get("cell_id"), "severity": finding.get("severity", "critical"), **_quality_fields(evidence)})
+        rows.append(
+            {
+                "cell_id": finding.get("cell_id"),
+                "severity": finding.get("severity", "critical"),
+                **_quality_fields(evidence),
+            }
+        )
         seen.add(cell_id)
     for cell in cells:
         cell_id = str(cell.get("cell_id"))
         if cell_id in seen:
             continue
-        quality = ((cell.get("metrics") or {}).get("canary_quality") or {})
+        quality = (cell.get("metrics") or {}).get("canary_quality") or {}
         if isinstance(quality, dict) and quality:
-            rows.append({"cell_id": cell.get("cell_id"), "severity": None, **_quality_fields(quality)})
+            rows.append(
+                {"cell_id": cell.get("cell_id"), "severity": None, **_quality_fields(quality)}
+            )
     return rows
 
 
@@ -855,7 +956,9 @@ def _blue_green_comparison(findings: list[dict[str, Any]]) -> list[dict[str, Any
     return rows
 
 
-def _output_structure_regression(findings: list[dict[str, Any]], cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _output_structure_regression(
+    findings: list[dict[str, Any]], cells: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for finding in findings:
@@ -863,15 +966,23 @@ def _output_structure_regression(findings: list[dict[str, Any]], cells: list[dic
             continue
         evidence = finding.get("evidence") if isinstance(finding.get("evidence"), dict) else {}
         cell_id = str(finding.get("cell_id"))
-        rows.append({"cell_id": finding.get("cell_id"), "severity": finding.get("severity", "critical"), **_structure_fields(evidence)})
+        rows.append(
+            {
+                "cell_id": finding.get("cell_id"),
+                "severity": finding.get("severity", "critical"),
+                **_structure_fields(evidence),
+            }
+        )
         seen.add(cell_id)
     for cell in cells:
         cell_id = str(cell.get("cell_id"))
         if cell_id in seen:
             continue
-        structure = ((cell.get("metrics") or {}).get("tool_call_schema_eval") or {})
+        structure = (cell.get("metrics") or {}).get("tool_call_schema_eval") or {}
         if isinstance(structure, dict) and structure:
-            rows.append({"cell_id": cell.get("cell_id"), "severity": None, **_structure_fields(structure)})
+            rows.append(
+                {"cell_id": cell.get("cell_id"), "severity": None, **_structure_fields(structure)}
+            )
     return rows
 
 
@@ -906,7 +1017,9 @@ def _retry_storm(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
-def _cold_start_decomposition(findings: list[dict[str, Any]], cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _cold_start_decomposition(
+    findings: list[dict[str, Any]], cells: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for finding in findings:
@@ -920,7 +1033,7 @@ def _cold_start_decomposition(findings: list[dict[str, Any]], cells: list[dict[s
         cell_id = str(cell.get("cell_id"))
         if cell_id in seen:
             continue
-        cold = ((cell.get("metrics") or {}).get("cold_start") or {})
+        cold = (cell.get("metrics") or {}).get("cold_start") or {}
         if isinstance(cold, dict) and cold:
             rows.append({"cell_id": cell.get("cell_id"), **_cold_fields(cold)})
     return rows
@@ -939,7 +1052,9 @@ def _cold_fields(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _crash_recovery(findings: list[dict[str, Any]], cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _crash_recovery(
+    findings: list[dict[str, Any]], cells: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for finding in findings:
@@ -953,7 +1068,7 @@ def _crash_recovery(findings: list[dict[str, Any]], cells: list[dict[str, Any]])
         cell_id = str(cell.get("cell_id"))
         if cell_id in seen:
             continue
-        chaos = ((cell.get("metrics") or {}).get("chaos_recovery") or {})
+        chaos = (cell.get("metrics") or {}).get("chaos_recovery") or {}
         if isinstance(chaos, dict) and chaos:
             rows.append({"cell_id": cell.get("cell_id"), **_crash_fields(chaos)})
     return rows
@@ -962,7 +1077,9 @@ def _crash_recovery(findings: list[dict[str, Any]], cells: list[dict[str, Any]])
 def _crash_fields(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "recovery_time_seconds": data.get("recovery_time_seconds"),
-        "time_from_crash_to_first_ready_seconds": data.get("time_from_crash_to_first_ready_seconds"),
+        "time_from_crash_to_first_ready_seconds": data.get(
+            "time_from_crash_to_first_ready_seconds"
+        ),
         "in_flight_request_loss_count": data.get("in_flight_request_loss_count"),
         "customer_error_signature": data.get("customer_error_signature"),
         "successful_retry_count_post_recovery": data.get("successful_retry_count_post_recovery"),
@@ -989,7 +1106,11 @@ def _cost_summary(report: dict[str, Any]) -> dict[str, Any]:
     cells = list(report.get("cells") or [])
     cell_costs = [cell.get("cost") or {} for cell in cells if cell.get("cost")]
     if cell_costs:
-        gpu_hour_costs = {cost.get("gpu_hour_cost") for cost in cell_costs if cost.get("gpu_hour_cost") is not None}
+        gpu_hour_costs = {
+            cost.get("gpu_hour_cost")
+            for cost in cell_costs
+            if cost.get("gpu_hour_cost") is not None
+        }
         gpu_counts = {cost.get("gpus") for cost in cell_costs if cost.get("gpus") is not None}
         if len(gpu_hour_costs) == 1:
             run_cost["gpu_hour_cost"] = next(iter(gpu_hour_costs))
@@ -1048,7 +1169,7 @@ def _cost_economics(cells: list[dict[str, Any]]) -> dict[str, Any]:
     observed_utilizations = []
     idle_penalties = []
     for cell in cells:
-        economics = ((cell.get("cost") or {}).get("cost_economics") or {})
+        economics = (cell.get("cost") or {}).get("cost_economics") or {}
         if not isinstance(economics, dict):
             continue
         currency = economics.get("currency") or currency
@@ -1085,10 +1206,16 @@ def _cost_economics(cells: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "schema_version": "inferguard-cost-economics/v1",
         "currency": currency,
-        "observed_utilization": sum(observed_utilizations) / len(observed_utilizations) if observed_utilizations else None,
+        "observed_utilization": sum(observed_utilizations) / len(observed_utilizations)
+        if observed_utilizations
+        else None,
         "idle_amortization_penalty": max(idle_penalties) if idle_penalties else None,
-        "cost_per_token_by_utilization": sorted(curve.values(), key=lambda row: str(row.get("bucket"))),
-        "customer_idle_amortization": sorted(customer_rows, key=lambda row: (str(row.get("customer_id")), str(row.get("cell_id")))),
+        "cost_per_token_by_utilization": sorted(
+            curve.values(), key=lambda row: str(row.get("bucket"))
+        ),
+        "customer_idle_amortization": sorted(
+            customer_rows, key=lambda row: (str(row.get("customer_id")), str(row.get("cell_id")))
+        ),
     }
 
 
@@ -1158,7 +1285,11 @@ def _customer_workload_cost(cells: list[dict[str, Any]], root: Path) -> list[dic
         path = _artifact_path(cell, root, "inferguard_bench_metrics_jsonl")
         metric_rows = _read_jsonl(path) if path is not None else []
         groups: dict[tuple[str, str], dict[str, Any]] = {}
-        successful = [row for row in metric_rows if row.get("success") is True or str(row.get("success")).lower() == "true"]
+        successful = [
+            row
+            for row in metric_rows
+            if row.get("success") is True or str(row.get("success")).lower() == "true"
+        ]
         total_success = len(successful) or 1
         for row in successful:
             metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
@@ -1182,9 +1313,15 @@ def _customer_workload_cost(cells: list[dict[str, Any]], root: Path) -> list[dic
         for group in groups.values():
             share = group["completed_sessions"] / total_success
             group["compute_cost"] = compute_cost * share
-            group["cost_per_completed_session"] = group["compute_cost"] / group["completed_sessions"] if group["completed_sessions"] else None
+            group["cost_per_completed_session"] = (
+                group["compute_cost"] / group["completed_sessions"]
+                if group["completed_sessions"]
+                else None
+            )
             out.append(group)
-    return sorted(out, key=lambda row: (str(row.get("customer_id")), str(row.get("workload_class"))))
+    return sorted(
+        out, key=lambda row: (str(row.get("customer_id")), str(row.get("workload_class")))
+    )
 
 
 def _artifact_path(cell: dict[str, Any], root: Path, key: str) -> Path | None:
@@ -1222,7 +1359,14 @@ def _cache_mode(cell: dict[str, Any]) -> str:
         if value not in (None, ""):
             return str(value)
     cell_id = str(cell.get("cell_id") or "").lower()
-    for marker in ("lmcache-ramssd", "lmcache_ramssd", "lmcache-ram", "lmcache_ram", "hicache", "native"):
+    for marker in (
+        "lmcache-ramssd",
+        "lmcache_ramssd",
+        "lmcache-ram",
+        "lmcache_ram",
+        "hicache",
+        "native",
+    ):
         if marker in cell_id:
             return marker.replace("_", "-")
     return "unknown"
@@ -1241,7 +1385,14 @@ def _best_stable_config(workload: str, cells: list[dict[str, Any]]) -> dict[str,
         stable.append(cell)
     if not stable:
         return None
-    best = min(stable, key=lambda cell: (_cost_per_task(cell) is None, _cost_per_task(cell) or 0, -(_concurrency(cell) or 0)))
+    best = min(
+        stable,
+        key=lambda cell: (
+            _cost_per_task(cell) is None,
+            _cost_per_task(cell) or 0,
+            -(_concurrency(cell) or 0),
+        ),
+    )
     return {
         "workload_class": workload,
         "cell_id": best.get("cell_id"),
@@ -1261,11 +1412,20 @@ def _best_stable_config(workload: str, cells: list[dict[str, Any]]) -> dict[str,
 def _ttft_cliff(workload: str, cells: list[dict[str, Any]]) -> dict[str, Any]:
     baseline = _baseline_p99_ttft(cells)
     if baseline is None:
-        return {"workload_class": workload, "status": "not_observed", "message": "No conc=1 p99 TTFT baseline available."}
+        return {
+            "workload_class": workload,
+            "status": "not_observed",
+            "message": "No conc=1 p99 TTFT baseline available.",
+        }
     for cell in _sorted_by_concurrency(cells):
         conc = _concurrency(cell)
         p99 = _num((cell.get("metrics") or {}).get("p99_ttft"))
-        if conc is not None and conc > 1 and p99 is not None and p99 > baseline * TTFT_CLIFF_MULTIPLIER:
+        if (
+            conc is not None
+            and conc > 1
+            and p99 is not None
+            and p99 > baseline * TTFT_CLIFF_MULTIPLIER
+        ):
             return {
                 "workload_class": workload,
                 "status": "observed",
@@ -1275,7 +1435,12 @@ def _ttft_cliff(workload: str, cells: list[dict[str, Any]]) -> dict[str, Any]:
                 "p99_ttft_seconds": p99,
                 "threshold_seconds": baseline * TTFT_CLIFF_MULTIPLIER,
             }
-    return {"workload_class": workload, "status": "not_observed", "baseline_p99_ttft_seconds": baseline, "message": "No p99 TTFT >2x baseline observed."}
+    return {
+        "workload_class": workload,
+        "status": "not_observed",
+        "baseline_p99_ttft_seconds": baseline,
+        "message": "No p99 TTFT >2x baseline observed.",
+    }
 
 
 def _failure_cliff(workload: str, cells: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1289,13 +1454,21 @@ def _failure_cliff(workload: str, cells: list[dict[str, Any]]) -> dict[str, Any]
                 "concurrency": _concurrency(cell),
                 "success_rate": success_rate,
             }
-    return {"workload_class": workload, "status": "not_observed", "message": "No success-rate drop below 95% observed."}
+    return {
+        "workload_class": workload,
+        "status": "not_observed",
+        "message": "No success-rate drop below 95% observed.",
+    }
 
 
 def _oom_cliff(cell: dict[str, Any], root: Path) -> dict[str, Any]:
     path = _metrics_timeline_path(cell, root)
     if path is None:
-        return {"cell_id": cell.get("cell_id"), "status": "not_observed", "message": "metrics_timeline.jsonl not present."}
+        return {
+            "cell_id": cell.get("cell_id"),
+            "status": "not_observed",
+            "message": "metrics_timeline.jsonl not present.",
+        }
     previous_preemptions: float | None = None
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
@@ -1304,19 +1477,49 @@ def _oom_cliff(cell: dict[str, Any], root: Path) -> dict[str, Any]:
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        snapshot = record.get("disagg_snapshot") if isinstance(record.get("disagg_snapshot"), dict) else record
-        usage = _num(snapshot.get("gpu_cache_usage", snapshot.get("kv_cache_usage"))) if isinstance(snapshot, dict) else None
-        preemptions = _num(snapshot.get("preemptions_total")) if isinstance(snapshot, dict) else None
+        snapshot = (
+            record.get("disagg_snapshot")
+            if isinstance(record.get("disagg_snapshot"), dict)
+            else record
+        )
+        usage = (
+            _num(snapshot.get("gpu_cache_usage", snapshot.get("kv_cache_usage")))
+            if isinstance(snapshot, dict)
+            else None
+        )
+        preemptions = (
+            _num(snapshot.get("preemptions_total")) if isinstance(snapshot, dict) else None
+        )
         if usage is not None and usage > OOM_GPU_CACHE_USAGE_THRESHOLD:
-            return _oom_observed(cell, path, root, record, line_no, "gpu_cache_usage>0.95", usage, preemptions)
-        if preemptions is not None and (preemptions > 0 if previous_preemptions is None else preemptions > previous_preemptions):
-            return _oom_observed(cell, path, root, record, line_no, "preemptions_begin", usage, preemptions)
+            return _oom_observed(
+                cell, path, root, record, line_no, "gpu_cache_usage>0.95", usage, preemptions
+            )
+        if preemptions is not None and (
+            preemptions > 0 if previous_preemptions is None else preemptions > previous_preemptions
+        ):
+            return _oom_observed(
+                cell, path, root, record, line_no, "preemptions_begin", usage, preemptions
+            )
         if preemptions is not None:
             previous_preemptions = preemptions
-    return {"cell_id": cell.get("cell_id"), "status": "not_observed", "path": _rel(path, root), "message": "No GPU cache usage >0.95 or preemptions observed."}
+    return {
+        "cell_id": cell.get("cell_id"),
+        "status": "not_observed",
+        "path": _rel(path, root),
+        "message": "No GPU cache usage >0.95 or preemptions observed.",
+    }
 
 
-def _oom_observed(cell: dict[str, Any], path: Path, root: Path, record: dict[str, Any], line_no: int, trigger: str, usage: float | None, preemptions: float | None) -> dict[str, Any]:
+def _oom_observed(
+    cell: dict[str, Any],
+    path: Path,
+    root: Path,
+    record: dict[str, Any],
+    line_no: int,
+    trigger: str,
+    usage: float | None,
+    preemptions: float | None,
+) -> dict[str, Any]:
     return {
         "cell_id": cell.get("cell_id"),
         "status": "observed",
@@ -1333,7 +1536,14 @@ def _oom_observed(cell: dict[str, Any], path: Path, root: Path, record: dict[str
 def _recommended_engine_config(best_stable: list[dict[str, Any]]) -> str:
     if not best_stable:
         return "No stable engine config observed. Re-run missing/failed cells before recommending a config."
-    best = min(best_stable, key=lambda item: (item.get("cost_per_task") is None, item.get("cost_per_task") or 0, -(item.get("concurrency") or 0)))
+    best = min(
+        best_stable,
+        key=lambda item: (
+            item.get("cost_per_task") is None,
+            item.get("cost_per_task") or 0,
+            -(item.get("concurrency") or 0),
+        ),
+    )
     parts = [
         _first(best.get("hardware"), "unknown-hardware"),
         _first(best.get("framework"), "unknown-engine"),
@@ -1434,14 +1644,21 @@ def _baseline_p99_ttft(cells: list[dict[str, Any]]) -> float | None:
 
 
 def _sorted_by_concurrency(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return sorted(cells, key=lambda cell: (_concurrency(cell) is None, _concurrency(cell) or 0, str(cell.get("cell_id"))))
+    return sorted(
+        cells,
+        key=lambda cell: (
+            _concurrency(cell) is None,
+            _concurrency(cell) or 0,
+            str(cell.get("cell_id")),
+        ),
+    )
 
 
 def _concurrency(cell: dict[str, Any]) -> int | None:
     value = _num(cell.get("concurrency"))
     if value is not None:
         return int(value)
-    levels = ((cell.get("topology") or {}).get("concurrency_levels"))
+    levels = (cell.get("topology") or {}).get("concurrency_levels")
     if isinstance(levels, list) and len(levels) == 1:
         value = _num(levels[0])
         return int(value) if value is not None else None

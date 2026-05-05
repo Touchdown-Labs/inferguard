@@ -43,7 +43,9 @@ def aggregates() -> dict:
 
 
 def client(tmp_path: Path, env: dict[str, str] | None = None) -> TelemetryClient:
-    return TelemetryClient(config_dir=tmp_path / "inferguard", env=env or {}, cluster_fingerprint="cluster-a")
+    return TelemetryClient(
+        config_dir=tmp_path / "inferguard", env=env or {}, cluster_fingerprint="cluster-a"
+    )
 
 
 @pytest.mark.harness
@@ -93,7 +95,9 @@ def test_consent_token_uses_secrets_path_and_0600_mode(tmp_path: Path) -> None:
 
 
 @pytest.mark.harness
-def test_refuses_world_readable_consent_token(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_refuses_world_readable_consent_token(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     c = client(tmp_path)
     c.grant_consent("token-123")
     os.chmod(c.consent_path, 0o644)
@@ -115,7 +119,9 @@ def test_disable_turns_off_upload_path(tmp_path: Path) -> None:
 @pytest.mark.harness
 def test_verify_payload_requires_consent(tmp_path: Path) -> None:
     with pytest.raises(PermissionError):
-        client(tmp_path).verify_payload(payload_kind="bench-summary", rig_fingerprint=rig(), aggregates=aggregates())
+        client(tmp_path).verify_payload(
+            payload_kind="bench-summary", rig_fingerprint=rig(), aggregates=aggregates()
+        )
 
 
 @pytest.mark.harness
@@ -238,7 +244,10 @@ def test_no_outbound_http_without_explicit_network_opt_in() -> None:
 
 @pytest.mark.harness
 def test_env_enabled_without_token_is_pending(tmp_path: Path) -> None:
-    assert client(tmp_path, {"INFERGUARD_TELEMETRY": "enabled"}).state is TelemetryState.ENABLED_PENDING_CONSENT
+    assert (
+        client(tmp_path, {"INFERGUARD_TELEMETRY": "enabled"}).state
+        is TelemetryState.ENABLED_PENDING_CONSENT
+    )
 
 
 @pytest.mark.harness

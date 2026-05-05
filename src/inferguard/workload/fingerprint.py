@@ -24,7 +24,9 @@ class CostEstimate(BaseModel):
 
 
 class WorkloadFingerprint(BaseModel):
-    schema_version: Literal["inferguard-workload-fingerprint/v1"] = WORKLOAD_FINGERPRINT_SCHEMA_VERSION
+    schema_version: Literal["inferguard-workload-fingerprint/v1"] = (
+        WORKLOAD_FINGERPRINT_SCHEMA_VERSION
+    )
     sample_count: int
     source_format: str
     input_token_distribution: Distribution

@@ -130,7 +130,9 @@ def simulate_from_options(
         cluster_profile_ref=str(cluster_profile) if cluster_profile else None,
     )
     write_matrix_artifacts(root, plan)
-    return simulate_results(root / "matrix_plan.json", Path(gpu_profiles_path) if gpu_profiles_path else None)
+    return simulate_results(
+        root / "matrix_plan.json", Path(gpu_profiles_path) if gpu_profiles_path else None
+    )
 
 
 def load_cluster_profile(path: str | Path | None) -> dict[str, Any] | None:
@@ -372,7 +374,9 @@ def expand_jobs(
                 if workload != workload_filter:
                     continue
                 workload_profile = profile["workload_profiles"][workload]
-                model_profile_name = normalize_model_profile(str(workload_profile.get("model_profile") or model_profile_filter))
+                model_profile_name = normalize_model_profile(
+                    str(workload_profile.get("model_profile") or model_profile_filter)
+                )
                 if model_profile_name != model_profile_filter:
                     continue
                 model_profile = profile["model_profiles"][model_profile_name]
@@ -440,10 +444,17 @@ def make_job(
         "GMI_MODEL_HF_REPO": model_profile.get("hf_repo", ""),
         "GMI_MODEL_ARCHITECTURE_CLASS": model_profile.get("architecture_class", "unknown"),
         "GMI_MODEL_CLAIM_LEVEL": model_profile.get("claim_level", "operator_supplied"),
-        "GMI_MODEL_PATH": env_or_placeholder(cluster.get("model_path_env"), model_profile.get("hf_repo", "MODEL_PATH_FROM_ENV")),
+        "GMI_MODEL_PATH": env_or_placeholder(
+            cluster.get("model_path_env"), model_profile.get("hf_repo", "MODEL_PATH_FROM_ENV")
+        ),
         "GMI_MODEL_CONFIG_PATH": env_or_placeholder(cluster.get("model_config_path_env"), ""),
-        "GMI_CONTAINER_IMAGE": env_or_placeholder(cluster.get("container_image_env"), "CONTAINER_IMAGE_FROM_ENV"),
-        "GMI_ENDPOINT": env_or_placeholder(cluster.get("endpoint_env"), cluster.get("default_endpoint", "http://127.0.0.1:8000/v1/chat/completions")),
+        "GMI_CONTAINER_IMAGE": env_or_placeholder(
+            cluster.get("container_image_env"), "CONTAINER_IMAGE_FROM_ENV"
+        ),
+        "GMI_ENDPOINT": env_or_placeholder(
+            cluster.get("endpoint_env"),
+            cluster.get("default_endpoint", "http://127.0.0.1:8000/v1/chat/completions"),
+        ),
         "GMI_CONTEXT_LENGTH": context_length,
         "GMI_CONCURRENCY": concurrency,
         "GMI_ARRIVAL_MODE": arrival_mode,
@@ -560,7 +571,10 @@ def expected_artifact_contract(jobs: list[dict[str, Any]], results_root: Path) -
             "expected_artifact_contract.json",
             "sbatch/*.sbatch",
         ],
-        "per_job": [{"job_id": job["job_id"], "output_dir": job["output_dir"], "expected_paths": required} for job in jobs],
+        "per_job": [
+            {"job_id": job["job_id"], "output_dir": job["output_dir"], "expected_paths": required}
+            for job in jobs
+        ],
         "mvp_required_paths": MVP_REQUIRED_PATHS,
         "claim_boundary": "No performance, prefill/decode, KV-cache, or routing claim is valid until live GMI artifacts are present for the relevant cell.",
     }
@@ -615,7 +629,9 @@ def render_results_readme(plan: dict[str, Any]) -> str:
     )
 
 
-def write_doctor_artifacts(results_root: Path, plan: dict[str, Any], contract: dict[str, Any]) -> None:
+def write_doctor_artifacts(
+    results_root: Path, plan: dict[str, Any], contract: dict[str, Any]
+) -> None:
     doctor_dir = results_root / "doctor"
     doctor_render_dir = results_root / "doctor-render"
     (doctor_render_dir / "sbatch").mkdir(parents=True, exist_ok=True)
@@ -640,7 +656,9 @@ def write_doctor_artifacts(results_root: Path, plan: dict[str, Any], contract: d
         path.write_text(render_simulation_sbatch(job), encoding="utf-8")
 
 
-def simulate_job(job: dict[str, Any], gpu_profile: dict[str, Any], catalog: dict[str, Any]) -> dict[str, Any]:
+def simulate_job(
+    job: dict[str, Any], gpu_profile: dict[str, Any], catalog: dict[str, Any]
+) -> dict[str, Any]:
     output_dir = Path(job["output_dir"])
     for rel in (
         "preflight",
@@ -659,7 +677,9 @@ def simulate_job(job: dict[str, Any], gpu_profile: dict[str, Any], catalog: dict
             "SLURM_JOB_ID": "synthetic",
             "SLURM_NODELIST": synthetic_nodelist(gpu_profile),
             "SLURM_NNODES": str(gpu_profile["nodes"]),
-            "CUDA_VISIBLE_DEVICES": ",".join(str(i) for i in range(int(gpu_profile["gpus_per_node"]))),
+            "CUDA_VISIBLE_DEVICES": ",".join(
+                str(i) for i in range(int(gpu_profile["gpus_per_node"]))
+            ),
             "INFERGUARD_SIMULATION_MODE": SIMULATION_MODE,
         }
     )
@@ -669,17 +689,29 @@ def simulate_job(job: dict[str, Any], gpu_profile: dict[str, Any], catalog: dict
         f"# provenance={SIMULATION_MODE}\n",
         encoding="utf-8",
     )
-    (output_dir / "preflight" / "nvidia_smi.txt").write_text(render_nvidia_smi(gpu_profile), encoding="utf-8")
+    (output_dir / "preflight" / "nvidia_smi.txt").write_text(
+        render_nvidia_smi(gpu_profile), encoding="utf-8"
+    )
     (output_dir / "preflight" / "nvidia_smi_topo.txt").write_text(
         render_nvidia_smi_topo(gpu_profile),
         encoding="utf-8",
     )
-    (output_dir / "preflight" / "ib_state.txt").write_text(render_ib_state(gpu_profile), encoding="utf-8")
-    (output_dir / "preflight" / "nccl_all_reduce.txt").write_text(render_nccl_smoke(job, gpu_profile), encoding="utf-8")
-    (output_dir / "raw" / "ibv_devinfo.txt").write_text(render_ibv_devinfo(gpu_profile), encoding="utf-8")
-    (output_dir / "raw" / "nccl_smoke.txt").write_text(render_nccl_smoke(job, gpu_profile), encoding="utf-8")
+    (output_dir / "preflight" / "ib_state.txt").write_text(
+        render_ib_state(gpu_profile), encoding="utf-8"
+    )
+    (output_dir / "preflight" / "nccl_all_reduce.txt").write_text(
+        render_nccl_smoke(job, gpu_profile), encoding="utf-8"
+    )
+    (output_dir / "raw" / "ibv_devinfo.txt").write_text(
+        render_ibv_devinfo(gpu_profile), encoding="utf-8"
+    )
+    (output_dir / "raw" / "nccl_smoke.txt").write_text(
+        render_nccl_smoke(job, gpu_profile), encoding="utf-8"
+    )
     metrics = synthetic_metrics(job, gpu_profile)
-    (output_dir / "dcgm" / "dcgm_metrics.prom").write_text(render_dcgm_prom(job, gpu_profile, metrics), encoding="utf-8")
+    (output_dir / "dcgm" / "dcgm_metrics.prom").write_text(
+        render_dcgm_prom(job, gpu_profile, metrics), encoding="utf-8"
+    )
     write_manifests(output_dir, job, gpu_profile, catalog, metrics)
     write_benchmark_outputs(output_dir, job, gpu_profile, metrics)
     manifest = {
@@ -689,11 +721,17 @@ def simulate_job(job: dict[str, Any], gpu_profile: dict[str, Any], catalog: dict
         "job_id": job["job_id"],
         "hardware": job["hardware"],
         "gpu_profile": gpu_profile,
-        "generated_paths": sorted(str(path.relative_to(output_dir)) for path in output_dir.rglob("*") if path.is_file()),
+        "generated_paths": sorted(
+            str(path.relative_to(output_dir)) for path in output_dir.rglob("*") if path.is_file()
+        ),
         "generated_at_unix": int(time.time()),
     }
     write_json(output_dir / "synthetic" / "simulation_manifest.json", manifest)
-    return {"job_id": job["job_id"], "output_dir": str(output_dir), "manifest": str(output_dir / "synthetic" / "simulation_manifest.json")}
+    return {
+        "job_id": job["job_id"],
+        "output_dir": str(output_dir),
+        "manifest": str(output_dir / "synthetic" / "simulation_manifest.json"),
+    }
 
 
 def synthetic_nodelist(gpu_profile: dict[str, Any]) -> str:
@@ -723,7 +761,9 @@ def render_nvidia_smi(gpu_profile: dict[str, Any]) -> str:
         lines.append(
             f"| 35%   45C    P0            420W / 700W | {used:>7}MiB / {memory:>7}MiB |     {55 + idx:>3}%      Default |"
         )
-    lines.append("+-----------------------------------------------------------------------------------------+")
+    lines.append(
+        "+-----------------------------------------------------------------------------------------+"
+    )
     lines.append(f"# provenance={SIMULATION_MODE}")
     return "\n".join(lines) + "\n"
 
@@ -788,7 +828,9 @@ def render_nccl_smoke(job: dict[str, Any], gpu_profile: dict[str, Any]) -> str:
         bytes_ = 2**exp
         algbw = base_bw * (0.72 + 0.02 * math.log2(max(gpus, 1)))
         busbw = algbw * 1.82
-        lines.append(f"{bytes_:>12} {bytes_ // 4:>9}   float    sum      -1   {1000 / algbw:7.2f} {algbw:7.2f} {busbw:7.2f}      0")
+        lines.append(
+            f"{bytes_:>12} {bytes_ // 4:>9}   float    sum      -1   {1000 / algbw:7.2f} {algbw:7.2f} {busbw:7.2f}      0"
+        )
     lines.append(f"# job_id={job['job_id']} provenance={SIMULATION_MODE}")
     return "\n".join(lines) + "\n"
 
@@ -796,11 +838,15 @@ def render_nccl_smoke(job: dict[str, Any], gpu_profile: dict[str, Any]) -> str:
 def synthetic_metrics(job: dict[str, Any], gpu_profile: dict[str, Any]) -> dict[str, float]:
     context = int(job["context_length"])
     concurrency = int(job["concurrency"])
-    params_b = float((job.get("model_architecture") or {}).get("hf_parameters_m") or 1000.0) / 1000.0
+    params_b = (
+        float((job.get("model_architecture") or {}).get("hf_parameters_m") or 1000.0) / 1000.0
+    )
     hbm = float(gpu_profile["hbm_bandwidth_tbps_per_gpu"])
     memory = float(gpu_profile["memory_gb_per_gpu"])
     prefill_ms = max(20.0, context / (hbm * 58.0) * (1.0 + params_b / 1800.0))
-    decode_tps = max(4.0, (hbm * memory * 0.72) / max(1.0, math.sqrt(params_b)) / max(1.0, concurrency / 4.0))
+    decode_tps = max(
+        4.0, (hbm * memory * 0.72) / max(1.0, math.sqrt(params_b)) / max(1.0, concurrency / 4.0)
+    )
     ttft_ms = prefill_ms + 8.0 * concurrency
     gpu_util = min(97.0, 38.0 + concurrency * 4.5 + context / 8192.0)
     fb_used_gb = min(memory * 0.92, memory * 0.22 + context / 8192.0 * 1.4 + params_b / 120.0)
@@ -811,11 +857,15 @@ def synthetic_metrics(job: dict[str, Any], gpu_profile: dict[str, Any]) -> dict[
         "synthetic_gpu_util": round(gpu_util, 3),
         "synthetic_fb_used_gb": round(fb_used_gb, 3),
         "synthetic_power_watts": round(360.0 + gpu_util * 2.8, 3),
-        "synthetic_nvlink_bandwidth_gbps": round(float(gpu_profile["nvlink_bandwidth_gbps_per_gpu"]) * gpu_util / 100.0, 3),
+        "synthetic_nvlink_bandwidth_gbps": round(
+            float(gpu_profile["nvlink_bandwidth_gbps_per_gpu"]) * gpu_util / 100.0, 3
+        ),
     }
 
 
-def render_dcgm_prom(job: dict[str, Any], gpu_profile: dict[str, Any], metrics: dict[str, float]) -> str:
+def render_dcgm_prom(
+    job: dict[str, Any], gpu_profile: dict[str, Any], metrics: dict[str, float]
+) -> str:
     lines = [
         f"# provenance={SIMULATION_MODE}",
         "# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization.",
@@ -825,11 +875,17 @@ def render_dcgm_prom(job: dict[str, Any], gpu_profile: dict[str, Any], metrics: 
     used_mib = int(metrics["synthetic_fb_used_gb"] * 1024)
     for idx in range(int(gpu_profile["gpus_per_node"])):
         labels = f'gpu="{idx}",UUID="GPU-SYNTH-{job["hardware"]}-{idx:02d}",modelName="{gpu_profile["gpu_name"]}"'
-        lines.append(f"DCGM_FI_DEV_GPU_UTIL{{{labels}}} {metrics['synthetic_gpu_util'] + idx * 0.25:.3f}")
+        lines.append(
+            f"DCGM_FI_DEV_GPU_UTIL{{{labels}}} {metrics['synthetic_gpu_util'] + idx * 0.25:.3f}"
+        )
         lines.append(f"DCGM_FI_DEV_FB_USED{{{labels}}} {used_mib + idx * 128}")
         lines.append(f"DCGM_FI_DEV_FB_FREE{{{labels}}} {max(0, memory_mib - used_mib - idx * 128)}")
-        lines.append(f"DCGM_FI_DEV_POWER_USAGE{{{labels}}} {metrics['synthetic_power_watts'] + idx:.3f}")
-        lines.append(f"DCGM_FI_PROF_NVLINK_TX_BYTES{{{labels}}} {int(metrics['synthetic_nvlink_bandwidth_gbps'] * 125000000)}")
+        lines.append(
+            f"DCGM_FI_DEV_POWER_USAGE{{{labels}}} {metrics['synthetic_power_watts'] + idx:.3f}"
+        )
+        lines.append(
+            f"DCGM_FI_PROF_NVLINK_TX_BYTES{{{labels}}} {int(metrics['synthetic_nvlink_bandwidth_gbps'] * 125000000)}"
+        )
         lines.append(f"DCGM_FI_DEV_XID_ERRORS{{{labels}}} 0")
     return "\n".join(lines) + "\n"
 

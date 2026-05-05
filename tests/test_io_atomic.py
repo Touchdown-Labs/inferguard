@@ -24,7 +24,9 @@ def test_atomic_write_json_happy_path(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": 2\n}\n'
 
 
-def test_atomic_write_replace_failure_keeps_original(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_atomic_write_replace_failure_keeps_original(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     path = tmp_path / "artifact.txt"
     path.write_text("original", encoding="utf-8")
 
@@ -114,7 +116,9 @@ def test_shared_signal_handler_reaps_child_process_group(
         while not pidfile.exists() and time.time() < deadline:
             time.sleep(0.05)
         assert pidfile.exists()
-        parent_pid, child_pid = [int(line) for line in pidfile.read_text(encoding="utf-8").splitlines()]
+        parent_pid, child_pid = [
+            int(line) for line in pidfile.read_text(encoding="utf-8").splitlines()
+        ]
         assert parent_pid == parent.pid
 
         with pytest.raises(SystemExit) as exc:

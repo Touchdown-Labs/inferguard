@@ -13,7 +13,9 @@ RUNNER = REPO_ROOT / "scripts" / "run_neocloud_nvidia_profile.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "sweep_dirs"
 
 
-def copy_fixture(tmp_path: Path, name: str, *, validation_status: str | None = "live_complete") -> Path:
+def copy_fixture(
+    tmp_path: Path, name: str, *, validation_status: str | None = "live_complete"
+) -> Path:
     src = FIXTURES / name
     dst = tmp_path / name
     shutil.copytree(src, dst)
@@ -24,7 +26,11 @@ def copy_fixture(tmp_path: Path, name: str, *, validation_status: str | None = "
                     "schema_version": "inferguard-validation-report/v1",
                     "status": validation_status,
                     "jobs": [
-                        {"job_id": path.name, "status": validation_status, "claim_status": "measured"}
+                        {
+                            "job_id": path.name,
+                            "status": validation_status,
+                            "claim_status": "measured",
+                        }
                         for path in sorted((dst / "jobs").iterdir())
                         if path.is_dir()
                     ],
@@ -158,7 +164,11 @@ def test_supporting_curve_present(tmp_path: Path) -> None:
     root = copy_fixture(tmp_path, "context_oom_sweep")
     data = capacity(root)
 
-    assert all(len(item["supporting_curve"]) >= 2 for item in data["cliffs"] if item["claim_status"] == "measured")
+    assert all(
+        len(item["supporting_curve"]) >= 2
+        for item in data["cliffs"]
+        if item["claim_status"] == "measured"
+    )
 
 
 def test_six_locked_cliffs_exactly(tmp_path: Path) -> None:

@@ -85,7 +85,9 @@ def make_app(state: MockState) -> web.Application:
     app = web.Application()
 
     async def models(_request: web.Request) -> web.Response:
-        return web.json_response({"object": "list", "data": [{"id": state.model, "object": "model"}]})
+        return web.json_response(
+            {"object": "list", "data": [{"id": state.model, "object": "model"}]}
+        )
 
     async def metrics(_request: web.Request) -> web.Response:
         return web.Response(text=state.metrics_text(), content_type="text/plain")
@@ -106,7 +108,9 @@ def make_app(state: MockState) -> web.Application:
             await asyncio.sleep(0.01)
             emitted = min(max_tokens, 16)
             for idx in range(max(1, min(4, emitted))):
-                await _write_sse(response, {"choices": [{"delta": {"content": f"mock-token-{idx} "}}]})
+                await _write_sse(
+                    response, {"choices": [{"delta": {"content": f"mock-token-{idx} "}}]}
+                )
                 await asyncio.sleep(0.002)
             await _write_sse(
                 response,
@@ -135,7 +139,9 @@ async def _write_sse(response: web.StreamResponse, payload: dict[str, Any]) -> N
 
 
 def _estimate_prompt_tokens(messages: list[dict[str, Any]]) -> int:
-    chars = sum(len(str(message.get("content", ""))) for message in messages if isinstance(message, dict))
+    chars = sum(
+        len(str(message.get("content", ""))) for message in messages if isinstance(message, dict)
+    )
     return max(1, chars // 4)
 
 
@@ -146,8 +152,15 @@ def main() -> None:  # pragma: no cover
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8888)
     args = parser.parse_args()
-    print(f"inferguard mock-openai {args.engine} model={args.model} → http://{args.host}:{args.port}")
-    web.run_app(make_app(MockState(engine=args.engine, model=args.model)), host=args.host, port=args.port, print=None)
+    print(
+        f"inferguard mock-openai {args.engine} model={args.model} → http://{args.host}:{args.port}"
+    )
+    web.run_app(
+        make_app(MockState(engine=args.engine, model=args.model)),
+        host=args.host,
+        port=args.port,
+        print=None,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

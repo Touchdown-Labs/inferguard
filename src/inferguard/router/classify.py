@@ -24,7 +24,9 @@ def classify_run_dir(
     hardware_fleet: list[str] | None = None,
 ) -> RouterVerdict:
     report = _load_or_analyze(run_dir)
-    fingerprint = _load_fingerprint(workload_fingerprint_path) if workload_fingerprint_path else None
+    fingerprint = (
+        _load_fingerprint(workload_fingerprint_path) if workload_fingerprint_path else None
+    )
     evidence = _finding_refs(report)
     bottleneck = _choose_bottleneck(report, fingerprint, slo or {})
     paths = _execution_paths(bottleneck, fingerprint, hardware_fleet or [])
@@ -68,7 +70,9 @@ def _load_or_analyze(run_dir: Path) -> dict[str, Any]:
                 return data
     try:
         with TemporaryDirectory(prefix="inferguard-router-analyze-") as tmp:
-            return analyze_results(run_dir, AnalyzeOptions(output_dir=Path(tmp), output_format="json"))
+            return analyze_results(
+                run_dir, AnalyzeOptions(output_dir=Path(tmp), output_format="json")
+            )
     except Exception as exc:  # noqa: BLE001 - CLI surfaces this as a route failure
         raise RouterClassifyError(f"could not load or analyze run_dir: {exc}") from exc
 
@@ -91,7 +95,9 @@ def _finding_refs(report: dict[str, Any]) -> list[FindingRef]:
                     code=str(finding.get("code") or "unknown"),
                     severity=str(finding.get("severity") or "info"),
                     message=str(finding.get("message") or ""),
-                    cell_id=str(finding.get("cell_id")) if finding.get("cell_id") is not None else None,
+                    cell_id=str(finding.get("cell_id"))
+                    if finding.get("cell_id") is not None
+                    else None,
                 )
             )
     return refs
@@ -206,7 +212,10 @@ def _p99_ttft_ms(report: dict[str, Any]) -> float:
 
 def _claim_label(report: dict[str, Any]) -> str:
     cells = report.get("cells") or []
-    if any(isinstance(cell, dict) and cell.get("source_format") == "agentx-trace-replay" for cell in cells):
+    if any(
+        isinstance(cell, dict) and cell.get("source_format") == "agentx-trace-replay"
+        for cell in cells
+    ):
         return "measured_local"
     if cells:
         return "measured_local"

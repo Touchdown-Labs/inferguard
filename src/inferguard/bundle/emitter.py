@@ -88,7 +88,9 @@ def _render_prometheus(verdict: RouterVerdict) -> str:
 
 def _write_cost_floor(path: Path, verdict: RouterVerdict) -> Path:
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["route", "confidence", "cost_floor_usd", "notes"])
+        writer = csv.DictWriter(
+            handle, fieldnames=["route", "confidence", "cost_floor_usd", "notes"]
+        )
         writer.writeheader()
         for route in verdict.execution_paths:
             writer.writerow(

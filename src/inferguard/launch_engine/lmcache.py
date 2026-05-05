@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +12,14 @@ from inferguard.launch_engine.vllm import build_vllm_command
 
 LMCACHE_LAUNCH_SCHEMA_VERSION = "inferguard-lmcache-launch/v1"
 LMCACHE_KV_TRANSFER_CONFIG = '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
-DEFAULT_PROMETHEUS_MULTIPROC_DIR = "/tmp/lmcache_prometheus"
+
+
+def _default_prometheus_multiproc_dir() -> str:
+    user_suffix = str(os.getuid()) if hasattr(os, "getuid") else "user"
+    return str(Path(tempfile.gettempdir()) / f"inferguard-lmcache-prometheus-{user_suffix}")
+
+
+DEFAULT_PROMETHEUS_MULTIPROC_DIR = _default_prometheus_multiproc_dir()
 
 
 class LMCacheLaunchError(ValueError):

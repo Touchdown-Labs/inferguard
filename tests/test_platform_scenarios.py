@@ -24,22 +24,33 @@ def _write_native_run(
         "command": "kvcast",
         "model": "mock-dsv4",
         "endpoint": "http://local/v1/chat/completions",
-        "request_counts": {"total": len(metrics_rows), "success": len(metrics_rows), "failed": 0, "failed_rate": 0.0},
+        "request_counts": {
+            "total": len(metrics_rows),
+            "success": len(metrics_rows),
+            "failed": 0,
+            "failed_rate": 0.0,
+        },
         "runtime_seconds": 60.0,
         "latency_seconds": {"p99": 0.2},
         "ttft_seconds": {"p99": 0.05},
         "concurrency": [{"concurrency": 1}],
-        "workloads": {"agent-chat": {"total": len(metrics_rows), "success": len(metrics_rows), "failed": 0}},
+        "workloads": {
+            "agent-chat": {"total": len(metrics_rows), "success": len(metrics_rows), "failed": 0}
+        },
         "tokens": {},
         "limitations": [],
     }
     if summary_extra:
         summary.update(summary_extra)
     (run_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
-    (run_dir / "metrics.jsonl").write_text("\n".join(json.dumps(row) for row in metrics_rows) + "\n", encoding="utf-8")
+    (run_dir / "metrics.jsonl").write_text(
+        "\n".join(json.dumps(row) for row in metrics_rows) + "\n", encoding="utf-8"
+    )
     (run_dir / "requests.jsonl").write_text("{}\n", encoding="utf-8")
     (run_dir / "run.json").write_text("{}\n", encoding="utf-8")
-    (run_dir / "config.json").write_text(json.dumps({"model": "mock-dsv4", "topology": {"framework": "vllm"}}), encoding="utf-8")
+    (run_dir / "config.json").write_text(
+        json.dumps({"model": "mock-dsv4", "topology": {"framework": "vllm"}}), encoding="utf-8"
+    )
     if timeline_rows is not None:
         (run_dir / "metrics_timeline.jsonl").write_text(
             "\n".join(json.dumps(row) for row in timeline_rows) + "\n",
@@ -77,18 +88,34 @@ def test_s21_daemon_and_operator_kv_by_customer(tmp_path: Path) -> None:
         }
     )
     assert daemon.snapshot().kv_by_customer["customer-a"]["hbm_bytes"] > 4096
-    assert 'inferguard_customer_kv_hbm_bytes{customer_id="customer-a"}' in daemon.prometheus_metrics_text()
+    assert (
+        'inferguard_customer_kv_hbm_bytes{customer_id="customer-a"}'
+        in daemon.prometheus_metrics_text()
+    )
 
     _write_native_run(
         tmp_path,
         "s21",
         metrics_rows=[_metric("customer-a"), _metric("customer-b")],
         timeline_rows=[
-            {"customer_kv_snapshot": {"customer-a": {"hbm_bytes": 800, "share": 0.8}, "customer-b": {"hbm_bytes": 200, "share": 0.2}}},
-            {"customer_kv_snapshot": {"customer-a": {"hbm_bytes": 900, "share": 0.75}, "customer-b": {"hbm_bytes": 300, "share": 0.25}}},
+            {
+                "customer_kv_snapshot": {
+                    "customer-a": {"hbm_bytes": 800, "share": 0.8},
+                    "customer-b": {"hbm_bytes": 200, "share": 0.2},
+                }
+            },
+            {
+                "customer_kv_snapshot": {
+                    "customer-a": {"hbm_bytes": 900, "share": 0.75},
+                    "customer-b": {"hbm_bytes": 300, "share": 0.25},
+                }
+            },
         ],
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     brief = json.loads((tmp_path / "report" / "operator_brief.json").read_text())
     assert brief["kv_by_customer"][0]["customer_id"] == "customer-a"
     report = json.loads((tmp_path / "report" / "report.json").read_text())
@@ -99,14 +126,27 @@ def test_s13_cost_by_customer_workload(tmp_path: Path) -> None:
     _write_native_run(
         tmp_path,
         "s13",
-        metrics_rows=[_metric("customer-a", "agent-chat"), _metric("customer-a", "coding-long"), _metric("customer-b", "agent-chat")],
+        metrics_rows=[
+            _metric("customer-a", "agent-chat"),
+            _metric("customer-a", "coding-long"),
+            _metric("customer-b", "agent-chat"),
+        ],
     )
     analyze_results(
         tmp_path,
-        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True, cost_per_gpu_hour=6.0, gpus=2),
+        AnalyzeOptions(
+            output_dir=tmp_path / "report",
+            output_format="both",
+            operator_brief=True,
+            cost_per_gpu_hour=6.0,
+            gpus=2,
+        ),
     )
     brief = json.loads((tmp_path / "report" / "operator_brief.json").read_text())
-    assert {row["customer_id"] for row in brief["customer_workload_cost"]} == {"customer-a", "customer-b"}
+    assert {row["customer_id"] for row in brief["customer_workload_cost"]} == {
+        "customer-a",
+        "customer-b",
+    }
     assert "Cost by customer × workload" in (tmp_path / "report" / "operator_brief.md").read_text()
 
 
@@ -118,11 +158,16 @@ def test_s07_cross_customer_prefix_eviction_finding(tmp_path: Path) -> None:
             _metric(
                 "customer-b",
                 cache_lineage={"cross_customer": True, "source_customer_id": "customer-a"},
-                prefix_eviction_event={"evicting_customer_id": "customer-b", "victim_customer_id": "customer-a"},
+                prefix_eviction_event={
+                    "evicting_customer_id": "customer-b",
+                    "victim_customer_id": "customer-a",
+                },
             )
         ],
     )
-    report = analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json"))
+    report = analyze_results(
+        tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json")
+    )
     assert any(f["code"] == "prefix_eviction_cross_customer" for f in report["findings"])
 
 
@@ -130,9 +175,15 @@ def test_s05_multi_tenant_noisy_neighbor_and_cli_flags(tmp_path: Path) -> None:
     _write_native_run(
         tmp_path,
         "s05",
-        metrics_rows=[_metric("customer-a", ttft=0.1), _metric("customer-b", ttft=0.5), _metric("customer-b", ttft=0.6)],
+        metrics_rows=[
+            _metric("customer-a", ttft=0.1),
+            _metric("customer-b", ttft=0.5),
+            _metric("customer-b", ttft=0.6),
+        ],
     )
-    report = analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json"))
+    report = analyze_results(
+        tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="json")
+    )
     assert any(f["code"] == "multi_tenant_noisy_neighbor" for f in report["findings"])
     help_result = CliRunner().invoke(app, ["bench", "kvcast", "--help"])
     assert "multi-tenant-storm" in help_result.stdout
@@ -154,7 +205,10 @@ def test_s01_cold_start_ramp_finding_and_cli(tmp_path: Path) -> None:
             },
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "cold_start_ramp_extended")
     assert finding["evidence"]["model_load_seconds"] == 12.0
@@ -183,7 +237,10 @@ def test_s03_engine_crash_recovery_slow(tmp_path: Path) -> None:
             }
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "engine_crash_recovery_slow")
     assert finding["evidence"]["in_flight_request_loss_count"] == 7
@@ -218,7 +275,10 @@ def test_retry_storm_engine_overload_finding(tmp_path: Path) -> None:
             },
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "retry_storm_engine_overload")
     assert finding["evidence"]["burst_peak_qps"] == 200
@@ -278,7 +338,10 @@ def test_partial_gpu_degradation_finding(tmp_path: Path) -> None:
         "\n".join(json.dumps(row) for row in rows) + "\n",
         encoding="utf-8",
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "gpu_partial_degradation")
     assert finding["evidence"]["gpu_index"] == 2
@@ -312,7 +375,10 @@ def test_oom_giant_prefill_blast_radius_finding(tmp_path: Path) -> None:
             },
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "oom_giant_prefill_blast_radius")
     assert finding["evidence"]["engine"] == "vllm"
@@ -364,7 +430,10 @@ def test_idle_amortization_curve_finding(tmp_path: Path) -> None:
     economics = brief["cost_economics"]
     assert economics["idle_amortization_penalty"] == 3.0
     assert economics["cost_per_token_by_utilization"]
-    assert {row["customer_id"] for row in economics["customer_idle_amortization"]} == {"customer-a", "customer-b"}
+    assert {row["customer_id"] for row in economics["customer_idle_amortization"]} == {
+        "customer-a",
+        "customer-b",
+    }
     brief_md = (tmp_path / "report" / "operator_brief.md").read_text()
     assert "Cost economics" in brief_md
     assert "Idle amortization by customer" in brief_md
@@ -392,7 +461,10 @@ def test_s79_canary_quality_regression_finding_and_cli(tmp_path: Path) -> None:
             },
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
     finding = next(f for f in report["findings"] if f["code"] == "canary_quality_regression")
     assert finding["evidence"]["baseline_accuracy"] == 0.96
@@ -421,13 +493,23 @@ def test_s80_blue_green_p99_regression_compare(tmp_path: Path) -> None:
     compare = compare_runs(
         blue,
         green,
-        CompareOptions(output_dir=compare_dir, label_a="blue-vllm-0.20.0", label_b="green-vllm-0.20.1", blue_green=True),
+        CompareOptions(
+            output_dir=compare_dir,
+            label_a="blue-vllm-0.20.0",
+            label_b="green-vllm-0.20.1",
+            blue_green=True,
+        ),
     )
     finding = next(f for f in compare["findings"] if f["code"] == "blue_green_p99_regression")
     assert finding["evidence"]["metric"] == "ttft"
     assert finding["evidence"]["regression_factor"] > 1.5
     assert "Blue/green comparison" in (compare_dir / "compare.md").read_text()
-    analyze_results(compare_dir, AnalyzeOptions(output_dir=compare_dir / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        compare_dir,
+        AnalyzeOptions(
+            output_dir=compare_dir / "report", output_format="both", operator_brief=True
+        ),
+    )
     brief = json.loads((compare_dir / "report" / "operator_brief.json").read_text())
     assert brief["blue_green_comparison"][0]["stack_a_id"] == "blue-vllm-0.20.0"
     assert "Blue/green comparison" in (compare_dir / "report" / "operator_brief.md").read_text()
@@ -458,7 +540,10 @@ def test_s82_tokenizer_mismatch_preflight_and_operator_brief(tmp_path: Path) -> 
     finding = next(f for f in payload["findings"] if f["code"] == "tokenizer_mismatch_silent_drift")
     assert finding["evidence"]["divergence_pct"] == 0.08
     (tmp_path / "preflight-tokenizer.json").write_text(result.stdout, encoding="utf-8")
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     brief = json.loads((tmp_path / "report" / "operator_brief.json").read_text())
     assert brief["tokenizer_drift"][0]["client_tokenizer"] == "old-tokenizer"
     assert "Tokenizer/config drift" in (tmp_path / "report" / "operator_brief.md").read_text()
@@ -480,9 +565,14 @@ def test_s83_prompt_template_tool_parser_regression(tmp_path: Path) -> None:
             },
         },
     )
-    analyze_results(tmp_path, AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True))
+    analyze_results(
+        tmp_path,
+        AnalyzeOptions(output_dir=tmp_path / "report", output_format="both", operator_brief=True),
+    )
     report = json.loads((tmp_path / "report" / "report.json").read_text())
-    finding = next(f for f in report["findings"] if f["code"] == "prompt_template_tool_parser_regression")
+    finding = next(
+        f for f in report["findings"] if f["code"] == "prompt_template_tool_parser_regression"
+    )
     assert finding["evidence"]["schema_id"] == "chat_template_v3_tool_call"
     brief = json.loads((tmp_path / "report" / "operator_brief.json").read_text())
     assert brief["output_structure"][0]["candidate_compliance_rate"] == 0.90

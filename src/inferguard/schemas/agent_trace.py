@@ -134,8 +134,12 @@ class ModelCall:
         _require_object(data, source)
         _assert_keys(data, MODEL_CALL_KEYS, source)
         _require_fields(data, MODEL_CALL_KEYS, source)
-        input_source = _enum(data["input_tokens_source"], TOKEN_SOURCES, "input_tokens_source", source)
-        output_source = _enum(data["output_tokens_source"], TOKEN_SOURCES, "output_tokens_source", source)
+        input_source = _enum(
+            data["input_tokens_source"], TOKEN_SOURCES, "input_tokens_source", source
+        )
+        output_source = _enum(
+            data["output_tokens_source"], TOKEN_SOURCES, "output_tokens_source", source
+        )
         return cls(
             endpoint=_str(data["endpoint"], "endpoint", source),
             model=_str(data["model"], "model", source),
@@ -145,7 +149,9 @@ class ModelCall:
             output_tokens_source=output_source,
             ttft_seconds=_non_negative_number(data["ttft_seconds"], "ttft_seconds", source),
             tpot_seconds=_non_negative_number(data["tpot_seconds"], "tpot_seconds", source),
-            latency_seconds=_non_negative_number(data["latency_seconds"], "latency_seconds", source),
+            latency_seconds=_non_negative_number(
+                data["latency_seconds"], "latency_seconds", source
+            ),
             tool_choice=_enum(data["tool_choice"], TOOL_CHOICES, "tool_choice", source),
             stream=_bool(data["stream"], "stream", source),
             stop_reason=_enum(data["stop_reason"], STOP_REASONS, "stop_reason", source),
@@ -180,7 +186,9 @@ class ToolCall:
                 data["wall_time_seconds"], "wall_time_seconds", source
             ),
             stall_seconds=_non_negative_number(data["stall_seconds"], "stall_seconds", source),
-            result_size_bytes=_non_negative_int(data["result_size_bytes"], "result_size_bytes", source),
+            result_size_bytes=_non_negative_int(
+                data["result_size_bytes"], "result_size_bytes", source
+            ),
             result_kind=_enum(data["result_kind"], RESULT_KINDS, "result_kind", source),
             is_external=_bool(data["is_external"], "is_external", source),
             is_io_bound=_bool(data["is_io_bound"], "is_io_bound", source),
@@ -252,10 +260,20 @@ class NodeEvent:
             raise AgentTraceValidationError(f"{source}: timestamp_end must be >= timestamp_start")
 
         model_call = _conditional_child(
-            data, key="model_call", expected_kind="model_call", actual_kind=kind, cls=ModelCall, source=source
+            data,
+            key="model_call",
+            expected_kind="model_call",
+            actual_kind=kind,
+            cls=ModelCall,
+            source=source,
         )
         tool_call = _conditional_child(
-            data, key="tool_call", expected_kind="tool_call", actual_kind=kind, cls=ToolCall, source=source
+            data,
+            key="tool_call",
+            expected_kind="tool_call",
+            actual_kind=kind,
+            cls=ToolCall,
+            source=source,
         )
         branch = _conditional_child(
             data, key="branch", expected_kind="branch", actual_kind=kind, cls=Branch, source=source
@@ -372,7 +390,9 @@ def iter_agent_trace_jsonl(path: Path | str) -> Iterable[AgentTraceEvent]:
     """Yield validated events from a JSONL trace file."""
 
     trace_path = Path(path)
-    for line_number, line in enumerate(trace_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, line in enumerate(
+        trace_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         if not line.strip():
             continue
         try:
@@ -418,7 +438,9 @@ def validate_trace_integrity(events: list[dict[str, Any]]) -> list[ValidationErr
         errors.append(ValidationError("trace must contain exactly one trace_id", field="trace_id"))
 
     node_entries = [(index, event) for index, event in validated if isinstance(event, NodeEvent)]
-    summary_entries = [(index, event) for index, event in validated if isinstance(event, SummaryEvent)]
+    summary_entries = [
+        (index, event) for index, event in validated if isinstance(event, SummaryEvent)
+    ]
 
     node_ids: dict[str, int] = {}
     for index, node in node_entries:
@@ -454,15 +476,21 @@ def validate_trace_integrity(events: list[dict[str, Any]]) -> list[ValidationErr
                 )
 
     if not summary_entries:
-        errors.append(ValidationError("trace must contain exactly one summary event", field="event_type"))
+        errors.append(
+            ValidationError("trace must contain exactly one summary event", field="event_type")
+        )
         return errors
     if len(summary_entries) > 1:
-        errors.append(ValidationError("trace must contain exactly one summary event", field="event_type"))
+        errors.append(
+            ValidationError("trace must contain exactly one summary event", field="event_type")
+        )
 
     summary_index, summary = summary_entries[-1]
     if summary_index != len(events) - 1:
         errors.append(
-            ValidationError("summary event must appear last", event_index=summary_index, field="event_type")
+            ValidationError(
+                "summary event must appear last", event_index=summary_index, field="event_type"
+            )
         )
     if not any(index < summary_index for index, _ in node_entries):
         errors.append(
@@ -525,7 +553,9 @@ def _conditional_child(
 
 def _schema(data: dict[str, Any], source: str) -> None:
     if data.get("schema_version") != AGENT_TRACE_SCHEMA_VERSION:
-        raise AgentTraceValidationError(f"{source}: schema_version must be {AGENT_TRACE_SCHEMA_VERSION!r}")
+        raise AgentTraceValidationError(
+            f"{source}: schema_version must be {AGENT_TRACE_SCHEMA_VERSION!r}"
+        )
 
 
 def _require_object(value: Any, source: str) -> None:
@@ -542,7 +572,9 @@ def _assert_keys(data: dict[str, Any], allowed: set[str], source: str) -> None:
 def _require_fields(data: dict[str, Any], required: set[str], source: str) -> None:
     missing = sorted(required - set(data))
     if missing:
-        raise AgentTraceValidationError(f"{source}: missing required field(s): {', '.join(missing)}")
+        raise AgentTraceValidationError(
+            f"{source}: missing required field(s): {', '.join(missing)}"
+        )
 
 
 def _str(value: Any, key: str, source: str) -> str:
@@ -607,7 +639,9 @@ def _non_negative_number(value: Any, key: str, source: str) -> float:
 
 def _enum(value: Any, allowed: set[Any], key: str, source: str) -> Any:
     if value not in allowed:
-        rendered = ", ".join("null" if item is None else repr(item) for item in sorted(allowed, key=str))
+        rendered = ", ".join(
+            "null" if item is None else repr(item) for item in sorted(allowed, key=str)
+        )
         raise AgentTraceValidationError(f"{source}: {key} must be one of {rendered}")
     return value
 

@@ -209,9 +209,7 @@ async def scrape(
     if resolved_engine == "lmcache":
         return _parse_lmcache(text, url, role)
     if resolved_engine == "llm-d":
-        return _parse_with_map(
-            text, url, role, engine="llm-d", field_map=LLMD_FIELD_MAP
-        )
+        return _parse_with_map(text, url, role, engine="llm-d", field_map=LLMD_FIELD_MAP)
     # Unknown / unidentified: still return what we can so the caller sees
     # endpoint is reachable; detect.py will emit ``engine_unidentified``.
     return DisaggSnapshot(
@@ -283,9 +281,7 @@ def _parse_dynamo(text: str, url: str, role: Role) -> DisaggSnapshot:
     base = snap.as_dict()
     base.pop("endpoint")
     base.pop("scraped_at")
-    base["dynamo_block_residency_seconds"] = histogram_avg(
-        metrics, _DYNAMO_RESIDENCY_PREFIX
-    )
+    base["dynamo_block_residency_seconds"] = histogram_avg(metrics, _DYNAMO_RESIDENCY_PREFIX)
     return DisaggSnapshot(
         endpoint=snap.endpoint,
         scraped_at=snap.scraped_at,

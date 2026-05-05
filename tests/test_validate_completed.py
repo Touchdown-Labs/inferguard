@@ -11,7 +11,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNNER = REPO_ROOT / "scripts" / "run_neocloud_nvidia_profile.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "run_dirs"
 OVERRIDES = Path(__file__).resolve().parent / "fixtures" / "overrides" / "operator_supplied.json"
-BUNDLE = REPO_ROOT / "docs" / "customer-packages" / "02-2026-05-04-gmi-engineer-turnkey-measurement-bundle"
+BUNDLE = (
+    REPO_ROOT
+    / "docs"
+    / "customer-packages"
+    / "02-2026-05-04-gmi-engineer-turnkey-measurement-bundle"
+)
 
 
 def copy_fixture(tmp_path: Path, name: str) -> Path:
@@ -278,7 +283,9 @@ def test_review_blocker_3_status_precedence_keeps_not_publishable(tmp_path: Path
     contract_path = root / "expected_artifact_contract.json"
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     contract["matrix_level"].append("handoff.md")
-    contract_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    contract_path.write_text(
+        json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     completed = run_validate(root)
 
@@ -329,7 +336,9 @@ def test_review_blocker_4_agentx_ingest_summary_matrix_row(tmp_path: Path) -> No
 
     assert completed.returncode == 0, completed.stderr
     report = load_report(root)
-    assert any(downgrade["claim_id"] == "agentx_ingest_summary" for downgrade in iter_downgrades(report))
+    assert any(
+        downgrade["claim_id"] == "agentx_ingest_summary" for downgrade in iter_downgrades(report)
+    )
 
 
 def test_review_blocker_5_long_context_templates_fail_loud() -> None:
@@ -375,4 +384,7 @@ def test_review_drift_9_gmi_go_propagates_validate_exit_code() -> None:
     assert "--strict" in text
     assert "VALIDATE_EXIT=$?" in text
     assert "validation_report.md" in text
-    assert "validate-completed --provider gmi --results-root \"$RESULTS_ROOT\" --output-dir \"$RESULTS_ROOT/analysis\" --json-only || true" not in text
+    assert (
+        'validate-completed --provider gmi --results-root "$RESULTS_ROOT" --output-dir "$RESULTS_ROOT/analysis" --json-only || true'
+        not in text
+    )

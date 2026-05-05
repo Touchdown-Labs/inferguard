@@ -177,7 +177,9 @@ class TelemetryPayload:
             rig_fingerprint=RigFingerprint.from_dict(
                 data["rig_fingerprint"], source=f"{source}.rig_fingerprint"
             ),
-            aggregates=TelemetryAggregates.from_dict(data["aggregates"], source=f"{source}.aggregates"),
+            aggregates=TelemetryAggregates.from_dict(
+                data["aggregates"], source=f"{source}.aggregates"
+            ),
             dp_params=DPParams.from_dict(data["dp_params"], source=f"{source}.dp_params"),
         )
 
@@ -189,7 +191,9 @@ class TelemetryPayload:
         return data
 
 
-def validate_telemetry_payload(data: dict[str, Any], *, source: str = "payload") -> TelemetryPayload:
+def validate_telemetry_payload(
+    data: dict[str, Any], *, source: str = "payload"
+) -> TelemetryPayload:
     """Validate one locked ``inferguard-telemetry/v1`` payload."""
 
     return TelemetryPayload.from_dict(data, source=source)

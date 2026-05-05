@@ -115,7 +115,9 @@ def classify(
                 top_class="not_enough_evidence",
                 claim_status="not_proven",
             )
-        return FailureClassification(job_id=_job_id(root), failures=(), top_class="none", claim_status="measured")
+        return FailureClassification(
+            job_id=_job_id(root), failures=(), top_class="none", claim_status="measured"
+        )
 
     top_class = failures[0].failure_class
     claim_status = "not_proven" if top_class == "not_enough_evidence" else failures[0].claim_status
@@ -178,10 +180,14 @@ def _collect_text_sources(root: Path) -> list[_TextSource]:
     sources: list[_TextSource] = []
     for rel, source_type in exact:
         for path in sorted(root.rglob(rel)):
-            sources.append(_TextSource(path=path, rel_path=_rel(path, root), source_type=source_type))
+            sources.append(
+                _TextSource(path=path, rel_path=_rel(path, root), source_type=source_type)
+            )
     for pattern, source_type in (("slurm-*.out", "slurm_stdout"), ("slurm-*.err", "slurm_stderr")):
         for path in sorted(root.rglob(pattern)):
-            sources.append(_TextSource(path=path, rel_path=_rel(path, root), source_type=source_type))
+            sources.append(
+                _TextSource(path=path, rel_path=_rel(path, root), source_type=source_type)
+            )
     unique: dict[Path, _TextSource] = {}
     for source in sources:
         unique[source.path] = source
@@ -201,7 +207,9 @@ def _source_type_for_file(path: Path) -> str:
     return "launch_stderr"
 
 
-def _match_text_source(source: _TextSource, text: str, patterns: tuple[PatternRule, ...]) -> list[_Candidate]:
+def _match_text_source(
+    source: _TextSource, text: str, patterns: tuple[PatternRule, ...]
+) -> list[_Candidate]:
     if source.source_type == "ib_state" and _ib_state_active(text):
         return []
     candidates: list[_Candidate] = []
@@ -210,7 +218,11 @@ def _match_text_source(source: _TextSource, text: str, patterns: tuple[PatternRu
         if not line.strip():
             continue
         for rule, regex in compiled:
-            if rule.failure_class == "rdma_inactive" and source.source_type == "ib_state" and _ib_state_active(text):
+            if (
+                rule.failure_class == "rdma_inactive"
+                and source.source_type == "ib_state"
+                and _ib_state_active(text)
+            ):
                 continue
             if regex.search(line):
                 candidates.append(
@@ -230,7 +242,11 @@ def _match_text_source(source: _TextSource, text: str, patterns: tuple[PatternRu
                         ],
                     )
                 )
-    if source.source_type == "ib_state" and not _ib_state_active(text) and _rdma_degraded_text(text):
+    if (
+        source.source_type == "ib_state"
+        and not _ib_state_active(text)
+        and _rdma_degraded_text(text)
+    ):
         candidates.append(
             _Candidate(
                 failure_class="rdma_inactive",
@@ -260,7 +276,13 @@ def _classify_healthchecks(root: Path, base: Path) -> list[_Candidate]:
         status = str(data.get("status") or "").lower()
         ok = data.get("ok")
         if status == "failed" or ok is False:
-            reason = data.get("failure_reason") or data.get("error") or data.get("message") or status or "failed"
+            reason = (
+                data.get("failure_reason")
+                or data.get("error")
+                or data.get("message")
+                or status
+                or "failed"
+            )
             candidates.append(
                 _Candidate(
                     failure_class="endpoint_healthcheck_failure",
@@ -379,7 +401,10 @@ def _classify_model_configs(root: Path, base: Path) -> list[_Candidate]:
                             path=_rel(path, base),
                             start_line=1,
                             end_line=1,
-                            excerpt=_excerpt("missing required model config key: " + ", ".join(sorted(missing_keys))),
+                            excerpt=_excerpt(
+                                "missing required model config key: "
+                                + ", ".join(sorted(missing_keys))
+                            ),
                         )
                     ],
                 )
@@ -409,9 +434,15 @@ def _xid_value(row: dict[str, Any]) -> float | None:
     candidates = [
         row.get("DCGM_FI_DEV_XID_ERRORS"),
         row.get("dcgm_xid_errors"),
-        (row.get("metrics") or {}).get("DCGM_FI_DEV_XID_ERRORS") if isinstance(row.get("metrics"), dict) else None,
-        (row.get("metrics") or {}).get("dcgm_xid_errors") if isinstance(row.get("metrics"), dict) else None,
-        (row.get("fields") or {}).get("DCGM_FI_DEV_XID_ERRORS") if isinstance(row.get("fields"), dict) else None,
+        (row.get("metrics") or {}).get("DCGM_FI_DEV_XID_ERRORS")
+        if isinstance(row.get("metrics"), dict)
+        else None,
+        (row.get("metrics") or {}).get("dcgm_xid_errors")
+        if isinstance(row.get("metrics"), dict)
+        else None,
+        (row.get("fields") or {}).get("DCGM_FI_DEV_XID_ERRORS")
+        if isinstance(row.get("fields"), dict)
+        else None,
     ]
     for candidate in candidates:
         try:
@@ -496,7 +527,11 @@ def _unknown_evidence(root: Path, sources: list[_TextSource]) -> EvidenceRef | N
         text = _read_text(source.path)
         if not text.strip():
             continue
-        if root.is_file() or source.source_type in {"launch_stderr", "slurm_stderr"} or _has_suspicious_word(text):
+        if (
+            root.is_file()
+            or source.source_type in {"launch_stderr", "slurm_stderr"}
+            or _has_suspicious_word(text)
+        ):
             lines = [line for line in text.splitlines() if line.strip()]
             tail_lines = lines[-5:] if lines else [text.strip()]
             start_line = max(1, len(lines) - len(tail_lines) + 1)
@@ -557,7 +592,16 @@ def _ib_state_active(text: str) -> bool:
 
 def _rdma_degraded_text(text: str) -> bool:
     lowered = text.lower()
-    return any(token in lowered for token in ("state: down", "physical state: polling", "physical state: disabled", "port_down", "disabled"))
+    return any(
+        token in lowered
+        for token in (
+            "state: down",
+            "physical state: polling",
+            "physical state: disabled",
+            "port_down",
+            "disabled",
+        )
+    )
 
 
 def _has_suspicious_word(text: str) -> bool:

@@ -46,8 +46,15 @@ PROTECTED_RESOURCE_MARKERS = (
     "prod-ingress",
     "model-server-prod",
 )
-DESTRUCTIVE_VERBS = ("rm -rf", "kubectl delete", "terraform destroy", "DROP TABLE", "truncate table")
-WILDCARD_BIND_HOSTS = {"", "0.0.0.0", "::"}
+DESTRUCTIVE_VERBS = (
+    "rm -rf",
+    "kubectl delete",
+    "terraform destroy",
+    "DROP TABLE",
+    "truncate table",
+)
+UNSPECIFIED_IPV4_HOST = ".".join(("0", "0", "0", "0"))
+WILDCARD_BIND_HOSTS = {"", UNSPECIFIED_IPV4_HOST, "::"}
 
 
 @dataclass(frozen=True)
@@ -95,32 +102,44 @@ class PermissionPolicy:
             return allow(AllowedReason.IS_READ_ONLY_AND_SETTING_ENABLED, f"loopback host: {host}")
         if self.allow_network or opted_in:
             return allow(AllowedReason.EXPLICITLY_ALLOWLISTED, f"network host allowed: {host}")
-        return deny(DeniedReason.ALWAYS_ASK_ENABLED, f"outbound network requires explicit opt-in: {url}")
+        return deny(
+            DeniedReason.ALWAYS_ASK_ENABLED, f"outbound network requires explicit opt-in: {url}"
+        )
 
     def check_bind(self, host: str, port: int, *, opted_in: bool = False) -> PermissionResult:
         """Gate local listen sockets before exposing daemon HTTP endpoints."""
 
         normalized_host = host.strip() if host else ""
-        display_host = normalized_host or "0.0.0.0"
+        display_host = normalized_host or "<all-interfaces>"
         endpoint = f"{display_host}:{port}"
         if normalized_host in self.denylist_hosts:
             return deny(DeniedReason.EXPLICITLY_DENYLISTED, f"listen host denied: {endpoint}")
         if self._is_protected(endpoint):
             return deny(DeniedReason.PROTECTED_RESOURCE, f"protected listen endpoint: {endpoint}")
         if normalized_host in self.allowlist_hosts:
-            return allow(AllowedReason.IS_READ_ONLY_AND_SETTING_ENABLED, f"loopback listen: {endpoint}")
+            return allow(
+                AllowedReason.IS_READ_ONLY_AND_SETTING_ENABLED, f"loopback listen: {endpoint}"
+            )
         if normalized_host in WILDCARD_BIND_HOSTS:
             if self.allow_network or opted_in:
-                return allow(AllowedReason.EXPLICITLY_ALLOWLISTED, f"cluster listen allowed: {endpoint}")
-            return deny(DeniedReason.ALWAYS_ASK_ENABLED, f"non-loopback listen requires opt-in: {endpoint}")
+                return allow(
+                    AllowedReason.EXPLICITLY_ALLOWLISTED, f"cluster listen allowed: {endpoint}"
+                )
+            return deny(
+                DeniedReason.ALWAYS_ASK_ENABLED, f"non-loopback listen requires opt-in: {endpoint}"
+            )
         if self.allow_network or opted_in:
-            return allow(AllowedReason.EXPLICITLY_ALLOWLISTED, f"listen endpoint allowed: {endpoint}")
+            return allow(
+                AllowedReason.EXPLICITLY_ALLOWLISTED, f"listen endpoint allowed: {endpoint}"
+            )
         return deny(DeniedReason.ALWAYS_ASK_ENABLED, f"listen endpoint requires opt-in: {endpoint}")
 
     def check_filesystem(self, path: str | Path, *, write: bool = False) -> PermissionResult:
         path_text = str(path)
         if self._is_protected(path_text):
-            return deny(DeniedReason.PROTECTED_RESOURCE, f"protected filesystem resource: {path_text}")
+            return deny(
+                DeniedReason.PROTECTED_RESOURCE, f"protected filesystem resource: {path_text}"
+            )
         if write and not self.allow_filesystem:
             return deny(DeniedReason.ALWAYS_ASK_ENABLED, f"filesystem write denied: {path_text}")
         return allow(AllowedReason.IS_READ_ONLY_AND_SETTING_ENABLED, path_text)

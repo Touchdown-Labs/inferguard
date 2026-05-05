@@ -21,12 +21,7 @@ def test_parse_discards_labels() -> None:
 
 
 def test_parse_skips_comments_and_blanks() -> None:
-    text = (
-        "# HELP foo bar\n"
-        "# TYPE foo gauge\n"
-        "\n"
-        "foo 1.0\n"
-    )
+    text = "# HELP foo bar\n# TYPE foo gauge\n\nfoo 1.0\n"
     result = parse_prometheus_text(text)
     assert result == {"foo": 1.0}
 

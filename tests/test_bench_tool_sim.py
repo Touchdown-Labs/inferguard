@@ -8,7 +8,10 @@ from inferguard.bench.types import ToolCall
 
 
 def _sse(content: str, *, done: bool = False) -> bytes:
-    chunk = {"choices": [{"delta": {"content": content}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+    chunk = {
+        "choices": [{"delta": {"content": content}}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+    }
     body = f"data: {json.dumps(chunk)}\n\n"
     if done:
         body += "data: [DONE]\n\n"

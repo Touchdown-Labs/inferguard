@@ -70,7 +70,11 @@ def validate_run(
 ) -> ValidationReport:
     """Validate a completed run directory and return a report contract."""
     root = Path(results_root).resolve()
-    plan_path = root / "matrix_plan.json" if plan is None or isinstance(plan, dict) else Path(plan).resolve()
+    plan_path = (
+        root / "matrix_plan.json"
+        if plan is None or isinstance(plan, dict)
+        else Path(plan).resolve()
+    )
     contract_path = (
         root / "expected_artifact_contract.json"
         if contract is None or isinstance(contract, dict)
@@ -132,8 +136,7 @@ def validate_run(
     jobs = _jobs_from_plan_or_contract(plan_data, contract_data)
     matrix_downgrades = [*load_downgrades, *_validate_matrix_level(root, contract_data)]
     job_reports = [
-        _validate_job(root, job, contract_data, override_data, matrix_downgrades)
-        for job in jobs
+        _validate_job(root, job, contract_data, override_data, matrix_downgrades) for job in jobs
     ]
     overall = _compose_overall_status(job_reports, matrix_downgrades)
     return _build_report(root, plan_path, contract_path, job_reports, overall)
@@ -312,7 +315,9 @@ def _validate_job(
 
 
 def _job_dir(root: Path, job: dict[str, Any]) -> Path:
-    output_dir = Path(str(job.get("output_dir") or root / "jobs" / str(job.get("job_id") or "unknown")))
+    output_dir = Path(
+        str(job.get("output_dir") or root / "jobs" / str(job.get("job_id") or "unknown"))
+    )
     if output_dir.is_absolute():
         return output_dir
     return root / output_dir
@@ -322,7 +327,11 @@ def _required_paths(contract: dict[str, Any]) -> list[tuple[str, str]]:
     raw = contract.get("mvp_required_paths") or DEFAULT_MVP_REQUIRED_PATHS
     paths: list[tuple[str, str]] = []
     if not isinstance(raw, dict):
-        return [(claim_id, rel_path) for claim_id, rels in DEFAULT_MVP_REQUIRED_PATHS.items() for rel_path in rels]
+        return [
+            (claim_id, rel_path)
+            for claim_id, rels in DEFAULT_MVP_REQUIRED_PATHS.items()
+            for rel_path in rels
+        ]
     for claim_id, spec in raw.items():
         for rel_path in _paths_from_spec(spec):
             paths.append((str(claim_id), rel_path))
@@ -376,7 +385,9 @@ def _node_count(
     unique_values = {value for _, value in values}
     if len(unique_values) == 1:
         return node_count, []
-    reason = "node_count_sources_disagree:" + ",".join(f"{source}={value}" for source, value in values)
+    reason = "node_count_sources_disagree:" + ",".join(
+        f"{source}={value}" for source, value in values
+    )
     return node_count, [
         Downgrade(
             claim_id="node_count_detection",
@@ -538,10 +549,14 @@ def _healthcheck_succeeded(path: Path) -> bool:
     if status_code == 200:
         return True
     status = str(data.get("status") or "").strip().lower()
-    return bool(data.get("ok") is True or status in {"healthy", "external_validated", "ok", "success"})
+    return bool(
+        data.get("ok") is True or status in {"healthy", "external_validated", "ok", "success"}
+    )
 
 
-def _validate_multi_node_network(job_dir: Path, node_count: int, downgrades: list[Downgrade]) -> None:
+def _validate_multi_node_network(
+    job_dir: Path, node_count: int, downgrades: list[Downgrade]
+) -> None:
     if node_count <= 1:
         return
     path = job_dir / "preflight" / "nccl_all_reduce.txt"
@@ -709,7 +724,9 @@ def _override_status_and_reason(spec: Any) -> tuple[str, str]:
     if isinstance(spec, str):
         return spec, "operator_supplied"
     if isinstance(spec, dict):
-        to_status = str(spec.get("to") or spec.get("claim_status") or spec.get("status") or "inferred")
+        to_status = str(
+            spec.get("to") or spec.get("claim_status") or spec.get("status") or "inferred"
+        )
         reason = str(spec.get("reason") or "operator_supplied")
         return to_status, reason
     return "inferred", "operator_supplied"

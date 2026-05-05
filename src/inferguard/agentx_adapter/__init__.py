@@ -181,7 +181,9 @@ def _convert_csv(
             gpu_rows.append(gpu_metric)
         crosscheck = total_tokens_crosscheck(row)
         if crosscheck is False:
-            warnings.append(f"row {sequence}: total_tokens did not equal prompt_tokens + completion_tokens")
+            warnings.append(
+                f"row {sequence}: total_tokens did not equal prompt_tokens + completion_tokens"
+            )
 
     _write_jsonl(paths["request_profile_jsonl"], [row.to_dict() for row in request_rows])
     request_summary = _summary_from_rows(
@@ -233,7 +235,9 @@ def _summary_from_rows(
     prompt_total = sum(row.prompt_tokens for row in rows)
     completion_total = sum(row.completion_tokens for row in rows)
     runtime_seconds = _runtime_seconds(rows)
-    decode_tps = [row.decode_tokens_per_sec for row in successes if row.decode_tokens_per_sec is not None]
+    decode_tps = [
+        row.decode_tokens_per_sec for row in successes if row.decode_tokens_per_sec is not None
+    ]
     return RequestProfileSummary(
         job_id=job_id,
         workload_label=workload_label,
@@ -252,7 +256,9 @@ def _summary_from_rows(
         },
         prompt_tokens_total=prompt_total,
         completion_tokens_total=completion_total,
-        tokens_per_sec_aggregate=(completion_total / runtime_seconds) if runtime_seconds > 0 else None,
+        tokens_per_sec_aggregate=(completion_total / runtime_seconds)
+        if runtime_seconds > 0
+        else None,
         failure_breakdown=dict(Counter(row.error_type or "unknown" for row in failures)),
         claim_status="measured" if rows else "not_proven",
         success_rate=(len(successes) / len(rows)) if rows else 0.0,
@@ -392,7 +398,9 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8"
+    )
 
 
 def _load_json(path: Path) -> dict[str, Any]:

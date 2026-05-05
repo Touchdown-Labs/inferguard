@@ -36,8 +36,14 @@ def test_mtrag_and_agent_skills_label_non_prefix_reuse() -> None:
     mtrag = importlib.import_module("inferguard.bench.workloads.lmcache_mtrag_reorder")
     agent_skills = importlib.import_module("inferguard.bench.workloads.lmcache_agent_skills")
 
-    assert any(row["expected_non_prefix_reuse_ratio"] > 0.5 for row in mtrag.generate_records(context_length_target=512))
-    assert any(row["expected_non_prefix_reuse_ratio"] > 0.5 for row in agent_skills.generate_records(context_length_target=512))
+    assert any(
+        row["expected_non_prefix_reuse_ratio"] > 0.5
+        for row in mtrag.generate_records(context_length_target=512)
+    )
+    assert any(
+        row["expected_non_prefix_reuse_ratio"] > 0.5
+        for row in agent_skills.generate_records(context_length_target=512)
+    )
 
 
 def test_multi_tenant_salt_never_claims_security_proof() -> None:
@@ -46,4 +52,7 @@ def test_multi_tenant_salt_never_claims_security_proof() -> None:
 
     assert len({row["tenant_id"] for row in rows}) > 1
     assert all(row["cache_salt"].startswith("salt:") for row in rows)
-    assert all(row["metadata"]["security_claim_status"] == "not_proven_without_engine_cache_salt_metrics" for row in rows)
+    assert all(
+        row["metadata"]["security_claim_status"] == "not_proven_without_engine_cache_salt_metrics"
+        for row in rows
+    )

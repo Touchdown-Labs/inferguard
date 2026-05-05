@@ -51,8 +51,18 @@ def generate_kv_stress_specs(
 ) -> list[RequestSpec]:
     if requests_per_level <= 0:
         raise WorkloadLoadError("requests_per_level must be a positive integer")
-    if mode not in {"prefix-reuse", "cold-pressure", "mixed-agent", "eviction-probe", "fragmentation-probe", "multi-tenant-storm", "retry-storm"}:
-        raise WorkloadLoadError("mode must be one of prefix-reuse|cold-pressure|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm")
+    if mode not in {
+        "prefix-reuse",
+        "cold-pressure",
+        "mixed-agent",
+        "eviction-probe",
+        "fragmentation-probe",
+        "multi-tenant-storm",
+        "retry-storm",
+    }:
+        raise WorkloadLoadError(
+            "mode must be one of prefix-reuse|cold-pressure|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm"
+        )
     if customers <= 0:
         raise WorkloadLoadError("customers must be a positive integer")
     specs: list[RequestSpec] = []
@@ -151,7 +161,12 @@ def _mode_shape(
     if mode == "eviction-probe":
         bucket = turn % 6
         if bucket in {0, 1}:
-            return "prefix-reuse", "eviction_warm", f"kvcast-evict-anchor-{context_length}", shared_prefix
+            return (
+                "prefix-reuse",
+                "eviction_warm",
+                f"kvcast-evict-anchor-{context_length}",
+                shared_prefix,
+            )
         if bucket in {2, 3, 4}:
             pressure_length = max(context_length * 2, context_length + 1024)
             return (
@@ -160,12 +175,22 @@ def _mode_shape(
                 None,
                 _synthetic_context(pressure_length, seed=f"evict-pressure-{context_length}-{turn}"),
             )
-        return "session-resume", "eviction_retest", f"kvcast-evict-anchor-{context_length}", shared_prefix
+        return (
+            "session-resume",
+            "eviction_retest",
+            f"kvcast-evict-anchor-{context_length}",
+            shared_prefix,
+        )
     if mode == "multi-tenant-storm":
         # Implements S-05 multi-tenant concurrency storm (see docs/inferguard/24).
         bucket = turn % 12
         if bucket < 4:
-            return "agent-chat", "storm_interactive", f"storm-chat-{context_length}-{turn % 2}", shared_prefix
+            return (
+                "agent-chat",
+                "storm_interactive",
+                f"storm-chat-{context_length}-{turn % 2}",
+                shared_prefix,
+            )
         if bucket < 8:
             return (
                 "kv-pressure",
@@ -173,7 +198,12 @@ def _mode_shape(
                 None,
                 _synthetic_context(context_length * 2, seed=f"storm-batch-{context_length}-{turn}"),
             )
-        return "session-resume", "storm_resume", f"storm-resume-{context_length}-{turn % 3}", shared_prefix
+        return (
+            "session-resume",
+            "storm_resume",
+            f"storm-resume-{context_length}-{turn % 3}",
+            shared_prefix,
+        )
     if mode == "retry-storm":
         # Implements S-26 function-call retry storm (see docs/inferguard/24).
         bucket = turn % 5
@@ -181,12 +211,19 @@ def _mode_shape(
             return "tool-heavy", "retry_root_turn", f"retry-root-{context_length}", shared_prefix
         if bucket in {1, 2, 3}:
             retry_context = shared_prefix + "\n\nTOOL_FAILURE_SIGNATURE=HTTP_503_RETRYABLE\n"
-            return "tool-heavy", "retry_failed_tool_call", f"retry-root-{context_length}", retry_context
+            return (
+                "tool-heavy",
+                "retry_failed_tool_call",
+                f"retry-root-{context_length}",
+                retry_context,
+            )
         return (
             "agent-chat",
             "retry_queue_replay",
             f"retry-replay-{context_length}-{turn % 2}",
-            _synthetic_context(max(512, context_length // 4), seed=f"retry-replay-{context_length}-{turn}"),
+            _synthetic_context(
+                max(512, context_length // 4), seed=f"retry-replay-{context_length}-{turn}"
+            ),
         )
     if mode == "fragmentation-probe":
         bucket = turn % 4
@@ -234,7 +271,12 @@ def _mode_shape(
     if bucket < 9:
         return "session-resume", "mixed", f"kvcast-resume-{context_length}", shared_prefix
     tool_context = shared_prefix + "\n\n" + _synthetic_tool_output(context_length, turn)
-    return "tool-heavy", "mixed", f"kvcast-tools-{context_length}", tool_context[: max(64, context_length * 4)]
+    return (
+        "tool-heavy",
+        "mixed",
+        f"kvcast-tools-{context_length}",
+        tool_context[: max(64, context_length * 4)],
+    )
 
 
 def _load_trace_file(path: Path) -> list[RequestSpec]:
@@ -265,7 +307,9 @@ def _spec_from_trace(trace: TraceRecord) -> RequestSpec:
         prefix_group=trace.prefix_group,
         tool_heavy=trace.tool_heavy,
         metadata=trace.metadata,
-        customer_id=str(trace.metadata.get("customer_id")) if trace.metadata.get("customer_id") else None,
+        customer_id=str(trace.metadata.get("customer_id"))
+        if trace.metadata.get("customer_id")
+        else None,
         sla_tier=str(trace.metadata.get("sla_tier")) if trace.metadata.get("sla_tier") else None,
     )
 

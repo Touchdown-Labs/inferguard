@@ -58,7 +58,9 @@ class SyntheticOpenAIHandler(BaseHTTPRequestHandler):
                     "id": "chatcmpl-synthetic",
                     "object": "chat.completion.chunk",
                     "model": model_id,
-                    "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+                    "choices": [
+                        {"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}
+                    ],
                     "simulation_mode": SIMULATION_MODE,
                 },
                 {
@@ -91,7 +93,7 @@ class SyntheticOpenAIHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
             for chunk in chunks:
-                self.wfile.write(f"data: {json.dumps(chunk, sort_keys=True)}\n\n".encode("utf-8"))
+                self.wfile.write(f"data: {json.dumps(chunk, sort_keys=True)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
             return
         self.write_json(
@@ -99,7 +101,13 @@ class SyntheticOpenAIHandler(BaseHTTPRequestHandler):
                 "id": "chatcmpl-synthetic",
                 "object": "chat.completion",
                 "model": body.get("model") or self.server.model_id,
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ],
                 "usage": {"prompt_tokens": 16, "completion_tokens": 1, "total_tokens": 17},
                 "simulation_mode": SIMULATION_MODE,
                 "claim_boundary": CLAIM_BOUNDARY,
@@ -122,7 +130,15 @@ def serve_synthetic_endpoint(host: str, port: int, model_id: str) -> None:
     """Serve a foreground fake OpenAI-compatible endpoint."""
     server = ThreadingHTTPServer((host, port), SyntheticOpenAIHandler)
     server.model_id = model_id  # type: ignore[attr-defined]
-    print(json.dumps({"endpoint": f"http://{host}:{port}", "model": model_id, "simulation_mode": SIMULATION_MODE}))
+    print(
+        json.dumps(
+            {
+                "endpoint": f"http://{host}:{port}",
+                "model": model_id,
+                "simulation_mode": SIMULATION_MODE,
+            }
+        )
+    )
     server.serve_forever()
 
 
@@ -133,8 +149,16 @@ def serve_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=None)
     parser.add_argument("--model-profile", default=None)
     args = parser.parse_args(argv)
-    serve_synthetic_endpoint(args.host, args.port, args.model or args.model_profile or "synthetic-gmi-model")
+    serve_synthetic_endpoint(
+        args.host, args.port, args.model or args.model_profile or "synthetic-gmi-model"
+    )
     return 0
 
 
-__all__ = ["CLAIM_BOUNDARY", "SIMULATION_MODE", "SyntheticOpenAIHandler", "serve_main", "serve_synthetic_endpoint"]
+__all__ = [
+    "CLAIM_BOUNDARY",
+    "SIMULATION_MODE",
+    "SyntheticOpenAIHandler",
+    "serve_main",
+    "serve_synthetic_endpoint",
+]

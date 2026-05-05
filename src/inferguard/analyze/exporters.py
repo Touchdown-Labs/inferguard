@@ -137,7 +137,9 @@ def emit_rlm_trace(report: dict[str, Any], path: Path) -> Path:
             continue
         rows.append(_finding_rlm_span(finding, trace_id, root_span_id, None, index))
 
-    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8"
+    )
     return path
 
 
@@ -145,7 +147,11 @@ def _cell_payload(cell: dict[str, Any]) -> dict[str, Any]:
     metrics = cell.get("metrics") or {}
     completion = cell.get("completion") or {}
     topology = cell.get("topology") or {}
-    is_multinode = _boolish(cell.get("is_multinode") if cell.get("is_multinode") is not None else topology.get("is_multinode"))
+    is_multinode = _boolish(
+        cell.get("is_multinode")
+        if cell.get("is_multinode") is not None
+        else topology.get("is_multinode")
+    )
     out = {key: None for key in BASE_KEYS}
     out.update(
         {
@@ -154,12 +160,16 @@ def _cell_payload(cell: dict[str, Any]) -> dict[str, Any]:
             "conc": cell.get("concurrency"),
             "image": _first(cell.get("image"), topology.get("image")),
             "model": cell.get("model"),
-            "infmax_model_prefix": _first(cell.get("infmax_model_prefix"), topology.get("model_prefix")),
+            "infmax_model_prefix": _first(
+                cell.get("infmax_model_prefix"), topology.get("model_prefix")
+            ),
             "framework": _first(cell.get("framework"), topology.get("framework")),
             "precision": _first(cell.get("precision"), topology.get("precision")),
             "spec_decoding": _first(topology.get("spec_decoding"), "none"),
             "disagg": bool(cell.get("disagg") or is_multinode),
-            "scenario_type": _first(cell.get("scenario_type"), metrics.get("workload_class"), "agentic-coding"),
+            "scenario_type": _first(
+                cell.get("scenario_type"), metrics.get("workload_class"), "agentic-coding"
+            ),
             "is_multinode": is_multinode,
             "tp": _intish(_first(topology.get("tp"), metrics.get("tp"))),
             "ep": _intish(_first(topology.get("ep"), topology.get("ep_size"), metrics.get("ep"))),
@@ -175,9 +185,13 @@ def _cell_payload(cell: dict[str, Any]) -> dict[str, Any]:
     if is_multinode:
         for key in MULTINODE_KEYS:
             if key == "prefill_dp_attention":
-                out[key] = _first(topology.get("prefill_dp_attention"), topology.get("prefill_dp_attn"))
+                out[key] = _first(
+                    topology.get("prefill_dp_attention"), topology.get("prefill_dp_attn")
+                )
             elif key == "decode_dp_attention":
-                out[key] = _first(topology.get("decode_dp_attention"), topology.get("decode_dp_attn"))
+                out[key] = _first(
+                    topology.get("decode_dp_attention"), topology.get("decode_dp_attn")
+                )
             else:
                 out[key] = _intish(topology.get(key))
         if out.get("num_prefill_gpu") is None:
@@ -260,7 +274,9 @@ def _finding_rlm_span(
         "parent_span_id": parent_span_id,
         "name": f"inferguard.finding.{code}",
         "kind": "SPAN_KIND_INTERNAL",
-        "status": {"code": "STATUS_CODE_ERROR" if severity in {"critical", "error"} else "STATUS_CODE_OK"},
+        "status": {
+            "code": "STATUS_CODE_ERROR" if severity in {"critical", "error"} else "STATUS_CODE_OK"
+        },
         "scope": {"name": "inferguard.rlm_exporter", "version": RLM_TRACE_SCHEMA_VERSION},
         "attributes": {
             "inferguard.cell_id": cell_id,

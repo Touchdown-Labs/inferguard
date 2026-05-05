@@ -60,7 +60,9 @@ def test_rejects_not_publishable(tmp_path: Path) -> None:
     contract_path = root / "expected_artifact_contract.json"
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     contract["matrix_level"].append("handoff.md")
-    contract_path.write_text(json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    contract_path.write_text(
+        json.dumps(contract, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     result = scan_release_bundle(root)
 

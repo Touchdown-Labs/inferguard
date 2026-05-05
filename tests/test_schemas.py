@@ -186,7 +186,10 @@ def test_telemetry_schema_rejects_non_stub_unknown_mechanism() -> None:
 def test_telemetry_schema_json_round_trip() -> None:
     payload = telemetry_payload()
     decoded = json.loads(json.dumps(payload))
-    assert validate_telemetry_payload(decoded).as_dict()["aggregates"]["node_counts"]["model_call"] == 12
+    assert (
+        validate_telemetry_payload(decoded).as_dict()["aggregates"]["node_counts"]["model_call"]
+        == 12
+    )
 
 
 @pytest.mark.harness
@@ -272,7 +275,9 @@ def test_trace_integrity_rejects_summary_not_at_end() -> None:
 @pytest.mark.harness
 def test_trace_integrity_round_trips_canonical_valid_trace(tmp_path: Path) -> None:
     trace_path = tmp_path / "agent-trace.jsonl"
-    trace_path.write_text("\n".join(json.dumps(event) for event in valid_trace()) + "\n", encoding="utf-8")
+    trace_path.write_text(
+        "\n".join(json.dumps(event) for event in valid_trace()) + "\n", encoding="utf-8"
+    )
 
     decoded = [event.as_dict() for event in iter_agent_trace_jsonl(trace_path)]
 

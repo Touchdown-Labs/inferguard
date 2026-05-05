@@ -10,7 +10,7 @@ async def _streaming_client_reads_sse_usage_and_ttft() -> None:
         'data: {"choices":[{"delta":{"content":"hel"}}]}\n\n'
         'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n'
         'data: {"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":2}}\n\n'
-        'data: [DONE]\n\n'
+        "data: [DONE]\n\n"
     )
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -46,7 +46,9 @@ async def _streaming_client_estimates_tokens_without_usage() -> None:
         return httpx.Response(200, content=body.encode())
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        result = await OpenAIStreamingChatClient("http://test/v1/chat/completions", model="m").stream_chat(
+        result = await OpenAIStreamingChatClient(
+            "http://test/v1/chat/completions", model="m"
+        ).stream_chat(
             http,
             messages=[{"role": "user", "content": "hello"}],
             output_tokens=4,
@@ -67,14 +69,16 @@ async def _streaming_client_ignores_role_only_chunk_for_ttft() -> None:
     body = (
         'data: {"choices":[{"delta":{"role":"assistant"}}]}\n\n'
         'data: {"choices":[{"delta":{"content":"real token"}}]}\n\n'
-        'data: [DONE]\n\n'
+        "data: [DONE]\n\n"
     )
 
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=body.encode())
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        result = await OpenAIStreamingChatClient("http://test/v1/chat/completions", model="m").stream_chat(
+        result = await OpenAIStreamingChatClient(
+            "http://test/v1/chat/completions", model="m"
+        ).stream_chat(
             http,
             messages=[{"role": "user", "content": "hello"}],
             output_tokens=4,
@@ -100,7 +104,9 @@ async def _streaming_client_fails_without_generated_content() -> None:
         return httpx.Response(200, content=body.encode())
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        result = await OpenAIStreamingChatClient("http://test/v1/chat/completions", model="m").stream_chat(
+        result = await OpenAIStreamingChatClient(
+            "http://test/v1/chat/completions", model="m"
+        ).stream_chat(
             http,
             messages=[{"role": "user", "content": "hello"}],
             output_tokens=4,

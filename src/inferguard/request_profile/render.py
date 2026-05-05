@@ -34,7 +34,9 @@ def summary_markdown(summary: RequestProfileSummary) -> str:
         "",
     ]
     if summary.failure_breakdown:
-        lines.extend(f"- `{key}`: {count}" for key, count in sorted(summary.failure_breakdown.items()))
+        lines.extend(
+            f"- `{key}`: {count}" for key, count in sorted(summary.failure_breakdown.items())
+        )
     else:
         lines.append("No failed requests recorded.")
     lines.append("")

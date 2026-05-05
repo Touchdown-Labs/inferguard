@@ -121,10 +121,17 @@ async def run_collect_metrics(
                             options,
                         )
                         if raw_handle is not None:
-                            _write_raw_row(raw_handle, sequence, observed_at, "engine", engine_result, labels)
+                            _write_raw_row(
+                                raw_handle, sequence, observed_at, "engine", engine_result, labels
+                            )
                             if lmcache_result is not None:
                                 _write_raw_row(
-                                    raw_handle, sequence, observed_at, "lmcache", lmcache_result, labels
+                                    raw_handle,
+                                    sequence,
+                                    observed_at,
+                                    "lmcache",
+                                    lmcache_result,
+                                    labels,
                                 )
 
                         combined_engine_text = engine_result.text
@@ -135,7 +142,9 @@ async def run_collect_metrics(
                             combined_engine_text,
                             snapshot=snapshot,
                         )
-                        scrape_error = engine_result.scrape_error or getattr(snapshot, "scrape_error", "")
+                        scrape_error = engine_result.scrape_error or getattr(
+                            snapshot, "scrape_error", ""
+                        )
                         for group in ENGINE_GROUPS:
                             group_data = normalized["groups"][group]
                             sample = EngineMetricsSample(
@@ -174,7 +183,9 @@ async def run_collect_metrics(
                         if sequence % dcgm_every == 0:
                             dcgm_result = await _fetch_text(client, options.dcgm_metrics_url)
                             if raw_handle is not None:
-                                _write_raw_row(raw_handle, sequence, observed_at, "dcgm", dcgm_result, labels)
+                                _write_raw_row(
+                                    raw_handle, sequence, observed_at, "dcgm", dcgm_result, labels
+                                )
                             dcgm_rows = normalize_dcgm_sample(
                                 dcgm_result.text,
                                 observed_at=observed_at,

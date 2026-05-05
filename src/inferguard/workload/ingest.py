@@ -49,7 +49,9 @@ def _sample_from_record(record: dict[str, Any], path: Path, index: int) -> Workl
     messages = _messages(record)
     prompt_text = "\n".join(_message_text(message) for message in messages)
     usage = record.get("usage") if isinstance(record.get("usage"), dict) else {}
-    input_tokens = _int_or_none(record.get("expected_input_tokens")) or _int_or_none(usage.get("prompt_tokens"))
+    input_tokens = _int_or_none(record.get("expected_input_tokens")) or _int_or_none(
+        usage.get("prompt_tokens")
+    )
     output_tokens = (
         _int_or_none(record.get("expected_output_tokens"))
         or _int_or_none(record.get("output_tokens"))
@@ -59,21 +61,30 @@ def _sample_from_record(record: dict[str, Any], path: Path, index: int) -> Workl
         input_tokens = estimate_text_tokens(prompt_text)
     if output_tokens is None:
         output_tokens = estimate_text_tokens(_output_text(record))
-    session_id = str(record.get("session_id") or record.get("conversation_id") or record.get("user_id") or f"{path.stem}-{index}")
+    session_id = str(
+        record.get("session_id")
+        or record.get("conversation_id")
+        or record.get("user_id")
+        or f"{path.stem}-{index}"
+    )
     trace_id = record.get("trace_id") or record.get("id") or record.get("request_id")
     prefix_key = str(record.get("prefix_group") or _prefix_key(messages))
     return WorkloadSample(
         source=str(path),
         session_id=session_id,
         trace_id=str(trace_id) if trace_id is not None else None,
-        timestamp=_float_or_none(record.get("timestamp") or record.get("created_at") or record.get("request_start_time")),
+        timestamp=_float_or_none(
+            record.get("timestamp") or record.get("created_at") or record.get("request_start_time")
+        ),
         input_tokens=max(0, int(input_tokens)),
         output_tokens=max(0, int(output_tokens)),
         prefix_key=prefix_key,
         tool_call_count=_tool_call_count(record, messages),
         retry_count=max(0, _int_or_none(record.get("retry_count")) or 0),
         rag_chunk_count=_rag_chunk_count(record, messages),
-        workload_class=str(record.get("workload_class") or record.get("scenario_type") or "unknown"),
+        workload_class=str(
+            record.get("workload_class") or record.get("scenario_type") or "unknown"
+        ),
     )
 
 

@@ -4,10 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from inferguard.launch_engine.vllm import build_vllm_command
 from tests.fixtures.mock_sglang_server import start_mock_sglang_server
 from tests.fixtures.mock_vllm_server import start_mock_servers
-
-from inferguard.launch_engine.vllm import build_vllm_command
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNNER = REPO_ROOT / "scripts" / "run_neocloud_nvidia_profile.py"

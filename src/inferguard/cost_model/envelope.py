@@ -95,7 +95,9 @@ def _evaluated_levels(levels: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows = grouped[concurrency]
         request_count = sum(_int_value(row.get("request_count")) or 0 for row in rows)
         success_count = sum(_int_value(row.get("success_count")) or 0 for row in rows)
-        success_rate = (success_count / request_count) if request_count else _max_number(rows, "success_rate")
+        success_rate = (
+            (success_count / request_count) if request_count else _max_number(rows, "success_rate")
+        )
         evaluated.append(
             {
                 "concurrency": concurrency,

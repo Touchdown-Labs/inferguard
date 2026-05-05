@@ -7,7 +7,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNNER = REPO_ROOT / "scripts" / "run_lmcache_slurm_matrix.py"
 
 
-def test_expected_artifact_contract_includes_slurm_layer_outputs_and_reports(tmp_path: Path) -> None:
+def test_expected_artifact_contract_includes_slurm_layer_outputs_and_reports(
+    tmp_path: Path,
+) -> None:
     out = tmp_path / "matrix"
     completed = subprocess.run(
         [sys.executable, str(RUNNER), "--dry-run", "--results-root", str(out), "--max-jobs", "2"],

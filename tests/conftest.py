@@ -34,7 +34,9 @@ class OutboundCallBlocked(AssertionError):
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "harness: tests for the v0.5 harness layer")
     config.addinivalue_line("markers", "allow_network: permit non-loopback HTTP for this test")
-    config.addinivalue_line("markers", "allow_outbound_network: permit outbound network for this test")
+    config.addinivalue_line(
+        "markers", "allow_outbound_network: permit outbound network for this test"
+    )
     config.addinivalue_line("markers", "integration: integration tests")
 
 
@@ -70,7 +72,9 @@ def block_outbound_network(monkeypatch: pytest.MonkeyPatch, request: pytest.Fixt
         host = urlsplit(str(url)).hostname
         return _is_loopback_host(host)
 
-    async def guarded_async_send(self: httpx.AsyncClient, request: httpx.Request, *args: Any, **kwargs: Any):
+    async def guarded_async_send(
+        self: httpx.AsyncClient, request: httpx.Request, *args: Any, **kwargs: Any
+    ):
         if not allowed_for_httpx(self, request.url):
             raise OutboundCallBlocked(f"unmocked outbound HTTP blocked: {request.url}")
         return await original_async_send(self, request, *args, **kwargs)

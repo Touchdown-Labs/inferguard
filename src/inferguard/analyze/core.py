@@ -200,13 +200,25 @@ def analyze_results(results_dir: Path, options: AnalyzeOptions) -> dict[str, Any
     written = write_report(report, options.output_dir, options.output_format)
     for path in written:
         report["artifact_manifest"].append(
-            {"path": str(path), "kind": "inferguard_report", "cell_id": None, "required": False, "present": True}
+            {
+                "path": str(path),
+                "kind": "inferguard_report",
+                "cell_id": None,
+                "required": False,
+                "present": True,
+            }
         )
     if options.operator_brief:
         brief_paths = emit_operator_brief(report, options.output_dir)
         for path in brief_paths:
             report["artifact_manifest"].append(
-                {"path": str(path), "kind": "inferguard_operator_brief", "cell_id": None, "required": False, "present": True}
+                {
+                    "path": str(path),
+                    "kind": "inferguard_operator_brief",
+                    "cell_id": None,
+                    "required": False,
+                    "present": True,
+                }
             )
     if written or options.operator_brief:
         write_report(report, options.output_dir, options.output_format)
@@ -231,7 +243,9 @@ def exit_code_for_report(report: dict[str, Any], fail_on: str) -> int:
     if fail_on == "never":
         return 0
     threshold = SEVERITY_RANK[fail_on]
-    max_rank = max((SEVERITY_RANK.get(f.get("severity", "info"), 0) for f in report["findings"]), default=0)
+    max_rank = max(
+        (SEVERITY_RANK.get(f.get("severity", "info"), 0) for f in report["findings"]), default=0
+    )
     if max_rank >= SEVERITY_RANK["critical"] and threshold <= SEVERITY_RANK["critical"]:
         return 2
     if max_rank >= SEVERITY_RANK["warning"] and threshold <= SEVERITY_RANK["warning"]:
@@ -253,12 +267,14 @@ def render_markdown(report: dict[str, Any]) -> str:
     if campaign_cost is not None:
         currency = report["run_summary"]["cost"].get("currency") or "USD"
         lines.append(f"- Campaign cost: {currency} {campaign_cost:.4f}")
-    lines.extend([
-        "",
-        "## Benchmark matrix",
-        "| Cell | Source | Hardware | Concurrency | Success rate | p99 TTFT | Output tput |",
-        "|---|---|---|---:|---:|---:|---:|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Benchmark matrix",
+            "| Cell | Source | Hardware | Concurrency | Success rate | p99 TTFT | Output tput |",
+            "|---|---|---|---:|---:|---:|---:|",
+        ]
+    )
     for cell in report["cells"]:
         metrics = cell["metrics"]
         completion = cell["completion"]
@@ -281,28 +297,34 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append("- No required artifacts missing for discovered cells.")
     lines.extend(["", "## Per-cell results"])
     for cell in report["cells"]:
-        lines.extend([
-            f"### {cell['cell_id']}",
-            f"- Source: `{cell['source_format']}`",
-            f"- Status: {cell['completion'].get('status', 'unknown')}",
-        ])
+        lines.extend(
+            [
+                f"### {cell['cell_id']}",
+                f"- Source: `{cell['source_format']}`",
+                f"- Status: {cell['completion'].get('status', 'unknown')}",
+            ]
+        )
         if cell.get("timeline"):
             lines.append(f"- Timeline samples: {cell['timeline'].get('sample_count', 0)}")
         if cell.get("cost") and cell["cost"].get("compute_cost") is not None:
             cost = cell["cost"]
             currency = cost.get("currency") or "USD"
-            lines.extend([
-                "#### Cost",
-                f"- Compute cost: {currency} {cost['compute_cost']:.4f}",
-                f"- GPU-hours: {_md(cost.get('gpu_hours'))}",
-                f"- Completed sessions: {_md(cost.get('completed_sessions'))}",
-                f"- Cost / completed session: {currency} {_md(cost.get('cost_per_completed_session'))}",
-                f"- Cost / completed request: {currency} {_md(cost.get('cost_per_completed_request'))}",
-            ])
+            lines.extend(
+                [
+                    "#### Cost",
+                    f"- Compute cost: {currency} {cost['compute_cost']:.4f}",
+                    f"- GPU-hours: {_md(cost.get('gpu_hours'))}",
+                    f"- Completed sessions: {_md(cost.get('completed_sessions'))}",
+                    f"- Cost / completed session: {currency} {_md(cost.get('cost_per_completed_session'))}",
+                    f"- Cost / completed request: {currency} {_md(cost.get('cost_per_completed_request'))}",
+                ]
+            )
         if cell["findings"]:
             lines.append("- Findings:")
             for finding in cell["findings"]:
-                lines.append(f"  - **{finding['severity']}** `{finding['code']}`: {finding['message']}")
+                lines.append(
+                    f"  - **{finding['severity']}** `{finding['code']}`: {finding['message']}"
+                )
     lines.extend(["", "## Live InferGuard timeline"])
     timeline_cells = [c for c in report["cells"] if c.get("timeline")]
     if timeline_cells:
@@ -310,19 +332,43 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- {cell['cell_id']}: {cell['timeline'].get('sample_count', 0)} samples")
     else:
         lines.append("- No timeline artifact discovered.")
-    lines.extend(["", "## Bottleneck analysis", "- v0 report only surfaces observed metrics and findings; it does not recommend actuation."])
-    lines.extend(["", "## Evidence-based next measurements", "- Re-run missing or partial cells before publishing comparative claims."])
+    lines.extend(
+        [
+            "",
+            "## Bottleneck analysis",
+            "- v0 report only surfaces observed metrics and findings; it does not recommend actuation.",
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## Evidence-based next measurements",
+            "- Re-run missing or partial cells before publishing comparative claims.",
+        ]
+    )
     lines.extend(["", "## Co-publish artifact manifest"])
     for artifact in report["artifact_manifest"]:
         lines.append(f"- `{artifact['kind']}`: `{artifact['path']}`")
     return "\n".join(lines) + "\n"
 
 
-def _parse_agg(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_agg(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None:
         return
-    cell = _cell(cells, _cell_id(path, root, data), "inferencex-srt-slurm" if data.get("is_multinode") or data.get("disagg") else "inferencex-static")
+    cell = _cell(
+        cells,
+        _cell_id(path, root, data),
+        "inferencex-srt-slurm"
+        if data.get("is_multinode") or data.get("disagg")
+        else "inferencex-static",
+    )
     cell.artifacts["agg_json"] = _rel(path, root)
     _manifest(manifest, path, root, "agg_json", cell.cell_id, True)
     mapping = {
@@ -344,18 +390,60 @@ def _parse_agg(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest:
             cell.identity[out_key] = data[in_key]
     if "recipe_name" in data:
         cell.identity["recipe_name"] = data["recipe_name"]
-    topology_keys = ["tp", "ep", "dp_attention", "prefill_tp", "prefill_ep", "prefill_dp_attention", "prefill_num_workers", "decode_tp", "decode_ep", "decode_dp_attention", "decode_num_workers", "num_prefill_gpu", "num_decode_gpu"]
+    topology_keys = [
+        "tp",
+        "ep",
+        "dp_attention",
+        "prefill_tp",
+        "prefill_ep",
+        "prefill_dp_attention",
+        "prefill_num_workers",
+        "decode_tp",
+        "decode_ep",
+        "decode_dp_attention",
+        "decode_num_workers",
+        "num_prefill_gpu",
+        "num_decode_gpu",
+    ]
     cell.identity["topology"].update({k: data[k] for k in topology_keys if k in data})
-    metric_keys = ["tput_per_gpu", "output_tput_per_gpu", "input_tput_per_gpu", "total_tput_tps", "output_tput_tps", "input_tput_tps", "mean_ttft", "p50_ttft", "p90_ttft", "p95_ttft", "p99_ttft", "mean_tpot", "p50_tpot", "p90_tpot", "p95_tpot", "p99_tpot", "mean_itl", "p99_itl", "intvty"]
+    metric_keys = [
+        "tput_per_gpu",
+        "output_tput_per_gpu",
+        "input_tput_per_gpu",
+        "total_tput_tps",
+        "output_tput_tps",
+        "input_tput_tps",
+        "mean_ttft",
+        "p50_ttft",
+        "p90_ttft",
+        "p95_ttft",
+        "p99_ttft",
+        "mean_tpot",
+        "p50_tpot",
+        "p90_tpot",
+        "p95_tpot",
+        "p99_tpot",
+        "mean_itl",
+        "p99_itl",
+        "intvty",
+    ]
     for key in metric_keys:
         if key in data:
             cell.metrics[key] = _number_or_raw(data[key])
     total = _first(data, "num_requests_total", "num_prompts", "request_count", "requests")
-    successful = _first(data, "num_requests_successful", "successful_requests", "completed", "success")
+    successful = _first(
+        data, "num_requests_successful", "successful_requests", "completed", "success"
+    )
     _set_completion(cell, total, successful)
 
 
-def _parse_agentx_detail(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_agentx_detail(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     rows = _read_csv(path, parse_findings, root)
     if rows is None:
         return
@@ -370,7 +458,9 @@ def _parse_agentx_detail(path: Path, root: Path, cells: dict[str, _CellBuilder],
     for row in successful_rows:
         start = _to_float(row.get("request_start_time"))
         end = _to_float(row.get("request_complete_time"))
-        e2el.append(end - start if start is not None and end is not None else _to_float(row.get("ttlt")))
+        e2el.append(
+            end - start if start is not None and end is not None else _to_float(row.get("ttlt"))
+        )
     itl = [_to_float(r.get("itl")) for r in successful_rows]
     input_tokens = [_to_float(r.get("input_tokens")) for r in successful_rows]
     output_actual = [_to_float(r.get("output_tokens_actual")) for r in successful_rows]
@@ -409,7 +499,13 @@ def _parse_agentx_detail(path: Path, root: Path, cells: dict[str, _CellBuilder],
         cell.metrics["theoretical_cache_hit_rate"] = hits / (hits + misses)
 
 
-def _parse_agentx_metrics(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_agentx_metrics(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     rows = _read_csv(path, parse_findings, root)
     if rows is None:
         return
@@ -430,12 +526,27 @@ def _parse_agentx_metrics(path: Path, root: Path, cells: dict[str, _CellBuilder]
     cpu_queries = sums.get("cpu_prefix_cache_queries")
     if cpu_hits is not None and cpu_queries:
         cell.metrics["server_cpu_cache_hit_rate"] = cpu_hits / cpu_queries
-    for key in ("kv_offload_bytes_gpu_to_cpu", "kv_offload_bytes_cpu_to_gpu", "kv_offload_time_gpu_to_cpu", "kv_offload_time_cpu_to_gpu", "cpu_kv_cache_usage_pct", "prompt_tokens_total", "generation_tokens_total", "request_success_total"):
+    for key in (
+        "kv_offload_bytes_gpu_to_cpu",
+        "kv_offload_bytes_cpu_to_gpu",
+        "kv_offload_time_gpu_to_cpu",
+        "kv_offload_time_cpu_to_gpu",
+        "cpu_kv_cache_usage_pct",
+        "prompt_tokens_total",
+        "generation_tokens_total",
+        "request_success_total",
+    ):
         if key in sums:
             cell.metrics[key] = sums[key]
 
 
-def _parse_eval_json(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_eval_json(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None:
         return
@@ -447,7 +558,13 @@ def _parse_eval_json(path: Path, root: Path, cells: dict[str, _CellBuilder], man
             cell.metrics[f"eval_{key}"] = value
 
 
-def _parse_inferguard_bench_summary(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_inferguard_bench_summary(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None or data.get("schema_version") != "inferguard-bench-summary/v1":
         return
@@ -458,12 +575,60 @@ def _parse_inferguard_bench_summary(path: Path, root: Path, cells: dict[str, _Ce
     metrics_timeline_path = path.parent / "metrics_timeline.jsonl"
     dcgm_correlated_path = path.parent / "dcgm-correlated-v1.jsonl"
     config_path = path.parent / "config.json"
-    _register_native_bench_companion(metrics_path, root, cell, manifest, parse_findings, "inferguard_bench_metrics_jsonl", required=True)
-    _register_native_bench_companion(metrics_timeline_path, root, cell, manifest, parse_findings, "inferguard_bench_metrics_timeline_jsonl", required=False)
-    _register_native_bench_companion(dcgm_correlated_path, root, cell, manifest, parse_findings, "dcgm_correlated_jsonl", required=False)
-    _register_native_bench_companion(path.parent / "requests.jsonl", root, cell, manifest, parse_findings, "inferguard_bench_requests_jsonl", required=True)
-    _register_native_bench_companion(path.parent / "run.json", root, cell, manifest, parse_findings, "inferguard_bench_run_json", required=True)
-    _register_native_bench_companion(config_path, root, cell, manifest, parse_findings, "inferguard_bench_config_json", required=True)
+    _register_native_bench_companion(
+        metrics_path,
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "inferguard_bench_metrics_jsonl",
+        required=True,
+    )
+    _register_native_bench_companion(
+        metrics_timeline_path,
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "inferguard_bench_metrics_timeline_jsonl",
+        required=False,
+    )
+    _register_native_bench_companion(
+        dcgm_correlated_path,
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "dcgm_correlated_jsonl",
+        required=False,
+    )
+    _register_native_bench_companion(
+        path.parent / "requests.jsonl",
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "inferguard_bench_requests_jsonl",
+        required=True,
+    )
+    _register_native_bench_companion(
+        path.parent / "run.json",
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "inferguard_bench_run_json",
+        required=True,
+    )
+    _register_native_bench_companion(
+        config_path,
+        root,
+        cell,
+        manifest,
+        parse_findings,
+        "inferguard_bench_config_json",
+        required=True,
+    )
 
     config_data = _load_json(config_path, parse_findings, root) if config_path.exists() else None
     topology = config_data.get("topology") if isinstance(config_data, dict) else None
@@ -474,7 +639,9 @@ def _parse_inferguard_bench_summary(path: Path, root: Path, cells: dict[str, _Ce
         _apply_hma_preflight(cell, config_data)
 
     cell.identity["model"] = data.get("model")
-    conc = [item.get("concurrency") for item in data.get("concurrency", []) if isinstance(item, dict)]
+    conc = [
+        item.get("concurrency") for item in data.get("concurrency", []) if isinstance(item, dict)
+    ]
     cell.identity["concurrency"] = conc[0] if len(conc) == 1 and isinstance(conc[0], int) else None
     cell.identity["topology"]["concurrency_levels"] = [c for c in conc if isinstance(c, int)]
     counts = data.get("request_counts", {})
@@ -504,7 +671,12 @@ def _parse_inferguard_bench_summary(path: Path, root: Path, cells: dict[str, _Ce
     _legacy_percentile_block(cell.metrics, "latency", data.get("latency_seconds") or {})
     tokens = data.get("tokens", {})
     if isinstance(tokens, dict):
-        for key in ("input_total", "output_total", "estimated_input_tokens", "estimated_output_tokens"):
+        for key in (
+            "input_total",
+            "output_total",
+            "estimated_input_tokens",
+            "estimated_output_tokens",
+        ):
             if key in tokens:
                 cell.metrics[key] = tokens[key]
 
@@ -535,17 +707,27 @@ def _parse_inferguard_bench_summary(path: Path, root: Path, cells: dict[str, _Ce
             cell.metrics["total_tput_tps"] = (total_input + total_output) / duration
             cell.metrics.update(_compute_qps_stats(ends))
     _apply_native_metrics_timeline_metrics(cell, metrics_timeline_path)
-    _apply_platform_scenario_findings(cell, metric_rows, metrics_timeline_path, dcgm_correlated_path)
+    _apply_platform_scenario_findings(
+        cell, metric_rows, metrics_timeline_path, dcgm_correlated_path
+    )
 
 
-def _parse_compare_json(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_compare_json(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None or data.get("schema_version") != "inferguard-compare/v1":
         return
     cell = _cell(cells, _path_cell_id(path, root), "inferguard-compare")
     cell.artifacts["inferguard_compare_json"] = _rel(path, root)
     _manifest(manifest, path, root, "inferguard_compare_json", cell.cell_id, False)
-    cell.identity["model"] = ((data.get("run_b") or {}).get("model") or (data.get("run_a") or {}).get("model"))
+    cell.identity["model"] = (data.get("run_b") or {}).get("model") or (
+        data.get("run_a") or {}
+    ).get("model")
     cell.metrics["blue_green"] = bool((data.get("options") or {}).get("blue_green"))
     cell.metrics["compare_workload_classes"] = data.get("workload_classes") or []
     _set_completion(cell, 1, 1)
@@ -562,7 +744,13 @@ def _parse_compare_json(path: Path, root: Path, cells: dict[str, _CellBuilder], 
             )
 
 
-def _parse_preflight_json(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_preflight_json(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None or data.get("schema_version") != "inferguard-preflight/v1":
         return
@@ -587,7 +775,10 @@ def _parse_preflight_json(path: Path, root: Path, cells: dict[str, _CellBuilder]
 
 
 def _apply_platform_scenario_findings(
-    cell: _CellBuilder, metric_rows: list[dict[str, Any]], metrics_timeline_path: Path, dcgm_correlated_path: Path
+    cell: _CellBuilder,
+    metric_rows: list[dict[str, Any]],
+    metrics_timeline_path: Path,
+    dcgm_correlated_path: Path,
 ) -> None:
     # Implements S-21/S-13/S-07/S-05/S-01/S-03/S-09/S-11 scenario findings (see docs/inferguard/24).
     imbalance = _kv_footprint_imbalance(metrics_timeline_path)
@@ -623,7 +814,9 @@ def _apply_platform_scenario_findings(
                 noisy,
             )
         )
-    cold = cell.metrics.get("cold_start") if isinstance(cell.metrics.get("cold_start"), dict) else None
+    cold = (
+        cell.metrics.get("cold_start") if isinstance(cell.metrics.get("cold_start"), dict) else None
+    )
     if cold:
         first = _to_float(cold.get("first_60s_p99_ttft_seconds"))
         steady = _to_float(cold.get("steady_state_p99_ttft_seconds"))
@@ -646,11 +839,17 @@ def _apply_platform_scenario_findings(
                         ),
                         "first_60s_p99_ttft_seconds": first,
                         "steady_state_p99_ttft_seconds": steady,
-                        "first_successful_request_seconds": cold.get("first_successful_request_seconds"),
+                        "first_successful_request_seconds": cold.get(
+                            "first_successful_request_seconds"
+                        ),
                     },
                 )
             )
-    chaos = cell.metrics.get("chaos_recovery") if isinstance(cell.metrics.get("chaos_recovery"), dict) else None
+    chaos = (
+        cell.metrics.get("chaos_recovery")
+        if isinstance(cell.metrics.get("chaos_recovery"), dict)
+        else None
+    )
     if chaos:
         recovery = _to_float(chaos.get("recovery_time_seconds"))
         threshold = _to_float(chaos.get("threshold_seconds")) or 30.0
@@ -675,7 +874,11 @@ def _apply_platform_scenario_findings(
                 gpu_degradation,
             )
         )
-    oom = cell.metrics.get("oom_giant_prefill") if isinstance(cell.metrics.get("oom_giant_prefill"), dict) else None
+    oom = (
+        cell.metrics.get("oom_giant_prefill")
+        if isinstance(cell.metrics.get("oom_giant_prefill"), dict)
+        else None
+    )
     if oom:
         cell.findings.append(
             _finding(
@@ -692,7 +895,11 @@ def _apply_platform_scenario_findings(
                 },
             )
         )
-    retry = cell.metrics.get("retry_storm") if isinstance(cell.metrics.get("retry_storm"), dict) else None
+    retry = (
+        cell.metrics.get("retry_storm")
+        if isinstance(cell.metrics.get("retry_storm"), dict)
+        else None
+    )
     if retry:
         cell.findings.append(
             _finding(
@@ -709,7 +916,11 @@ def _apply_platform_scenario_findings(
                 },
             )
         )
-    quality = cell.metrics.get("canary_quality") if isinstance(cell.metrics.get("canary_quality"), dict) else None
+    quality = (
+        cell.metrics.get("canary_quality")
+        if isinstance(cell.metrics.get("canary_quality"), dict)
+        else None
+    )
     if quality:
         delta = _to_float(quality.get("accuracy_delta"))
         p_value = _to_float(quality.get("p_value"))
@@ -773,11 +984,17 @@ def _kv_footprint_imbalance(path: Path) -> dict[str, Any] | None:
                 max_share[str(customer)] = max(max_share.get(str(customer), 0.0), share)
     for customer, count in counts.items():
         if count >= 2:
-            return {"customer_id": customer, "snapshot_count": count, "max_share": max_share.get(customer)}
+            return {
+                "customer_id": customer,
+                "snapshot_count": count,
+                "max_share": max_share.get(customer),
+            }
     return None
 
 
-def _gpu_partial_degradation(metrics_timeline_path: Path, dcgm_correlated_path: Path) -> dict[str, Any] | None:
+def _gpu_partial_degradation(
+    metrics_timeline_path: Path, dcgm_correlated_path: Path
+) -> dict[str, Any] | None:
     rows: list[dict[str, Any]] = []
     if dcgm_correlated_path.exists():
         rows.extend(_read_jsonl_dicts(dcgm_correlated_path))
@@ -805,10 +1022,18 @@ def _cross_customer_events(metric_rows: list[dict[str, Any]]) -> list[dict[str, 
     events: list[dict[str, Any]] = []
     for row in metric_rows:
         metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
-        lineage = metadata.get("cache_lineage") if isinstance(metadata.get("cache_lineage"), dict) else {}
-        eviction = metadata.get("prefix_eviction_event") if isinstance(metadata.get("prefix_eviction_event"), dict) else {}
+        lineage = (
+            metadata.get("cache_lineage") if isinstance(metadata.get("cache_lineage"), dict) else {}
+        )
+        eviction = (
+            metadata.get("prefix_eviction_event")
+            if isinstance(metadata.get("prefix_eviction_event"), dict)
+            else {}
+        )
         if lineage.get("cross_customer") or eviction:
-            events.append({"request_id": row.get("request_id"), "lineage": lineage, "eviction": eviction})
+            events.append(
+                {"request_id": row.get("request_id"), "lineage": lineage, "eviction": eviction}
+            )
     return events
 
 
@@ -853,7 +1078,9 @@ def _apply_hma_preflight(cell: _CellBuilder, config_data: dict[str, Any]) -> Non
             topology.get("disable_hybrid_kv_cache_manager"),
         ),
     }
-    model_family = _first_value(config_data.get("model_family"), config_data.get("model"), topology.get("model_prefix"))
+    model_family = _first_value(
+        config_data.get("model_family"), config_data.get("model"), topology.get("model_prefix")
+    )
     for finding in check_hma_offload_compat(status, str(model_family or "")):
         cell.findings.append(
             _finding(
@@ -871,7 +1098,11 @@ def _apply_native_metrics_timeline_metrics(cell: _CellBuilder, path: Path) -> No
         return
     sums: dict[str, float] = {}
     for record in _read_jsonl_dicts(path):
-        snapshot = record.get("disagg_snapshot") if isinstance(record.get("disagg_snapshot"), dict) else record
+        snapshot = (
+            record.get("disagg_snapshot")
+            if isinstance(record.get("disagg_snapshot"), dict)
+            else record
+        )
         if not isinstance(snapshot, dict):
             continue
         for key in (
@@ -922,7 +1153,9 @@ def _register_native_bench_companion(
         _manifest(manifest, path, root, kind, cell.cell_id, required)
         return
     rel = _rel(path, root)
-    manifest.append({"path": rel, "kind": kind, "cell_id": cell.cell_id, "required": required, "present": False})
+    manifest.append(
+        {"path": rel, "kind": kind, "cell_id": cell.cell_id, "required": required, "present": False}
+    )
     if required:
         parse_findings.append(
             _finding(
@@ -935,13 +1168,21 @@ def _register_native_bench_companion(
         )
 
 
-def _register_eval_sample(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]]) -> None:
+def _register_eval_sample(
+    path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]]
+) -> None:
     cell = _cell(cells, _path_cell_id(path, root), "eval")
     cell.artifacts.setdefault("sample_jsonl", []).append(_rel(path, root))
     _manifest(manifest, path, root, "sample_jsonl", cell.cell_id, False)
 
 
-def _parse_meta_env(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_meta_env(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     data = _load_json(path, parse_findings, root)
     if data is None:
         return
@@ -953,7 +1194,13 @@ def _parse_meta_env(path: Path, root: Path, cells: dict[str, _CellBuilder], mani
             cell.identity[key] = data[key]
 
 
-def _parse_timeline(path: Path, root: Path, cells: dict[str, _CellBuilder], manifest: list[dict[str, Any]], parse_findings: list[dict[str, Any]]) -> None:
+def _parse_timeline(
+    path: Path,
+    root: Path,
+    cells: dict[str, _CellBuilder],
+    manifest: list[dict[str, Any]],
+    parse_findings: list[dict[str, Any]],
+) -> None:
     cell = _cell_for_path(cells, path, root) or _cell(cells, _path_cell_id(path, root), "unknown")
     cell.artifacts["inferguard_timeline_jsonl"] = _rel(path, root)
     _manifest(manifest, path, root, "inferguard_timeline_jsonl", cell.cell_id, False)
@@ -969,13 +1216,19 @@ def _parse_timeline(path: Path, root: Path, cells: dict[str, _CellBuilder], mani
         try:
             record = json.loads(line)
         except json.JSONDecodeError as exc:
-            parse_findings.append(_parse_finding(path, root, f"invalid timeline JSONL line {line_no}: {exc}"))
+            parse_findings.append(
+                _parse_finding(path, root, f"invalid timeline JSONL line {line_no}: {exc}")
+            )
             continue
         sample_count += 1
         observed = record.get("observed_at") or record.get("timestamp")
         first_observed = first_observed or observed
         last_observed = observed or last_observed
-        status = record.get("disagg_status") if record.get("schema_version") == "inferguard-timeline/v1" else record
+        status = (
+            record.get("disagg_status")
+            if record.get("schema_version") == "inferguard-timeline/v1"
+            else record
+        )
         for finding in status.get("findings", []) if isinstance(status, dict) else []:
             code = finding.get("code")
             if code in SUPPORTED_FINDING_CODES:
@@ -1002,16 +1255,50 @@ def _parse_timeline(path: Path, root: Path, cells: dict[str, _CellBuilder], mani
 
 
 def _finalize_cell(cell: _CellBuilder) -> None:
-    if cell.source_format == "agentx-trace-replay" and "metrics_server_metrics_csv" not in cell.artifacts:
-        cell.findings.append(_finding("metrics_unavailable", "warning", "AgentX server metrics CSV not found", cell.cell_id, {}))
+    if (
+        cell.source_format == "agentx-trace-replay"
+        and "metrics_server_metrics_csv" not in cell.artifacts
+    ):
+        cell.findings.append(
+            _finding(
+                "metrics_unavailable",
+                "warning",
+                "AgentX server metrics CSV not found",
+                cell.cell_id,
+                {},
+            )
+        )
     total = cell.completion.get("num_requests_total")
     successful = cell.completion.get("num_requests_successful")
     if total is not None and successful == 0:
-        cell.findings.append(_finding("invalid_run_no_successful_requests", "critical", "Run completed with zero successful requests", cell.cell_id, {"num_requests_total": total}))
+        cell.findings.append(
+            _finding(
+                "invalid_run_no_successful_requests",
+                "critical",
+                "Run completed with zero successful requests",
+                cell.cell_id,
+                {"num_requests_total": total},
+            )
+        )
     elif cell.completion.get("success_rate") is not None and cell.completion["success_rate"] < 0.95:
-        cell.findings.append(_finding("partial_run", "warning", "Success rate below 95%", cell.cell_id, {"success_rate": cell.completion["success_rate"]}))
+        cell.findings.append(
+            _finding(
+                "partial_run",
+                "warning",
+                "Success rate below 95%",
+                cell.cell_id,
+                {"success_rate": cell.completion["success_rate"]},
+            )
+        )
     if not cell.completion:
-        cell.completion.update({"status": "unknown", "num_requests_total": None, "num_requests_successful": None, "success_rate": None})
+        cell.completion.update(
+            {
+                "status": "unknown",
+                "num_requests_total": None,
+                "num_requests_successful": None,
+                "success_rate": None,
+            }
+        )
 
 
 def _apply_cost_model(cell: _CellBuilder, root: Path, options: AnalyzeOptions) -> None:
@@ -1099,7 +1386,11 @@ def _cost_utilization_economics(
 ) -> dict[str, Any] | None:
     if compute_cost is None:
         return None
-    path = root / cell.artifacts["inferguard_bench_metrics_jsonl"] if isinstance(cell.artifacts.get("inferguard_bench_metrics_jsonl"), str) else None
+    path = (
+        root / cell.artifacts["inferguard_bench_metrics_jsonl"]
+        if isinstance(cell.artifacts.get("inferguard_bench_metrics_jsonl"), str)
+        else None
+    )
     metric_rows = _read_jsonl_dicts(path) if path is not None and path.exists() else []
     successes = [row for row in metric_rows if _truthy(row.get("success"))]
     total_tokens = sum(_row_tokens(row) for row in successes)
@@ -1107,9 +1398,15 @@ def _cost_utilization_economics(
         return None
     observed_utilization = _observed_utilization(cell, successes)
     idle_fraction = _observed_idle_fraction(cell, observed_utilization)
-    penalty = (TARGET_UTILIZATION / observed_utilization) if observed_utilization and observed_utilization > 0 else None
+    penalty = (
+        (TARGET_UTILIZATION / observed_utilization)
+        if observed_utilization and observed_utilization > 0
+        else None
+    )
     curve = _utilization_curve(successes, compute_cost)
-    customer_rows = _customer_idle_penalties(successes, compute_cost, observed_utilization, idle_fraction, penalty, options.cost_currency)
+    customer_rows = _customer_idle_penalties(
+        successes, compute_cost, observed_utilization, idle_fraction, penalty, options.cost_currency
+    )
     return {
         "schema_version": "inferguard-cost-economics/v1",
         "currency": options.cost_currency,
@@ -1192,7 +1489,9 @@ def _customer_idle_penalties(
     return sorted(out, key=lambda row: str(row.get("customer_id")))
 
 
-def _idle_underutilization_findings(cell: _CellBuilder, economics: dict[str, Any]) -> list[dict[str, Any]]:
+def _idle_underutilization_findings(
+    cell: _CellBuilder, economics: dict[str, Any]
+) -> list[dict[str, Any]]:
     utilization = _to_float(economics.get("observed_utilization"))
     idle_fraction = _to_float(economics.get("idle_fraction"))
     penalty = _to_float(economics.get("idle_amortization_penalty"))
@@ -1201,8 +1500,14 @@ def _idle_underutilization_findings(cell: _CellBuilder, economics: dict[str, Any
     if utilization >= 0.50 or idle_fraction <= 0.60 or penalty <= 1.50:
         return []
     findings = []
-    rows = economics.get("customer_idle_amortization") if isinstance(economics.get("customer_idle_amortization"), list) else []
-    target_rows = rows or [{"customer_id": "unknown", "recommendation": _idle_recommendation("unknown", penalty)}]
+    rows = (
+        economics.get("customer_idle_amortization")
+        if isinstance(economics.get("customer_idle_amortization"), list)
+        else []
+    )
+    target_rows = rows or [
+        {"customer_id": "unknown", "recommendation": _idle_recommendation("unknown", penalty)}
+    ]
     for row in target_rows:
         customer = row.get("customer_id") or "unknown"
         findings.append(
@@ -1225,7 +1530,11 @@ def _idle_underutilization_findings(cell: _CellBuilder, economics: dict[str, Any
 
 
 def _observed_utilization(cell: _CellBuilder, rows: list[dict[str, Any]]) -> float | None:
-    idle_mix = cell.metrics.get("idle_active_mix") if isinstance(cell.metrics.get("idle_active_mix"), dict) else {}
+    idle_mix = (
+        cell.metrics.get("idle_active_mix")
+        if isinstance(cell.metrics.get("idle_active_mix"), dict)
+        else {}
+    )
     explicit = _to_float(idle_mix.get("observed_utilization"))
     if explicit is not None:
         return max(0.0, min(1.0, explicit))
@@ -1235,7 +1544,11 @@ def _observed_utilization(cell: _CellBuilder, rows: list[dict[str, Any]]) -> flo
 
 
 def _observed_idle_fraction(cell: _CellBuilder, observed_utilization: float | None) -> float | None:
-    idle_mix = cell.metrics.get("idle_active_mix") if isinstance(cell.metrics.get("idle_active_mix"), dict) else {}
+    idle_mix = (
+        cell.metrics.get("idle_active_mix")
+        if isinstance(cell.metrics.get("idle_active_mix"), dict)
+        else {}
+    )
     explicit = _to_float(idle_mix.get("idle_fraction"))
     if explicit is not None:
         return max(0.0, min(1.0, explicit))
@@ -1244,7 +1557,9 @@ def _observed_idle_fraction(cell: _CellBuilder, observed_utilization: float | No
 
 def _row_utilization(row: dict[str, Any]) -> float | None:
     metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
-    idle_mix = metadata.get("idle_active_mix") if isinstance(metadata.get("idle_active_mix"), dict) else {}
+    idle_mix = (
+        metadata.get("idle_active_mix") if isinstance(metadata.get("idle_active_mix"), dict) else {}
+    )
     value = _first_value(
         row.get("gpu_utilization"),
         row.get("gpu_utilization_pct"),
@@ -1269,14 +1584,17 @@ def _utilization_bucket_label(utilization: float | None) -> str:
 
 
 def _row_tokens(row: dict[str, Any]) -> int:
-    return max(0, int(_to_float(row.get("input_tokens")) or 0) + int(_to_float(row.get("output_tokens")) or 0))
+    return max(
+        0,
+        int(_to_float(row.get("input_tokens")) or 0)
+        + int(_to_float(row.get("output_tokens")) or 0),
+    )
 
 
 def _idle_recommendation(customer: str, penalty: float | None) -> str:
     if penalty is None or penalty <= 1.5:
         return "Monitor utilization before changing placement."
     return f"Consolidate Customer {customer} to fewer GPUs or co-tenant with a compatible workload."
-
 
 
 def _run_cost_summary(cells: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1395,7 +1713,9 @@ def _cost_per_million_tokens(compute_cost: float | None, tokens: float | None) -
 def _cross_run(cells: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "cell_ids": [c["cell_id"] for c in cells],
-        "max_output_tput_tps": max((c["metrics"].get("output_tput_tps") or 0 for c in cells), default=0),
+        "max_output_tput_tps": max(
+            (c["metrics"].get("output_tput_tps") or 0 for c in cells), default=0
+        ),
     }
 
 
@@ -1436,11 +1756,28 @@ def _rel(path: Path, root: Path) -> str:
     return path.resolve().relative_to(root).as_posix()
 
 
-def _manifest(manifest: list[dict[str, Any]], path: Path, root: Path, kind: str, cell_id: str | None, required: bool) -> None:
-    manifest.append({"path": _rel(path, root), "kind": kind, "cell_id": cell_id, "required": required, "present": True})
+def _manifest(
+    manifest: list[dict[str, Any]],
+    path: Path,
+    root: Path,
+    kind: str,
+    cell_id: str | None,
+    required: bool,
+) -> None:
+    manifest.append(
+        {
+            "path": _rel(path, root),
+            "kind": kind,
+            "cell_id": cell_id,
+            "required": required,
+            "present": True,
+        }
+    )
 
 
-def _load_json(path: Path, parse_findings: list[dict[str, Any]], root: Path) -> dict[str, Any] | None:
+def _load_json(
+    path: Path, parse_findings: list[dict[str, Any]], root: Path
+) -> dict[str, Any] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -1449,7 +1786,9 @@ def _load_json(path: Path, parse_findings: list[dict[str, Any]], root: Path) -> 
     return data if isinstance(data, dict) else {}
 
 
-def _read_csv(path: Path, parse_findings: list[dict[str, Any]], root: Path) -> list[dict[str, str]] | None:
+def _read_csv(
+    path: Path, parse_findings: list[dict[str, Any]], root: Path
+) -> list[dict[str, str]] | None:
     try:
         with path.open(newline="", encoding="utf-8") as handle:
             return list(csv.DictReader(handle))
@@ -1469,12 +1808,14 @@ def _set_completion(cell: _CellBuilder, total: Any, successful: Any) -> None:
         success_num = total_num
     rate = None if not total_num else success_num / total_num
     status = "complete" if rate == 1 else "partial" if rate and rate > 0 else "failed"
-    cell.completion.update({
-        "status": status,
-        "num_requests_total": int(total_num) if total_num is not None else None,
-        "num_requests_successful": int(success_num) if success_num is not None else None,
-        "success_rate": rate,
-    })
+    cell.completion.update(
+        {
+            "status": status,
+            "num_requests_total": int(total_num) if total_num is not None else None,
+            "num_requests_successful": int(success_num) if success_num is not None else None,
+            "success_rate": rate,
+        }
+    )
 
 
 def _series(metrics: dict[str, Any], name: str, values: list[float | None]) -> None:
@@ -1629,12 +1970,22 @@ def _first_value(*values: Any) -> Any:
     return None
 
 
-def _finding(code: str, severity: str, message: str, cell_id: str | None, evidence: dict[str, Any]) -> dict[str, Any]:
-    return {"code": code, "severity": severity, "message": message, "cell_id": cell_id, "evidence": evidence}
+def _finding(
+    code: str, severity: str, message: str, cell_id: str | None, evidence: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "code": code,
+        "severity": severity,
+        "message": message,
+        "cell_id": cell_id,
+        "evidence": evidence,
+    }
 
 
 def _parse_finding(path: Path, root: Path, message: str) -> dict[str, Any]:
-    return _finding("missing_required_artifact", "critical", message, None, {"path": _rel(path, root)})
+    return _finding(
+        "missing_required_artifact", "critical", message, None, {"path": _rel(path, root)}
+    )
 
 
 def _md(value: Any) -> str:

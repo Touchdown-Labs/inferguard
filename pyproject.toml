@@ -39,11 +39,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "aiohttp>=3.9",
+    "bandit>=1.7",
     "build",
     "matplotlib>=3.7",
+    "pip-audit>=2.7",
+    "pre-commit>=3.7",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.6",
+    "safety>=3.2",
     "twine",
 ]
 mcp = ["fastmcp>=3.1"]

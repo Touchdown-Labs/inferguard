@@ -103,7 +103,9 @@ def test_no_cost_input_refuses_cost(tmp_path: Path) -> None:
 
 def test_truncated_validation_report_downgrades_without_crash(tmp_path: Path) -> None:
     root = copy_fixture(tmp_path, "live_complete")
-    (root / "validation_report.json").write_text('{"status":"live_complete","jobs":[', encoding="utf-8")
+    (root / "validation_report.json").write_text(
+        '{"status":"live_complete","jobs":[', encoding="utf-8"
+    )
 
     rec = recommendation(root)
 
@@ -135,7 +137,9 @@ def test_claim_table_completeness(tmp_path: Path) -> None:
         "lmcache_verdict",
         "gb200_justification",
     } <= set(claims)
-    assert all(claim["evidence_paths"] for claim in claims.values() if claim["status"] == "measured")
+    assert all(
+        claim["evidence_paths"] for claim in claims.values() if claim["status"] == "measured"
+    )
 
 
 def test_strict_exit_code(tmp_path: Path) -> None:

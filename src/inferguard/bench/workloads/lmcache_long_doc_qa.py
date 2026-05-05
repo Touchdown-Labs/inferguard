@@ -22,7 +22,10 @@ def generate_records(
     seed: int = 1702,
     redact_prompts: bool = False,
 ) -> list[dict[str, Any]]:
-    corpus = [f"DOC_{idx:02d}\n{_synthetic_text(f'long-doc-{idx}', doc_tokens, seed)}" for idx in range(docs)]
+    corpus = [
+        f"DOC_{idx:02d}\n{_synthetic_text(f'long-doc-{idx}', doc_tokens, seed)}"
+        for idx in range(docs)
+    ]
     records: list[dict[str, Any]] = []
     for question in range(questions):
         prompt = "\n".join(corpus) + f"\n\nQUESTION {question}: cite the relevant document ids."

@@ -1,0 +1,7 @@
+title = "InferGuard gitleaks configuration"
+
+[[allowlists]]
+description = "Allow deterministic non-secret sanitizer fixture used by tests"
+condition = "AND"
+paths = ['''tests/test_telemetry_consent\.py''']
+regexes = ['''0123456789abcdef0123456789abcdef01234567''']

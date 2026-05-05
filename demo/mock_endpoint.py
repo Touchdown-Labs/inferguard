@@ -27,7 +27,7 @@ SCENARIOS = {
         "ttft_count": 30,
         "tpot_sum": 0.9,
         "tpot_count": 120,
-        "kv_sent": 52_428_800,   # 50 MiB
+        "kv_sent": 52_428_800,  # 50 MiB
         "kv_recv": 52_428_800,
         "kv_errors": 0,
     },
@@ -41,7 +41,7 @@ SCENARIOS = {
         "ttft_count": 40,
         "tpot_sum": 1.8,
         "tpot_count": 150,
-        "kv_sent": 1_073_741_824,   # 1 GiB
+        "kv_sent": 1_073_741_824,  # 1 GiB
         "kv_recv": 1_073_741_824,
         "kv_errors": 0,
     },
@@ -195,7 +195,9 @@ def main() -> None:  # pragma: no cover
         args.port = {"prefill": 18000, "decode": 18001, "transfer": 18002}[args.role]
 
     app = make_app(engine=args.engine, scenario=args.scenario, connector=args.connector)
-    print(f"inferguard mock {args.engine} [{args.role}] scenario={args.scenario} → http://{args.host}:{args.port}/metrics")
+    print(
+        f"inferguard mock {args.engine} [{args.role}] scenario={args.scenario} → http://{args.host}:{args.port}/metrics"
+    )
     web.run_app(app, host=args.host, port=args.port, print=None)
 
 

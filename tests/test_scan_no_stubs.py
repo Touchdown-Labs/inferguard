@@ -21,7 +21,9 @@ def messages(root: Path) -> list[str]:
 
 def test_catches_todo_in_fixture_file(tmp_path: Path) -> None:
     root = tmp_path / "src" / "inferguard"
-    write_file(root, "validate/example.py", "def ready() -> bool:\n    return True  # TODO: implement\n")
+    write_file(
+        root, "validate/example.py", "def ready() -> bool:\n    return True  # TODO: implement\n"
+    )
 
     found = messages(root)
 
