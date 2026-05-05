@@ -1,0 +1,102 @@
+site_name: InferGuard
+site_description: Evidence-gated inference diagnostics for vLLM, SGLang, Dynamo, LMCache, and llm-d.
+site_url: https://touchdown-labs.com/inferguard/
+repo_name: Touchdown-Labs/inferguard
+repo_url: https://github.com/Touchdown-Labs/inferguard
+edit_uri: edit/main/docs/
+strict: true
+use_directory_urls: true
+exclude_docs: |
+  ARCHITECTURE.md
+  CLI_REFERENCE.md
+  HARDWARE_COVERAGE.md
+  HARNESS.md
+  ANALYZE.md
+  SCHEMAS.md
+  SPEC.md
+  SUPPORTED_ENGINES.md
+  SUPPORTED_INPUTS.md
+  TROUBLESHOOTING.md
+  examples/
+  images/
+  schemas/
+  telemetry/v0/
+  telemetry/v1/
+validation:
+  nav:
+    omitted_files: ignore
+    not_found: warn
+    absolute_links: ignore
+
+theme:
+  name: material
+  language: en
+  favicon: assets/logo.svg
+  logo: assets/logo.svg
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.share
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: black
+      accent: blue
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            members_order: source
+            show_if_no_docstring: false
+            show_root_heading: true
+            show_source: false
+            show_signature_annotations: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - How This Works:
+      - Overview: how-this-works/overview.md
+  - Getting Started:
+      - Install the CLI: getting-started/install.md
+      - Quick Start: getting-started/quick-start.md
+  - Guides:
+      - Analyze a Run: guides/analyze.md
+      - Run the Harness: guides/harness.md
+      - Troubleshooting: guides/troubleshooting.md
+  - Reference:
+      - CLI Reference: reference/cli.md
+      - API Reference: reference/api.md
+      - Schemas: reference/schemas.md
+      - agent-trace/v1: reference/agent-trace.md
+      - dcgm-correlated/v1: reference/dcgm-correlated.md
+      - Supported Engines: reference/supported-engines.md
+      - Supported Inputs: reference/supported-inputs.md
+      - Hardware Coverage: reference/hardware-coverage.md
+  - System Design:
+      - Architecture: system-design/architecture.md
+      - Specification: system-design/spec.md
+  - Telemetry:
+      - Posture: telemetry/posture.md
+      - v1 Specification: telemetry/spec.md

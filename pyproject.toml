@@ -50,16 +50,20 @@ dev = [
     "safety>=3.2",
     "twine",
 ]
+docs = [
+    "mkdocs-material>=9.6",
+    "mkdocstrings[python]>=0.30",
+]
 mcp = ["fastmcp>=3.1"]
 plot = ["matplotlib>=3.7"]
 harness = ["prometheus-client>=0.20"]
 
 [project.urls]
-Homepage = "https://github.com/OCWC22/inferguard"
-Repository = "https://github.com/OCWC22/inferguard"
-Issues = "https://github.com/OCWC22/inferguard/issues"
-Changelog = "https://github.com/OCWC22/inferguard/blob/main/CHANGELOG.md"
-Documentation = "https://github.com/OCWC22/inferguard#readme"
+Homepage = "https://touchdown-labs.com/inferguard/"
+Repository = "https://github.com/Touchdown-Labs/inferguard"
+Issues = "https://github.com/Touchdown-Labs/inferguard/issues"
+Changelog = "https://github.com/Touchdown-Labs/inferguard/blob/main/CHANGELOG.md"
+Documentation = "https://touchdown-labs.com/inferguard/"
 
 [project.scripts]
 inferguard = "inferguard.cli:app"

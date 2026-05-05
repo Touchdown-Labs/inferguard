@@ -31,3 +31,24 @@ jobs:
 
       - name: Pytest
         run: pytest --strict-markers
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package + docs deps
+        run: pip install -e .[docs]
+
+      - name: Build docs
+        run: mkdocs build --strict
+
+      - name: Check docs links
+        run: python scripts/check_docs_links.py site --base-path /inferguard/ --check-external --ignore-host touchdown-labs.com

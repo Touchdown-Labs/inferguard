@@ -81,7 +81,7 @@ InferGuard's bias is the opposite:
 | `router classify` | Rule-based execution-path routing from workload fingerprints. |
 | `emit-bundle` | Emit a deployment bundle from a router verdict. |
 
-See [CLI reference](docs/CLI_REFERENCE.md) for full `--help` output for every command and subcommand.
+See the [CLI reference](https://touchdown-labs.com/inferguard/reference/cli/) for full `--help` output for every command and subcommand.
 
 ## Hardware coverage
 
@@ -91,15 +91,17 @@ InferGuard ships with the DSv4 6-SKU capability matrix: H100, H200, B200, B300, 
 - `INFEASIBLE_DOCUMENTED` (4 cells: H100 × DSv4-Pro single-node)
 - `FUTURE_EXTERNAL` (16 cells: GB200/GB300, awaiting rack-level external access)
 
-See [hardware coverage](docs/HARDWARE_COVERAGE.md) for the full matrix and status definitions.
+See [hardware coverage](https://touchdown-labs.com/inferguard/reference/hardware-coverage/) for the full matrix and status definitions.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [CLI reference](docs/CLI_REFERENCE.md)
-- [Hardware coverage](docs/HARDWARE_COVERAGE.md)
+- [Documentation](https://touchdown-labs.com/inferguard/)
+- [Architecture](https://touchdown-labs.com/inferguard/system-design/architecture/)
+- [CLI reference](https://touchdown-labs.com/inferguard/reference/cli/)
+- [Hardware coverage](https://touchdown-labs.com/inferguard/reference/hardware-coverage/)
+- [Schemas](https://touchdown-labs.com/inferguard/reference/schemas/)
 - [Examples](examples/)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Troubleshooting](https://touchdown-labs.com/inferguard/guides/troubleshooting/)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 - [Code of conduct](CODE_OF_CONDUCT.md)
