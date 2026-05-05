@@ -10,8 +10,17 @@ from inferguard.cost_model import compute_cost
 from inferguard.find_cliffs import find_cliffs
 from inferguard.validate import validate_run
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-PACKAGE_ROOT = REPO_ROOT / "oss" / "inferguard"
+# Layout detection: in the Touchdown-Labs monorepo this file lives at
+# <monorepo>/oss/inferguard/tests/test_claim_status_discipline.py so parents[3]
+# is the monorepo root. In the standalone OSS repo (OCWC22/inferguard) the
+# package IS the repo root, so parents[1] is the package root directly.
+_THIS = Path(__file__).resolve()
+if (_THIS.parents[3] / "oss" / "inferguard").is_dir():
+    REPO_ROOT = _THIS.parents[3]
+    PACKAGE_ROOT = REPO_ROOT / "oss" / "inferguard"
+else:
+    PACKAGE_ROOT = _THIS.parents[1]
+    REPO_ROOT = PACKAGE_ROOT
 SRC_ROOT = PACKAGE_ROOT / "src" / "inferguard"
 FIXTURES = PACKAGE_ROOT / "tests" / "fixtures"
 ALLOWED_CLAIM_STATUS = {"synthetic", "inferred", "measured", "not_proven"}
