@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "InferGuard: Read-only disaggregated-serving diagnostics for vLLM, SGLang, Dynamo, and llm-d"
+authors:
+  - family-names: Chen
+    given-names: William
+    affiliation: Touchdown Labs
+type: software
+version: 0.7.1
+date-released: 2026-05-04
+url: https://github.com/OCWC22/inferguard
+license: Apache-2.0
+keywords:
+  - llm-inference
+  - benchmarking
+  - vllm
+  - sglang
+  - dynamo
+  - gpu
+  - slurm
+  - neocloud
+  - diagnostics
