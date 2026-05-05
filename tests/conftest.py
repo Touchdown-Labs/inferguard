@@ -16,6 +16,18 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 
+# ---------------------------------------------------------------------------
+# Plain CLI rendering for tests (added 2026-05-05 for OSS publish CI)
+# ---------------------------------------------------------------------------
+# Several tests assert `--flag-name` substrings appear in `inferguard <cmd>
+# --help` output. Rich (via Typer) line-wraps + injects ANSI escapes + box
+# chars on narrow terminals (CI's default ~80 cols), breaking the substring
+# match. Force plain wide-terminal rendering before any Typer/Rich import.
+os.environ.setdefault("NO_COLOR", "1")
+os.environ.setdefault("COLUMNS", "200")
+os.environ.setdefault("TERM", "dumb")
+os.environ.setdefault("_TYPER_FORCE_DISABLE_TERMINAL", "1")
+
 _ROOT = Path(__file__).resolve().parents[1]
 _SRC = _ROOT / "src"
 for _path in (str(_SRC), str(_ROOT)):
