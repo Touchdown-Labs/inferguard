@@ -1,0 +1,35 @@
+{
+  "claim_status": "measured",
+  "completion_tokens_total": 120000,
+  "concurrency": 8,
+  "decode_tokens_per_sec": {
+    "p50": 1300,
+    "p95": 1365.0
+  },
+  "duration_seconds": 180.0,
+  "e2e_latency_ms": {
+    "p50": 585.0,
+    "p95": 792.0,
+    "p99": 900
+  },
+  "engine": "vllm",
+  "failure_breakdown": {},
+  "failure_count": 0,
+  "job_id": "job-h200-vllm",
+  "prompt_tokens_total": 800000,
+  "request_count": 40,
+  "schema_version": "inferguard-request-profile-summary/v1",
+  "success_count": 40,
+  "success_rate": 1.0,
+  "tokens_per_sec_aggregate": 1300,
+  "tpot_ms": {
+    "p50": 26.25,
+    "p95": 35
+  },
+  "ttft_ms": {
+    "p50": 161.0,
+    "p95": 230,
+    "p99": 264.5
+  },
+  "workload_label": "gmi_dsv4_long_context"
+}

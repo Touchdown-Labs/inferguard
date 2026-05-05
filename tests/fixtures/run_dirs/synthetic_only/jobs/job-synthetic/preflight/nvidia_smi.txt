@@ -1,0 +1,2 @@
+NVIDIA-SMI synthetic
+# provenance=synthetic_gpu_mimic

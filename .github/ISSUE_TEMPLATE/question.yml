@@ -1,0 +1,28 @@
+name: Question
+description: Ask a usage or integration question
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - CLI usage
+        - MCP usage
+        - Engine support
+        - Schemas
+        - Contribution process
+        - Other
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Include environment details and what you've already tried.

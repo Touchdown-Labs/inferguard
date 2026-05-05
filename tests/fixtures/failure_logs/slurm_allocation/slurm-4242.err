@@ -1,0 +1,2 @@
+sbatch: error: Batch job submission failed: Requested node configuration is not available
+slurm_load_jobs error: Unable to contact slurm controller

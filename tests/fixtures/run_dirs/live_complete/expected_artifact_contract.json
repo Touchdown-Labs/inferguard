@@ -1,0 +1,76 @@
+{
+  "claim_boundary": "Live claims require completed run artifacts.",
+  "matrix_level": [
+    "matrix_plan.json",
+    "expected_artifact_contract.json"
+  ],
+  "mvp_required_paths": {
+    "agentx_ingest_summary": [
+      "agentx_ingest_summary.json"
+    ],
+    "bottleneck_diagnosis": [
+      "diagnosis/bottleneck_diagnosis.json",
+      "diagnosis/bottleneck_diagnosis.md"
+    ],
+    "engine_metrics": [
+      "metrics/engine_metrics_timeline.jsonl"
+    ],
+    "failure_classification": [
+      "diagnosis/failure_classification.json",
+      "diagnosis/failure_classification.md"
+    ],
+    "gpu_inventory": [
+      "gpu_inventory.json"
+    ],
+    "gpu_metrics": [
+      "metrics/gpu_metrics_timeline.jsonl"
+    ],
+    "gpu_topology": [
+      "gpu_topology.txt"
+    ],
+    "kv_cache_benefit": [],
+    "launch": [
+      "launch/command.json",
+      "launch/stdout.log",
+      "launch/stderr.log",
+      "launch/healthcheck.json"
+    ],
+    "metrics_summary": [
+      "metrics/metrics_summary.json"
+    ],
+    "multi_node_throughput": [
+      "preflight/nccl_all_reduce.txt"
+    ],
+    "network_topology": [
+      "preflight/nccl_all_reduce.txt"
+    ],
+    "operator_recommendation": [
+      "report/operator_recommendation.json",
+      "report/operator_recommendation.md"
+    ],
+    "rdma_health": [
+      "preflight/ib_state.txt"
+    ],
+    "request_profile": [
+      "request_profile/requests_profile.jsonl",
+      "request_profile/requests_summary.json"
+    ],
+    "slurm_env": [
+      "slurm_env.json"
+    ]
+  },
+  "per_job": [
+    {
+      "expected_paths": [],
+      "job_id": "job-live",
+      "output_dir": "jobs/job-live"
+    },
+    {
+      "expected_paths": [],
+      "job_id": "job-b200-sglang",
+      "output_dir": "jobs/job-b200-sglang"
+    }
+  ],
+  "results_root": "oss/inferguard/tests/fixtures/run_dirs/live_complete",
+  "schema_version": "inferguard-gmi-dsv4-artifact-contract/v1"
+}

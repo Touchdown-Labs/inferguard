@@ -1,0 +1,2 @@
+request_id,total_tokens,prompt_tokens,latency_ms,success
+req-bad-1,110,100,1000,true

@@ -1,0 +1,9 @@
+{
+  "concurrency": 4,
+  "context_length": 16384,
+  "engine": "vllm",
+  "hardware": "H200",
+  "job_id": "cell-c4-ctx16384",
+  "max_model_len": 16384,
+  "tensor_parallel_size": 8
+}

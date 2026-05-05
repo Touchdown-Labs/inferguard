@@ -1,0 +1,8 @@
+{
+  "gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA H200"
+    }
+  ]
+}

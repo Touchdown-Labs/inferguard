@@ -1,0 +1,5 @@
+{
+  "max_core_utilization": 0.99,
+  "saturated_core_count": 1,
+  "schema_version": "inferguard-cpu-timeline/v1"
+}

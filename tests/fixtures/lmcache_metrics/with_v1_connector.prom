@@ -1,0 +1,16 @@
+# vLLM /metrics scrape with LMCacheConnectorV1 labels and lmcache:* metrics.
+vllm:cache_config_info{model_name="mock-dsv4",kv_connector="LMCacheConnectorV1",kv_role="kv_both"} 1
+lmcache:connector_info{connector="LMCacheConnectorV1"} 1
+lmcache_config_info{connector="nixl",mp_mode="true",enabled="true"} 1
+lmcache:num_hit_tokens 64
+lmcache:num_lookup_hits 60
+lmcache:retrieve_hit_rate 0.64
+lmcache:lookup_hit_rate 0.60
+lmcache:lookup_0_hit_requests 3
+lmcache:local_cpu_evict_count 2
+lmcache:local_cpu_evict_keys_count 5
+lmcache:local_cpu_evict_failed_count 0
+lmcache:local_cache_usage 1048576
+lmcache:remote_cache_usage 524288
+lmcache:local_storage_usage 2097152
+lmcache:local_cpu_hot_cache_count 11

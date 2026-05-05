@@ -1,0 +1,9 @@
+# HELP dynamo:kvbm_block_residency_seconds Mock Dynamo KVBM block residency.
+# TYPE dynamo:kvbm_block_residency_seconds summary
+dynamo:kvbm_block_residency_seconds_sum 42
+dynamo:kvbm_block_residency_seconds_count 7
+dynamo:kvbm_blocks{tier="l1_gpu"} 128
+dynamo:kvbm_blocks{tier="l2_cpu"} 64
+dynamo:kvbm_blocks{tier="l3_storage"} 16
+dynamo:kvbm_evictions_total 3
+dynamo:kvbm_promotions_total 9

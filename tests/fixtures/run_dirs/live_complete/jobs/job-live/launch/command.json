@@ -1,0 +1,5 @@
+{
+  "engine": "vllm",
+  "external": true,
+  "schema_version": "inferguard-launch-command/v1"
+}

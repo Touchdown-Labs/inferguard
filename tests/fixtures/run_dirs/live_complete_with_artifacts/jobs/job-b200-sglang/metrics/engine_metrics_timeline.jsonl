@@ -1,0 +1,1 @@
+{"schema_version": "inferguard-engine-metrics-timeline/v1", "sequence": 1, "engine": "sglang", "group": "summary", "metrics": {"sglang:prompt_tokens_total": 800000, "sglang:generation_tokens_total": 120000, "sglang:num_running_reqs": 4}, "claim_status": "measured"}

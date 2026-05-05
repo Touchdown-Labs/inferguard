@@ -1,0 +1,18 @@
+# HELP sglang:token_usage Token slots in use.
+# TYPE sglang:token_usage gauge
+sglang:prompt_tokens_total 32768
+sglang:generation_tokens_total 4096
+sglang:token_usage 0.55
+sglang:cache_hit_rate 0.62
+sglang:num_running_reqs 12
+sglang:num_used_tokens 24576
+sglang:gen_throughput 187.5
+sglang:num_queue_reqs 1
+sglang:num_preemptions_total 0
+sglang:kv_transfer_sent_bytes_total{connector="mooncake"} 52428800
+sglang:kv_transfer_recv_bytes_total{connector="mooncake"} 52428800
+sglang:kv_transfer_errors_total{connector="mooncake"} 0
+sglang:time_to_first_token_seconds_sum 1.4
+sglang:time_to_first_token_seconds_count 30
+sglang:time_per_output_token_seconds_sum 0.8
+sglang:time_per_output_token_seconds_count 90

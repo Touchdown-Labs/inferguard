@@ -1,0 +1,9 @@
+{
+  "agentx_branch": "chore/agentx-v0.1-testing",
+  "concurrency": 2,
+  "engine": "vllm",
+  "job_id": "agentx-minimal",
+  "model_profile": "dsv4-agentx",
+  "result_csv": "result.csv",
+  "workload_label": "agent-chat"
+}

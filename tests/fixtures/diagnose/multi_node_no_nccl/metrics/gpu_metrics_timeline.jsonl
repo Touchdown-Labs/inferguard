@@ -1,0 +1,1 @@
+{"metrics": {"DCGM_FI_DEV_GPU_UTIL": 72, "DCGM_FI_PROF_NVLINK_RX_BYTES": 2100000000000, "DCGM_FI_PROF_NVLINK_TX_BYTES": 2100000000000, "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE": 0.45}, "observed_at": "2026-05-04T00:00:00Z", "schema_version": "dcgm-correlated/v1", "sequence": 0}

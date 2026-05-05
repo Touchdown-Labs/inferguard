@@ -1,0 +1,9 @@
+{
+  "agentx_branch": "chore/agentx-v0.1-testing",
+  "concurrency": 1,
+  "engine": "sglang",
+  "job_id": "agentx-partial",
+  "model_profile": "dsv4-agentx",
+  "result_csv": "result.csv",
+  "workload_label": "agent-chat-partial"
+}

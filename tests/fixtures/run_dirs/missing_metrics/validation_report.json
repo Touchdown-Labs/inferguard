@@ -1,0 +1,25 @@
+{
+  "artifact_contract_ref": "oss/inferguard/tests/fixtures/run_dirs/missing_metrics/expected_artifact_contract.json",
+  "harness_version": "0.5.0",
+  "jobs": [
+    {
+      "claim_status": "not_proven",
+      "downgrades": [],
+      "job_id": "job-missing",
+      "required_paths_missing": [
+        "metrics/metrics_summary.json"
+      ],
+      "required_paths_present": [],
+      "status": "missing_required_artifacts",
+      "synthetic_markers": []
+    }
+  ],
+  "matrix_plan_ref": "oss/inferguard/tests/fixtures/run_dirs/missing_metrics/matrix_plan.json",
+  "results_root": "oss/inferguard/tests/fixtures/run_dirs/missing_metrics",
+  "schema_version": "inferguard-validation-report/v1",
+  "status": "missing_required_artifacts",
+  "summary": {
+    "missing_required_artifacts": 1
+  },
+  "validated_at": "2026-05-04T00:00:00Z"
+}

@@ -1,0 +1,13 @@
+{
+  "engine": "vllm",
+  "gpu_count": 1,
+  "hardware": "gb200",
+  "kv_cache_dtype": "fp8",
+  "max_model_len": 131072,
+  "model": "deepseek-v4-pro",
+  "model_profile": "dsv4-long-context",
+  "node_count": 1,
+  "quantization": "fp8",
+  "sku": "GB200",
+  "tensor_parallel_size": 1
+}

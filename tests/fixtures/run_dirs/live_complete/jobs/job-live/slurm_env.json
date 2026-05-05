@@ -1,0 +1,4 @@
+{
+  "SLURM_JOB_ID": "123",
+  "schema_version": "inferguard-slurm-env/v1"
+}

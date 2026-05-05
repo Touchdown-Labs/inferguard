@@ -4,35 +4,79 @@ build-backend = "hatchling.build"
 
 [project]
 name = "inferguard"
-version = "0.1.0"
-description = "Standalone-first inference monitoring for vLLM and SGLang endpoints."
+version = "0.7.1"
+description = "Read-only disaggregated-serving diagnostics for vLLM, SGLang, Dynamo, and llm-d."
+keywords = ["llm", "inference", "vllm", "sglang", "dynamo", "gpu", "benchmarking", "slurm", "neocloud", "diagnostics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Benchmark",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 dependencies = [
-    # pydantic intentionally omitted: the current package uses stdlib dataclasses.
     "httpx>=0.28",
-    "structlog>=25.0",
     "typer>=0.16",
     "rich>=14.0",
+    "pydantic>=2",
+    "prometheus-client>=0.20",
 ]
-
-[project.scripts]
-inferguard = "inferguard.cli:app"
 
 [project.optional-dependencies]
 dev = [
+    "aiohttp>=3.9",
+    "build",
+    "matplotlib>=3.7",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-]
-demo = [
-    "aiohttp>=3.9",
-    "numpy>=1.26",
-    "tqdm>=4.66",
+    "ruff>=0.6",
+    "twine",
 ]
 mcp = ["fastmcp>=3.1"]
-blaxel = ["blaxel-core>=0.2"]
-inferscope = ["inferscope"]
+plot = ["matplotlib>=3.7"]
+harness = ["prometheus-client>=0.20"]
+
+[project.urls]
+Homepage = "https://github.com/OCWC22/inferguard"
+Repository = "https://github.com/OCWC22/inferguard"
+Issues = "https://github.com/OCWC22/inferguard/issues"
+Changelog = "https://github.com/OCWC22/inferguard/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/OCWC22/inferguard#readme"
+
+[project.scripts]
+inferguard = "inferguard.cli:app"
+inferguard-mcp = "inferguard.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/inferguard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "harness: tests for the v0.5 harness layer",
+    "allow_network: permit non-loopback HTTP in tests that explicitly opt in",
+    "integration: integration tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

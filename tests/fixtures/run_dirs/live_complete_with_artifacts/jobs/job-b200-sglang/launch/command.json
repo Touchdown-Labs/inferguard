@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "sglang",
+    "serve"
+  ],
+  "engine": "sglang",
+  "external": true,
+  "schema_version": "inferguard-launch-command/v1"
+}

@@ -1,0 +1,2 @@
+CA mlx5_0
+	State: Active

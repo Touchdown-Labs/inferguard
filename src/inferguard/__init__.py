@@ -1,6 +1,3 @@
-"""InferGuard — autonomous inference engine monitoring core."""
+"""InferGuard — read-only disaggregated-serving diagnostics."""
 
-__all__ = ["__version__"]
-
-__version__ = "0.1.0"
-
+__version__ = "0.7.1"

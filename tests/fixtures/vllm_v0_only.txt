@@ -1,0 +1,5 @@
+# HELP vllm:gpu_cache_usage_perc V0 KV cache usage.
+# TYPE vllm:gpu_cache_usage_perc gauge
+vllm:gpu_cache_usage_perc 0.77
+vllm:num_requests_running 2
+vllm:num_requests_waiting 1

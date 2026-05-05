@@ -1,0 +1,37 @@
+{
+  "required_row_keys": [
+    "schema_version",
+    "request_id",
+    "job_id",
+    "workload_label",
+    "model_profile",
+    "engine",
+    "context_length",
+    "concurrency",
+    "prompt_tokens",
+    "completion_tokens",
+    "prompt_tokens_source",
+    "send_ts",
+    "first_token_ts",
+    "done_ts",
+    "ttft_ms",
+    "e2e_latency_ms",
+    "tpot_ms",
+    "inter_token_latency_ms_p50",
+    "inter_token_latency_ms_p95",
+    "decode_tokens_per_sec",
+    "streaming",
+    "success",
+    "http_status",
+    "error_type",
+    "error_message",
+    "cached_tokens",
+    "claim_status",
+    "raw_response_ref",
+    "claim_status_per_field"
+  ],
+  "schema_versions": {
+    "requests_profile.jsonl": "inferguard-request-profile/v1",
+    "requests_summary.json": "inferguard-request-profile-summary/v1"
+  }
+}

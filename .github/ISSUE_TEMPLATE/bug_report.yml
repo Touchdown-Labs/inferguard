@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible problem in InferGuard OSS
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug report. Please include enough detail to reproduce.
+  - type: input
+    id: version
+    attributes:
+      label: inferguard version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - vLLM
+        - SGLang
+        - NVIDIA Dynamo
+        - llm-d
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command
+      description: Include the full `inferguard` command you ran.
+      placeholder: inferguard disagg status --prefill ... --decode ... --json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      description: Paste redacted output only.
+      render: shell

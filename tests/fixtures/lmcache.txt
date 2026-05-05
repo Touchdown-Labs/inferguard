@@ -1,0 +1,10 @@
+# HELP lmcache:hit_rate Mock LMCache aggregate hit rate.
+# TYPE lmcache:hit_rate gauge
+lmcache:hit_rate 0.73
+lmcache:eviction_count 4
+lmcache:tier_usage{tier="cpu"} 2147483648
+lmcache:tier_usage{tier="local_disk"} 1073741824
+lmcache:tier_usage{tier="remote"} 536870912
+lmcache:remote_bytes_sent_total 33554432
+lmcache:remote_bytes_received_total 67108864
+lmcache:queue_depth 2

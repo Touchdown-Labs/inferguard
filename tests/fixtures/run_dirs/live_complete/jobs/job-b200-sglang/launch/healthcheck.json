@@ -1,0 +1,7 @@
+{
+  "claim_status": "measured",
+  "ok": true,
+  "ready_after_seconds": 3.5,
+  "schema_version": "inferguard-launch-healthcheck/v1",
+  "status": "healthy"
+}

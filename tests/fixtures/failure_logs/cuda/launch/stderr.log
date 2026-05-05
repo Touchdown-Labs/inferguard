@@ -1,0 +1,2 @@
+RuntimeError: CUDA error: an illegal memory access was encountered
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.

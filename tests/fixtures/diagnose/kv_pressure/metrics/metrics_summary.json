@@ -1,0 +1,105 @@
+{
+  "dcgm_sample_count": 3,
+  "decode": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:time_per_output_token_seconds"
+    ],
+    "time_per_output_token_seconds": 0.02
+  },
+  "duration_seconds": 60,
+  "engine": "vllm",
+  "generated_at": "2026-05-04T00:00:00Z",
+  "gpu_util": {
+    "DCGM_FI_DEV_GPU_UTIL": {
+      "count": 3,
+      "max": 73,
+      "p50": 70,
+      "p95": 72
+    },
+    "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE": {
+      "count": 3,
+      "max": 0.46,
+      "p50": 0.45,
+      "p95": 0.45
+    },
+    "claim_status": "measured"
+  },
+  "hbm": {
+    "claim_status": "not_proven"
+  },
+  "kv_cache": {
+    "claim_status": "measured",
+    "kv_block_idle_before_evict_seconds": 0.0,
+    "kv_transfer_errors_total": 0,
+    "kv_transfer_recv_bytes_total": 1024,
+    "kv_transfer_sent_bytes_total": 1024,
+    "source_metrics": [
+      "vllm:kv_cache_usage_perc"
+    ],
+    "usage_fraction": 0.93,
+    "usage_fraction_source": "vllm:kv_cache_usage_perc"
+  },
+  "labels": {
+    "hardware": "H200",
+    "node_count": 1
+  },
+  "lmcache": {
+    "claim_status": "not_proven"
+  },
+  "nvlink": {
+    "DCGM_FI_PROF_NVLINK_RX_BYTES": {
+      "count": 3,
+      "max": 1000,
+      "p50": 1000,
+      "p95": 1000
+    },
+    "DCGM_FI_PROF_NVLINK_TX_BYTES": {
+      "count": 3,
+      "max": 1000,
+      "p50": 1000,
+      "p95": 1000
+    },
+    "claim_status": "measured",
+    "saturation_fraction": 0.1
+  },
+  "pcie": {
+    "claim_status": "not_proven"
+  },
+  "power": {
+    "claim_status": "not_proven"
+  },
+  "prefill": {
+    "claim_status": "measured",
+    "e2e_request_latency_seconds": 1.0,
+    "request_prefill_time_seconds": 0.2,
+    "source_metrics": [
+      "vllm:request_prefill_time_seconds",
+      "vllm:e2e_request_latency_seconds"
+    ]
+  },
+  "prefix_cache": {
+    "claim_status": "measured",
+    "hit_rate": 0.7,
+    "hits": 70,
+    "queries": 100,
+    "source_metrics": [
+      "vllm:prefix_cache_hits",
+      "vllm:prefix_cache_queries"
+    ]
+  },
+  "queue": {
+    "claim_status": "measured",
+    "requests_running": 1,
+    "requests_waiting": 0,
+    "source_metrics": [
+      "vllm:num_requests_running",
+      "vllm:num_requests_waiting"
+    ]
+  },
+  "sample_count": 3,
+  "schema_version": "inferguard-metrics-summary/v1",
+  "xid_ecc": {
+    "claim_status": "not_proven"
+  }
+}

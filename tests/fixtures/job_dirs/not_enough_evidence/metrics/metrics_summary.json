@@ -1,0 +1,48 @@
+{
+  "dcgm_sample_count": 3,
+  "decode": {
+    "claim_status": "not_proven"
+  },
+  "duration_seconds": 60,
+  "engine": "vllm",
+  "generated_at": "2026-05-04T00:00:00Z",
+  "gpu_util": {
+    "claim_status": "not_proven"
+  },
+  "hbm": {
+    "claim_status": "not_proven"
+  },
+  "kv_cache": {
+    "claim_status": "not_proven"
+  },
+  "labels": {
+    "hardware": "H200",
+    "node_count": 1
+  },
+  "lmcache": {
+    "claim_status": "not_proven"
+  },
+  "nvlink": {
+    "claim_status": "not_proven"
+  },
+  "pcie": {
+    "claim_status": "not_proven"
+  },
+  "power": {
+    "claim_status": "not_proven"
+  },
+  "prefill": {
+    "claim_status": "not_proven"
+  },
+  "prefix_cache": {
+    "claim_status": "not_proven"
+  },
+  "queue": {
+    "claim_status": "not_proven"
+  },
+  "sample_count": 3,
+  "schema_version": "inferguard-metrics-summary/v1",
+  "xid_ecc": {
+    "claim_status": "not_proven"
+  }
+}

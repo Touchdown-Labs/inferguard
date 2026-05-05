@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package + test dependencies
+        run: pip install -e .[dev,mcp] tomli
+
+      - name: Pytest release gate
+        run: pytest tests/
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(python - <<'PY'
+import re
+from pathlib import Path
+text = Path("src/inferguard/__init__.py").read_text(encoding="utf-8")
+m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
+if not m:
+    raise SystemExit("Could not find __version__ in src/inferguard/__init__.py")
+print(m.group(1))
+PY
+)
+          echo "Tag version: ${TAG}"
+          echo "Package version: ${VERSION}"
+          test "${TAG}" = "${VERSION}"
+
+      - name: Verify pyproject version matches runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+import tomli
+from inferguard import __version__
+
+pyproject = tomli.loads(open("pyproject.toml", encoding="utf-8").read())
+assert pyproject["project"]["version"] == __version__, (
+    f"version mismatch: pyproject={pyproject['project']['version']} vs __init__={__version__}"
+)
+print("version match OK:", __version__)
+PY
+
+      - name: Install build tooling
+        run: pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Smoke install from TestPyPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-smoke
+          source .venv-smoke/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "inferguard==${GITHUB_REF_NAME#v}"
+          inferguard --help
+          inferguard-mcp --help
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Prepare release notes from CHANGELOG
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk '/^## \['"${GITHUB_REF_NAME#v}"'\]/{flag=1; next} /^## \[/{if(flag) exit} flag' CHANGELOG.md > RELEASE_NOTES.md
+          if [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "No changelog notes found for ${GITHUB_REF_NAME#v}" > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
+          files: |
+            dist/*

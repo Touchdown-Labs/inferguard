@@ -1,0 +1,9 @@
+lmcache:hit_rate 0.625
+lmcache:eviction_count 2
+lmcache:tier_usage{tier="cpu"} 1024
+lmcache:tier_usage{tier="local_disk"} 2048
+lmcache:tier_usage{tier="remote"} 4096
+lmcache:remote_bytes_sent_total 512
+lmcache:remote_bytes_received_total 256
+lmcache:queue_depth 7
+lmcache_experimental_fragmentation_score 0.42

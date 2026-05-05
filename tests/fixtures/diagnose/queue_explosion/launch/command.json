@@ -1,0 +1,8 @@
+{
+  "argv": [
+    "vllm"
+  ],
+  "engine": "vllm",
+  "quantization": null,
+  "schema_version": "inferguard-launch-command/v1"
+}

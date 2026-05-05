@@ -1,0 +1,13 @@
+{
+  "claim_boundary": "Synthetic GPU mimic artifacts validate harness parsing and operator workflow only; they are not publishable benchmark evidence.",
+  "jobs": 1,
+  "manifests": [
+    {
+      "job_id": "job-synthetic",
+      "manifest": "jobs/job-synthetic/synthetic/simulation_manifest.json",
+      "output_dir": "jobs/job-synthetic"
+    }
+  ],
+  "schema_version": "inferguard-neocloud-gpu-mimic-run/v1",
+  "simulation_mode": "synthetic_gpu_mimic"
+}

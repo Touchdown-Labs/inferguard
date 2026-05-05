@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python",
+    "-m",
+    "sglang.launch_server",
+    "--quantization",
+    "fp8"
+  ],
+  "engine": "sglang",
+  "quantization": "fp8",
+  "schema_version": "inferguard-launch-command/v1"
+}

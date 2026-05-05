@@ -1,0 +1,8 @@
+{
+  "currency": "USD",
+  "note": "EXAMPLE - replace with real GMI rates before making customer claims.",
+  "rates_usd_per_gpu_hour": {
+    "H200": 4.0,
+    "B200": 7.5
+  }
+}

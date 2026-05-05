@@ -1,0 +1,13 @@
+{
+  "agentx_branch": "chore/agentx-v0.1-testing",
+  "concurrency": 3,
+  "engine": "vllm",
+  "job_id": "agentx-full",
+  "model_profile": "dsv4-agentx",
+  "observed_average_isl": 1500,
+  "observed_average_osl": 63,
+  "result_csv": "result.csv",
+  "target_isl": 1500,
+  "target_osl": 64,
+  "workload_label": "agent-chat"
+}

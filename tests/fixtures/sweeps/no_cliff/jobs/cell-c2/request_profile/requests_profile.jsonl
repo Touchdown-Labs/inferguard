@@ -1,0 +1,1 @@
+{"schema_version": "inferguard-request-profile/v1", "job_id": "cell-c2", "concurrency": 2, "context_length": 32768, "success": true, "ttft_ms": 220, "tpot_ms": 20, "e2e_latency_ms": 640, "claim_status": "measured"}
