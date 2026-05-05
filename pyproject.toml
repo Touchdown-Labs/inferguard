@@ -75,6 +75,7 @@ markers = [
     "harness: tests for the v0.5 harness layer",
     "allow_network: permit non-loopback HTTP in tests that explicitly opt in",
     "integration: integration tests",
+    "monorepo_only: integration tests that shell out to the Touchdown-Labs monorepo's scripts/ dir; auto-skipped when the monorepo path is absent",
 ]
 
 [tool.ruff]
