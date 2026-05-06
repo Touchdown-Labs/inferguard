@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -1417,9 +1417,9 @@ def collect_metrics_cmd(
         typer.Option("--engine-metrics-url", help="Serving-engine Prometheus metrics URL."),
     ] = ...,
     dcgm_metrics_url: Annotated[
-        str,
+        str | None,
         typer.Option("--dcgm-metrics-url", help="DCGM exporter Prometheus metrics URL."),
-    ] = ...,
+    ] = None,
     duration_seconds: Annotated[
         int,
         typer.Option("--duration-seconds", help="Collection duration in seconds."),
@@ -1462,7 +1462,7 @@ def collect_metrics_cmd(
         raise typer.BadParameter("--duration-seconds must be a positive integer for collect-metrics")
     if interval_seconds <= 0:
         raise typer.BadParameter("--interval-seconds must be positive for collect-metrics")
-    if dcgm_interval_seconds <= 0:
+    if dcgm_metrics_url and dcgm_interval_seconds <= 0:
         raise typer.BadParameter("--dcgm-interval-seconds must be positive for collect-metrics")
     collect_metrics(
         CollectMetricsOptions(
@@ -1505,6 +1505,21 @@ def lmcache_compat_cmd(
         Path | None,
         typer.Option("--output", help="Optional JSON report path."),
     ] = None,
+    expect_mode: Annotated[
+        str,
+        typer.Option("--expect-mode", help="Expected LMCache mode: auto, mp, or embedded."),
+    ] = "auto",
+    l2_configured: Annotated[
+        bool,
+        typer.Option("--l2-configured", help="Treat MP L2 metric families as expected."),
+    ] = False,
+    fail_on: Annotated[
+        str,
+        typer.Option(
+            "--fail-on",
+            help="Exit nonzero on: never, mode-mismatch, or missing-required.",
+        ),
+    ] = "never",
     json_out: Annotated[
         bool,
         typer.Option("--json", help="Emit the full compatibility report as JSON."),
@@ -1517,6 +1532,12 @@ def lmcache_compat_cmd(
         write_compat_report,
     )
 
+    valid_modes = {"auto", "mp", "embedded"}
+    valid_fail_on = {"never", "mode-mismatch", "missing-required"}
+    if expect_mode not in valid_modes:
+        raise typer.BadParameter("--expect-mode must be one of auto|mp|embedded")
+    if fail_on not in valid_fail_on:
+        raise typer.BadParameter("--fail-on must be one of never|mode-mismatch|missing-required")
     if not any([engine_metrics_url, lmcache_metrics_url, engine_metrics_file, lmcache_metrics_file]):
         raise typer.BadParameter(
             "pass at least one of --engine-metrics-url, --lmcache-metrics-url, "
@@ -1526,17 +1547,22 @@ def lmcache_compat_cmd(
         report = build_compat_report_from_urls(
             engine_metrics_url=engine_metrics_url,
             lmcache_metrics_url=lmcache_metrics_url,
+            expect_mode=expect_mode,
+            l2_configured=l2_configured,
         )
     else:
         report = build_compat_report_from_paths(
             engine_metrics_file=engine_metrics_file,
             lmcache_metrics_file=lmcache_metrics_file,
+            expect_mode=expect_mode,
+            l2_configured=l2_configured,
         )
     if output is not None:
         write_compat_report(report, output)
+    exit_code = _lmcache_compat_exit_code(report, fail_on)
     if json_out:
         typer.echo(json.dumps(report, indent=2, sort_keys=True))
-        raise typer.Exit(code=0)
+        raise typer.Exit(code=exit_code)
     table = Table(title="InferGuard LMCache Observability Compatibility")
     table.add_column("Surface")
     table.add_column("Status")
@@ -1544,6 +1570,7 @@ def lmcache_compat_cmd(
     table.add_column("Populated")
     table.add_column("Zero")
     table.add_column("Missing")
+    table.add_column("N/A")
     for surface, row in sorted(report["surfaces"].items()):
         table.add_row(
             surface,
@@ -1552,11 +1579,29 @@ def lmcache_compat_cmd(
             str(row["populated"]),
             str(row["zero"]),
             str(row["missing"]),
+            str(row.get("not_applicable", 0)),
         )
     Console().print(table)
+    typer.echo(
+        f"detected_mode={report.get('detected_mode')} "
+        f"expect_mode={report.get('expect_mode')} "
+        f"failure_reasons={len(report.get('failure_reasons') or [])} "
+        f"upstream_questions={len(report.get('upstream_questions') or [])}"
+    )
     if output is not None:
         typer.echo(f"wrote {output}")
-    raise typer.Exit(code=0)
+    raise typer.Exit(code=exit_code)
+
+
+def _lmcache_compat_exit_code(report: dict[str, Any], fail_on: str) -> int:
+    if fail_on == "never":
+        return 0
+    failures = list(report.get("failure_reasons") or [])
+    if fail_on == "mode-mismatch":
+        return 1 if any(item.get("code") == "lmcache_mode_mismatch" for item in failures) else 0
+    if fail_on == "missing-required":
+        return 1 if failures else 0
+    return 0
 
 
 @app.command("agentx-ingest")

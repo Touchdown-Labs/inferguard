@@ -79,6 +79,7 @@ class EvidenceBundle:
     nccl_evidence_paths: list[Path] = field(default_factory=list)
     cpu_summary: dict[str, Any] = field(default_factory=dict)
     cpu_summary_path: Path | None = None
+    lmcache_compat_report: dict[str, Any] = field(default_factory=dict)
     missing_required_paths: list[Path] = field(default_factory=list)
     parse_errors: dict[str, str] = field(default_factory=dict)
     rule_config: dict[str, Any] = field(default_factory=dict)
@@ -113,6 +114,7 @@ def apply_rules(bundle: EvidenceBundle) -> BottleneckDiagnosis:
     for checker in (
         is_model_launch_bound,
         _missing_required_inputs,
+        _lmcache_missing_signal_downgrade,
         _all_metric_groups_not_proven,
         _sglang_chunked_prefill_bug_downgrade,
         _sglang_speculative_kv_bug_downgrade,
@@ -777,6 +779,53 @@ def _sglang_speculative_kv_bug_downgrade(
                 "measured",
                 "inferred",
                 "sglang_speculative_cache_hit_rate_zero_bug",
+            )
+        ],
+    )
+
+
+def _lmcache_missing_signal_downgrade(
+    bundle: EvidenceBundle,
+    thresholds: Mapping[str, float],
+) -> RuleResult | None:
+    del thresholds
+    report = bundle.lmcache_compat_report
+    if not report or report.get("detected_mode") not in {"mp", "mixed"}:
+        return None
+    questions = [
+        item
+        for item in report.get("upstream_questions") or []
+        if isinstance(item, Mapping)
+    ]
+    codes = {str(item.get("code")) for item in questions}
+    if not codes:
+        return None
+    priority = [
+        "lmcache_mp_lookup_counters_missing",
+        "vllm_external_prefix_no_hits",
+        "lmcache_eventbus_self_metrics_missing",
+    ]
+    selected = next((code for code in priority if code in codes), sorted(codes)[0])
+    return _not_enough_result(
+        bundle,
+        rule_fired=selected,
+        reasoning=(
+            "LMCache MP telemetry is present, but a required observability surface is "
+            "missing or ambiguous. The run proves MP is wired, not that the cache "
+            "economics are fully diagnosable."
+        ),
+        metric_values={
+            "lmcache_compat.detected_mode": report.get("detected_mode"),
+            "lmcache_compat.upstream_question_codes": sorted(codes),
+            "lmcache_compat.surfaces": report.get("surfaces") or {},
+        },
+        claim_status="inferred",
+        downgrades=[
+            Downgrade(
+                "lmcache_mp_compatibility",
+                "measured",
+                "inferred",
+                selected,
             )
         ],
     )

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "inferguard"
-version = "0.7.1"
+version = "0.7.2"
 description = "Read-only disaggregated-serving diagnostics for vLLM, SGLang, Dynamo, and llm-d."
 keywords = ["llm", "inference", "vllm", "sglang", "dynamo", "gpu", "benchmarking", "slurm", "neocloud", "diagnostics"]
 classifiers = [

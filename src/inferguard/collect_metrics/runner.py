@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
 from inferguard.disagg.adapters import scrape
 from inferguard.disagg.types import EngineName
 from inferguard.io import (
@@ -36,6 +35,7 @@ ENGINE_TIMELINE_FILENAME = "engine_metrics_timeline.jsonl"
 GPU_TIMELINE_FILENAME = "gpu_metrics_timeline.jsonl"
 METRICS_SUMMARY_FILENAME = "metrics_summary.json"
 RAW_SAMPLES_FILENAME = "raw_samples.jsonl"
+LMCACHE_COMPAT_REPORT_FILENAME = "lmcache_compat_report.json"
 SUPPORTED_ENGINES = {"vllm", "sglang", "lmcache", "dynamo-sglang"}
 
 
@@ -81,6 +81,7 @@ async def run_collect_metrics(
     gpu_path = output_dir / GPU_TIMELINE_FILENAME
     summary_path = output_dir / METRICS_SUMMARY_FILENAME
     raw_path = output_dir / RAW_SAMPLES_FILENAME
+    compat_path = output_dir / LMCACHE_COMPAT_REPORT_FILENAME
     partial_path = output_dir / "partial_results.json"
     labels = options.labels()
 
@@ -88,6 +89,8 @@ async def run_collect_metrics(
     dcgm_every = max(1, math.ceil(options.dcgm_interval_seconds / options.interval_seconds))
     engine_rows: list[dict[str, Any]] = []
     gpu_rows: list[dict[str, Any]] = []
+    last_engine_text = ""
+    last_lmcache_text = ""
 
     raw_handle = raw_path.open("w", encoding="utf-8") if options.keep_raw_samples else None
     if raw_handle is not None:
@@ -120,6 +123,9 @@ async def run_collect_metrics(
                             client,
                             options,
                         )
+                        last_engine_text = engine_result.text
+                        if lmcache_result is not None:
+                            last_lmcache_text = lmcache_result.text
                         if raw_handle is not None:
                             _write_raw_row(
                                 raw_handle, sequence, observed_at, "engine", engine_result, labels
@@ -180,7 +186,7 @@ async def run_collect_metrics(
                             engine_rows.append(row)
                             _write_jsonl(engine_handle, row)
 
-                        if sequence % dcgm_every == 0:
+                        if options.dcgm_metrics_url and sequence % dcgm_every == 0:
                             dcgm_result = await _fetch_text(client, options.dcgm_metrics_url)
                             if raw_handle is not None:
                                 _write_raw_row(
@@ -224,6 +230,18 @@ async def run_collect_metrics(
     )
     summary = MetricsSummary(**summary_data)
     atomic_write_json(summary_path, summary.as_dict())
+    if options.lmcache_metrics_url:
+        from inferguard.compat import build_compat_report, write_compat_report
+
+        write_compat_report(
+            build_compat_report(
+                engine_text=last_engine_text,
+                lmcache_text=last_lmcache_text,
+                engine_source=options.engine_metrics_url,
+                lmcache_source=options.lmcache_metrics_url,
+            ),
+            compat_path,
+        )
     if emit is not None:
         emit(_stdout_summary(options.engine, summary.as_dict()))
     return summary
@@ -282,6 +300,8 @@ def _partial_results_payload(
     }
     if raw_path is not None:
         artifacts["raw_samples"] = str(raw_path)
+    if options.lmcache_metrics_url:
+        artifacts["lmcache_compat_report"] = str(summary_path.parent / LMCACHE_COMPAT_REPORT_FILENAME)
     return {
         "command": "collect-metrics",
         "status": "interrupted",
@@ -354,17 +374,6 @@ def _validate_options(options: CollectMetricsOptions) -> None:
         raise CollectMetricsError("--engine must be one of vllm|sglang|lmcache|dynamo-sglang")
     if not options.engine_metrics_url:
         raise CollectMetricsError("--engine-metrics-url is required")
-    if not options.dcgm_metrics_url:
-        raise CollectMetricsError("--dcgm-metrics-url is required")
-    if (
-        options.engine == "lmcache"
-        and options.lmcache_metrics_url
-        and options.lmcache_metrics_url.rstrip("/") != options.engine_metrics_url.rstrip("/")
-    ):
-        raise CollectMetricsError(
-            "LMCache metrics must be scraped from the vLLM /metrics endpoint passed via "
-            "--engine-metrics-url; do not use a separate LMCache metrics port."
-        )
     if options.duration_seconds <= 0:
         raise CollectMetricsError("--duration-seconds must be positive")
     if options.interval_seconds <= 0:
@@ -405,6 +414,7 @@ MappingLike = dict[str, Any]
 __all__ = [
     "ENGINE_TIMELINE_FILENAME",
     "GPU_TIMELINE_FILENAME",
+    "LMCACHE_COMPAT_REPORT_FILENAME",
     "METRICS_SUMMARY_FILENAME",
     "RAW_SAMPLES_FILENAME",
     "SUPPORTED_ENGINES",

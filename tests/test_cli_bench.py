@@ -1,6 +1,10 @@
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from inferguard.cli import app
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def test_bench_help_surfaces_commands() -> None:
@@ -96,3 +100,25 @@ def test_preflight_command_surfaces_hma_warning() -> None:
     assert result.exit_code == 1
     assert "inferguard-preflight/v1" in result.stdout
     assert "hma_offload_incompatible" in result.stdout
+
+
+def test_lmcache_compat_cli_can_fail_on_missing_required() -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "lmcache-compat",
+            "--engine-metrics-file",
+            str(FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom"),
+            "--lmcache-metrics-file",
+            str(FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom"),
+            "--expect-mode",
+            "mp",
+            "--fail-on",
+            "missing-required",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert '"detected_mode": "mp"' in result.stdout
+    assert "lmcache_mp_lookup_counters_missing" in result.stdout

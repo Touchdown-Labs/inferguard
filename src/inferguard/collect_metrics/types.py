@@ -37,7 +37,7 @@ class CollectMetricsOptions:
 
     engine: str
     engine_metrics_url: str
-    dcgm_metrics_url: str
+    dcgm_metrics_url: str | None
     duration_seconds: float
     output_dir: Path
     interval_seconds: float = 1.0

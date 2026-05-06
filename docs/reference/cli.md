@@ -3,7 +3,7 @@ title: Use the command map
 description: Every InferGuard command, every flag, and the artifact each step writes.
 ---
 
-This page is generated from the v0.7.1 Typer help output and curated with operator notes. Use it with:
+This page is generated from the v0.7.2 Typer help output and curated with operator notes. Use it with:
 
 ```bash
 inferguard --help

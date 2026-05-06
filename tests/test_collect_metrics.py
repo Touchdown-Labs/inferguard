@@ -176,14 +176,39 @@ def test_lmcache_compat_report_distinguishes_mp_and_external_prefix() -> None:
     report = build_compat_report_from_paths(
         engine_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
         lmcache_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
+        expect_mode="mp",
     )
 
     assert report["observed"]["lmcache_mp"] is True
     assert report["observed"]["lmcache_embedded"] is False
+    assert report["detected_mode"] == "mp"
     families = {(row["surface"], row["family"]): row for row in report["families"]}
     assert families[("lmcache_mp", "storage_manager")]["status"] == "populated"
     assert families[("lmcache_mp", "lookup_tokens")]["status"] == "missing"
+    assert families[("lmcache_mp", "l2_counters")]["status"] == "not_applicable"
     assert families[("vllm_prefix_cache", "external_prefix")]["status"] == "populated"
+    assert {
+        item["code"] for item in report["upstream_questions"]
+    } >= {
+        "lmcache_mp_lookup_counters_missing",
+        "vllm_external_prefix_no_hits",
+    }
+
+
+def test_lmcache_compat_report_marks_l2_required_when_configured() -> None:
+    report = build_compat_report_from_paths(
+        engine_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
+        lmcache_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
+        expect_mode="mp",
+        l2_configured=True,
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_mp", "l2_counters")]["status"] == "missing"
+    assert any(
+        item["code"] == "lmcache_mp_family_missing" and item["family"] == "l2_counters"
+        for item in report["failure_reasons"]
+    )
 
 
 def test_dynamo_kvbm() -> None:
@@ -268,6 +293,41 @@ def test_scrape_failure_graceful(tmp_path: Path) -> None:
         for line in (tmp_path / "raw_samples.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert any(row["source"] == "engine" and row["scrape_error"] == "http_500" for row in raw_rows)
+
+
+def test_collect_metrics_writes_lmcache_compat_report_without_dcgm(tmp_path: Path) -> None:
+    server = _MetricsServer(
+        {
+            "/metrics": (200, _fixture("vllm.txt")),
+            "/lmcache": (200, _fixture("lmcache_metrics/mp_modal_real_slice.prom")),
+        }
+    )
+    base_url = server.start()
+    try:
+        summary = collect_metrics(
+            CollectMetricsOptions(
+                engine="vllm",
+                engine_metrics_url=f"{base_url}/metrics",
+                dcgm_metrics_url=None,
+                lmcache_metrics_url=f"{base_url}/lmcache",
+                duration_seconds=0.01,
+                interval_seconds=0.01,
+                output_dir=tmp_path,
+                keep_raw_samples=True,
+            ),
+            emit=None,
+        ).as_dict()
+    finally:
+        server.stop()
+
+    assert summary["dcgm_sample_count"] == 0
+    compat = json.loads((tmp_path / "lmcache_compat_report.json").read_text(encoding="utf-8"))
+    assert compat["detected_mode"] == "mp"
+    raw_rows = [
+        json.loads(line)
+        for line in (tmp_path / "raw_samples.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert any(row["source"] == "lmcache" for row in raw_rows)
 
 
 def test_dcgm_schema_locked(tmp_path: Path) -> None:

@@ -126,6 +126,31 @@ def test_not_enough_fixture() -> None:
     assert diagnosis["verdict"] == "not_enough_evidence"
 
 
+def test_lmcache_compat_missing_signal_becomes_specific_diagnosis(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_mp_missing_signal"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    compat = {
+        "schema_version": "inferguard-observability-compat/v1",
+        "detected_mode": "mp",
+        "surfaces": {"lmcache_mp": {"status": "partial"}},
+        "upstream_questions": [
+            {
+                "code": "lmcache_mp_lookup_counters_missing",
+                "owner_question": "Should lookup counters populate?",
+            }
+        ],
+    }
+    (root / "metrics" / "lmcache_compat_report.json").write_text(
+        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["verdict"] == "not_enough_evidence"
+    assert diagnosis["claim_status"] == "inferred"
+    assert diagnosis["rule_fired"] == "lmcache_mp_lookup_counters_missing"
+
+
 def test_schema_version_locked() -> None:
     diagnosis = _diagnosis("prefill_bound")
 
