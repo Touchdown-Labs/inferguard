@@ -67,6 +67,78 @@ def test_lmcache_mp_prometheus_fixture_parses_normalized_fields() -> None:
     assert metrics.lmcache_event_bus_dropped_events_total == 0
 
 
+def test_lmcache_mp_observability_doc_families_parse() -> None:
+    metrics = parse_lmcache_prometheus(
+        """
+lmcache_mp_l1_chunk_lifetime_seconds_sum 30
+lmcache_mp_l1_chunk_lifetime_seconds_count 3
+lmcache_mp_l1_chunk_idle_before_evict_seconds_sum 20
+lmcache_mp_l1_chunk_idle_before_evict_seconds_count 2
+lmcache_mp_l1_chunk_reuse_gap_seconds_sum 12
+lmcache_mp_l1_chunk_reuse_gap_seconds_count 4
+lmcache_mp_l1_chunk_evict_reuse_gap_seconds_sum 9
+lmcache_mp_l1_chunk_evict_reuse_gap_seconds_count 3
+lmcache_mp_real_reuse_gap_seconds_sum{cache_salt="tenant-a"} 40
+lmcache_mp_real_reuse_gap_seconds_count{cache_salt="tenant-a"} 4
+lmcache_mp_real_reuse_gap_chunks_sum{cache_salt="tenant-a"} 100
+lmcache_mp_real_reuse_gap_chunks_count{cache_salt="tenant-a"} 5
+lmcache_mp_l2_store_tasks_total 10
+lmcache_mp_l2_store_keys_total 20
+lmcache_mp_l2_store_completed_total{l2_name="fs"} 9
+lmcache_mp_l2_store_succeeded_keys_total 18
+lmcache_mp_l2_store_failed_keys_total 2
+lmcache_mp_l2_prefetch_lookups_total 11
+lmcache_mp_l2_prefetch_lookup_keys_total 22
+lmcache_mp_l2_prefetch_hit_keys_total 15
+lmcache_mp_l2_prefetch_load_tasks_total 6
+lmcache_mp_l2_prefetch_load_keys_total 12
+lmcache_mp_l2_prefetch_loaded_keys_total 10
+lmcache_mp_l2_prefetch_failed_keys_total 2
+lmcache_mp_l2_load_completed_total{l2_name="fs"} 5
+lmcache_mp_l2_store_throughput_gbs_sum{l2_name="fs"} 8
+lmcache_mp_l2_store_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp_l2_load_throughput_gbs_sum{l2_name="fs"} 6
+lmcache_mp_l2_load_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp_l0_l1_store_throughput_gbs_sum{engine_id="0"} 10
+lmcache_mp_l0_l1_store_throughput_gbs_count{engine_id="0"} 2
+lmcache_mp_l0_l1_load_throughput_gbs_sum{engine_id="0"} 14
+lmcache_mp_l0_l1_load_throughput_gbs_count{engine_id="0"} 2
+lmcache_mp_num_chunks_loaded_total{worker_id="0",model_name="Qwen/Qwen3-8B",cache_salt="tenant-a"} 33
+lmcache_mp_inflight_load_memory_usage_bytes{l2_name="fs",adapter_index="0"} 4096
+lmcache_mp_event_bus_queue_depth 7
+lmcache_mp_event_bus_drain_lag_seconds 0.25
+lmcache_mp_event_bus_dropped_events_total 3
+lmcache_mp_event_bus_subscriber_exceptions_total 1
+"""
+    )
+
+    assert metrics.lmcache_l1_chunk_lifetime_seconds == 10
+    assert metrics.lmcache_l1_chunk_idle_before_evict_seconds == 10
+    assert metrics.lmcache_l1_chunk_reuse_gap_seconds == 3
+    assert metrics.lmcache_l1_chunk_evict_reuse_gap_seconds == 3
+    assert metrics.lmcache_real_reuse_gap_seconds == 10
+    assert metrics.lmcache_real_reuse_gap_chunks == 20
+    assert metrics.lmcache_l2_store_tasks == 10
+    assert metrics.lmcache_l2_store_keys == 20
+    assert metrics.lmcache_l2_store_succeeded_keys == 18
+    assert metrics.lmcache_l2_prefetch_lookups == 11
+    assert metrics.lmcache_l2_prefetch_lookup_keys == 22
+    assert metrics.lmcache_l2_prefetch_load_tasks == 6
+    assert metrics.lmcache_l2_prefetch_load_keys == 12
+    assert metrics.lmcache_l2_prefetch_failed_keys == 2
+    assert metrics.lmcache_l2_load_completed == 5
+    assert metrics.lmcache_l2_store_throughput_gbs == 4
+    assert metrics.lmcache_l2_load_throughput_gbs == 3
+    assert metrics.lmcache_l0_l1_store_throughput_gbs == 5
+    assert metrics.lmcache_l0_l1_load_throughput_gbs == 7
+    assert metrics.lmcache_num_chunks_loaded == 33
+    assert metrics.lmcache_inflight_load_memory_usage_bytes == 4096
+    assert metrics.lmcache_event_bus_queue_depth == 7
+    assert metrics.lmcache_event_bus_drain_lag_seconds == 0.25
+    assert metrics.lmcache_event_bus_dropped_events_total == 3
+    assert metrics.lmcache_event_bus_subscriber_exceptions_total == 1
+
+
 def test_lmcache_real_modal_mp_slice_parses_storage_and_l0_fields() -> None:
     metrics = parse_lmcache_prometheus((FIXTURES / "mp_modal_real_slice.prom").read_text(encoding="utf-8"))
 

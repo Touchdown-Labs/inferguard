@@ -62,18 +62,41 @@ class LmcacheMetrics:
     lmcache_l1_write_keys: int | None = None
     lmcache_l1_evicted_keys: int | None = None
     lmcache_l1_memory_usage_bytes: int | None = None
+    lmcache_l1_chunk_lifetime_seconds: float | None = None
+    lmcache_l1_chunk_idle_before_evict_seconds: float | None = None
+    lmcache_l1_chunk_reuse_gap_seconds: float | None = None
+    lmcache_l1_chunk_evict_reuse_gap_seconds: float | None = None
     lmcache_l0_block_lifetime_seconds: float | None = None
     lmcache_l0_block_idle_before_evict_seconds: float | None = None
     lmcache_l0_block_reuse_gap_seconds: float | None = None
+    lmcache_real_reuse_gap_seconds: float | None = None
+    lmcache_real_reuse_gap_chunks: float | None = None
+    lmcache_l2_store_tasks: int | None = None
+    lmcache_l2_store_keys: int | None = None
     lmcache_l2_store_completed: int | None = None
+    lmcache_l2_store_succeeded_keys: int | None = None
     lmcache_l2_store_failed_keys: int | None = None
+    lmcache_l2_prefetch_lookups: int | None = None
+    lmcache_l2_prefetch_lookup_keys: int | None = None
     lmcache_l2_prefetch_hit_keys: int | None = None
+    lmcache_l2_prefetch_load_tasks: int | None = None
+    lmcache_l2_prefetch_load_keys: int | None = None
     lmcache_l2_prefetch_loaded_keys: int | None = None
+    lmcache_l2_prefetch_failed_keys: int | None = None
+    lmcache_l2_load_completed: int | None = None
+    lmcache_l2_store_throughput_gbs: float | None = None
+    lmcache_l2_load_throughput_gbs: float | None = None
+    lmcache_l0_l1_store_throughput_gbs: float | None = None
+    lmcache_l0_l1_load_throughput_gbs: float | None = None
+    lmcache_num_chunks_loaded: int | None = None
     lmcache_active_prefetch_jobs: int | None = None
     lmcache_num_inflight_l2_stores: int | None = None
     lmcache_num_inflight_l2_loads: int | None = None
+    lmcache_inflight_load_memory_usage_bytes: int | None = None
     lmcache_event_bus_queue_depth: int | None = None
+    lmcache_event_bus_drain_lag_seconds: float | None = None
     lmcache_event_bus_dropped_events_total: int | None = None
+    lmcache_event_bus_subscriber_exceptions_total: int | None = None
     raw_metrics_extra: dict[str, float] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -243,6 +266,18 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_l1_memory_usage_bytes": (
         {"name": "lmcache_mp_l1_memory_usage_bytes", "type": "int"},
     ),
+    "lmcache_l1_chunk_lifetime_seconds": (
+        {"name": "lmcache_mp_l1_chunk_lifetime_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l1_chunk_idle_before_evict_seconds": (
+        {"name": "lmcache_mp_l1_chunk_idle_before_evict_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l1_chunk_reuse_gap_seconds": (
+        {"name": "lmcache_mp_l1_chunk_reuse_gap_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l1_chunk_evict_reuse_gap_seconds": (
+        {"name": "lmcache_mp_l1_chunk_evict_reuse_gap_seconds", "type": "hist_avg"},
+    ),
     "lmcache_l0_block_lifetime_seconds": (
         {"name": "lmcache_mp_l0_block_lifetime_seconds", "type": "hist_avg"},
     ),
@@ -252,17 +287,65 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_l0_block_reuse_gap_seconds": (
         {"name": "lmcache_mp_l0_block_reuse_gap_seconds", "type": "hist_avg"},
     ),
+    "lmcache_real_reuse_gap_seconds": (
+        {"name": "lmcache_mp_real_reuse_gap_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_real_reuse_gap_chunks": (
+        {"name": "lmcache_mp_real_reuse_gap_chunks", "type": "hist_avg"},
+    ),
+    "lmcache_l2_store_tasks": (
+        {"name": "lmcache_mp_l2_store_tasks_total", "type": "int"},
+    ),
+    "lmcache_l2_store_keys": (
+        {"name": "lmcache_mp_l2_store_keys_total", "type": "int"},
+    ),
     "lmcache_l2_store_completed": (
         {"name": "lmcache_mp_l2_store_completed_total", "type": "int"},
+    ),
+    "lmcache_l2_store_succeeded_keys": (
+        {"name": "lmcache_mp_l2_store_succeeded_keys_total", "type": "int"},
     ),
     "lmcache_l2_store_failed_keys": (
         {"name": "lmcache_mp_l2_store_failed_keys_total", "type": "int"},
     ),
+    "lmcache_l2_prefetch_lookups": (
+        {"name": "lmcache_mp_l2_prefetch_lookups_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_lookup_keys": (
+        {"name": "lmcache_mp_l2_prefetch_lookup_keys_total", "type": "int"},
+    ),
     "lmcache_l2_prefetch_hit_keys": (
         {"name": "lmcache_mp_l2_prefetch_hit_keys_total", "type": "int"},
     ),
+    "lmcache_l2_prefetch_load_tasks": (
+        {"name": "lmcache_mp_l2_prefetch_load_tasks_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_load_keys": (
+        {"name": "lmcache_mp_l2_prefetch_load_keys_total", "type": "int"},
+    ),
     "lmcache_l2_prefetch_loaded_keys": (
         {"name": "lmcache_mp_l2_prefetch_loaded_keys_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_failed_keys": (
+        {"name": "lmcache_mp_l2_prefetch_failed_keys_total", "type": "int"},
+    ),
+    "lmcache_l2_load_completed": (
+        {"name": "lmcache_mp_l2_load_completed_total", "type": "int"},
+    ),
+    "lmcache_l2_store_throughput_gbs": (
+        {"name": "lmcache_mp_l2_store_throughput_gbs", "type": "hist_avg"},
+    ),
+    "lmcache_l2_load_throughput_gbs": (
+        {"name": "lmcache_mp_l2_load_throughput_gbs", "type": "hist_avg"},
+    ),
+    "lmcache_l0_l1_store_throughput_gbs": (
+        {"name": "lmcache_mp_l0_l1_store_throughput_gbs", "type": "hist_avg"},
+    ),
+    "lmcache_l0_l1_load_throughput_gbs": (
+        {"name": "lmcache_mp_l0_l1_load_throughput_gbs", "type": "hist_avg"},
+    ),
+    "lmcache_num_chunks_loaded": (
+        {"name": "lmcache_mp_num_chunks_loaded_total", "type": "int"},
     ),
     "lmcache_active_prefetch_jobs": (
         {"name": "lmcache_mp_active_prefetch_jobs", "type": "int"},
@@ -273,11 +356,21 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_num_inflight_l2_loads": (
         {"name": "lmcache_mp_num_inflight_l2_loads", "type": "int"},
     ),
+    "lmcache_inflight_load_memory_usage_bytes": (
+        {"name": "lmcache_mp_inflight_load_memory_usage_bytes", "type": "int"},
+    ),
     "lmcache_event_bus_queue_depth": (
         {"name": "lmcache_mp_event_bus_queue_depth", "type": "int"},
     ),
+    "lmcache_event_bus_drain_lag_seconds": (
+        {"name": "lmcache_mp_event_bus_drain_lag_seconds", "type": "float"},
+        {"name": "lmcache_mp_event_bus_drain_lag_seconds", "type": "hist_avg"},
+    ),
     "lmcache_event_bus_dropped_events_total": (
         {"name": "lmcache_mp_event_bus_dropped_events_total", "type": "int"},
+    ),
+    "lmcache_event_bus_subscriber_exceptions_total": (
+        {"name": "lmcache_mp_event_bus_subscriber_exceptions_total", "type": "int"},
     ),
     "lmcache_cacheblend_enabled": (
         {"name": "lmcache:cacheblend_enabled", "type": "bool"},
