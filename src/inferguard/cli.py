@@ -1674,6 +1674,180 @@ def _lmcache_compat_exit_code(report: dict[str, Any], fail_on: str) -> int:
     return 0
 
 
+@app.command("collect-lmcache")
+def collect_lmcache_cmd(
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Output directory for the LMCache evidence packet."),
+    ] = ...,
+    engine_metrics_url: Annotated[
+        str | None,
+        typer.Option("--engine-metrics-url", help="Optional serving-engine Prometheus metrics URL."),
+    ] = None,
+    lmcache_metrics_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-metrics-url", help="Optional LMCache Prometheus metrics URL."),
+    ] = None,
+    engine_metrics_file: Annotated[
+        Path | None,
+        typer.Option("--engine-metrics-file", help="Optional saved engine Prometheus scrape."),
+    ] = None,
+    lmcache_metrics_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-metrics-file", help="Optional saved LMCache Prometheus scrape."),
+    ] = None,
+    lmcache_health_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-health-url", help="Optional LMCache MP HTTP healthcheck URL."),
+    ] = None,
+    lmcache_status_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-status-url", help="Optional LMCache MP HTTP status URL."),
+    ] = None,
+    engine_log_file: Annotated[
+        Path | None,
+        typer.Option("--engine-log-file", help="Optional engine log file to copy into the packet."),
+    ] = None,
+    lmcache_log_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-log-file", help="Optional LMCache log file to copy into the packet."),
+    ] = None,
+    expect_mode: Annotated[
+        str,
+        typer.Option("--expect-mode", help="Expected LMCache mode: auto, mp, or embedded."),
+    ] = "auto",
+    l2_configured: Annotated[
+        bool,
+        typer.Option("--l2-configured", help="Treat MP L2 metric families as expected."),
+    ] = False,
+    timeout_seconds: Annotated[
+        float,
+        typer.Option("--timeout-seconds", help="HTTP timeout per scrape."),
+    ] = 10.0,
+    mp_prometheus_port: Annotated[
+        int | None,
+        typer.Option("--mp-prometheus-port", help="LMCache MP Prometheus port from launch/config."),
+    ] = None,
+    mp_event_bus_queue_size: Annotated[
+        int | None,
+        typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
+    ] = None,
+    mp_metrics_sample_rate: Annotated[
+        float | None,
+        typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
+    ] = None,
+    mp_service_instance_id: Annotated[
+        str | None,
+        typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
+    ] = None,
+    mp_observability_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-observability-disabled/--mp-observability-enabled",
+            help="Whether LMCache MP was launched with --disable-observability.",
+        ),
+    ] = False,
+    mp_metrics_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-metrics-disabled/--mp-metrics-enabled",
+            help="Whether LMCache MP was launched with --disable-metrics.",
+        ),
+    ] = False,
+    mp_logging_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-logging-disabled/--mp-logging-enabled",
+            help="Whether LMCache MP was launched with --disable-logging.",
+        ),
+    ] = False,
+    mp_tracing_enabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-tracing-enabled/--mp-tracing-disabled",
+            help="Whether LMCache MP tracing was launched with --enable-tracing.",
+        ),
+    ] = False,
+    mp_trace_recording_enabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-trace-recording-enabled/--mp-trace-recording-disabled",
+            help="Whether LMCache MP trace recording was launched with --trace-level storage.",
+        ),
+    ] = False,
+    json_out: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the packet manifest as JSON."),
+    ] = False,
+) -> None:
+    """Collect raw LMCache/vLLM evidence plus a compatibility report."""
+    from inferguard.lmcache_packet import LmcachePacketOptions, collect_lmcache_packet
+
+    valid_modes = {"auto", "mp", "embedded"}
+    if expect_mode not in valid_modes:
+        raise typer.BadParameter("--expect-mode must be one of auto|mp|embedded")
+    if timeout_seconds <= 0:
+        raise typer.BadParameter("--timeout-seconds must be positive")
+    if mp_metrics_sample_rate is not None and not (0 < mp_metrics_sample_rate <= 1.0):
+        raise typer.BadParameter("--mp-metrics-sample-rate must be in (0, 1.0]")
+    if mp_event_bus_queue_size is not None and mp_event_bus_queue_size < 0:
+        raise typer.BadParameter("--mp-event-bus-queue-size must be non-negative")
+    if mp_prometheus_port is not None and not (0 < mp_prometheus_port <= 65535):
+        raise typer.BadParameter("--mp-prometheus-port must be a valid TCP port")
+    if not any(
+        [
+            engine_metrics_url,
+            lmcache_metrics_url,
+            engine_metrics_file,
+            lmcache_metrics_file,
+            lmcache_health_url,
+            lmcache_status_url,
+            engine_log_file,
+            lmcache_log_file,
+        ]
+    ):
+        raise typer.BadParameter("pass at least one URL or file input to collect")
+    manifest = collect_lmcache_packet(
+        LmcachePacketOptions(
+            output_dir=output_dir,
+            engine_metrics_url=engine_metrics_url,
+            lmcache_metrics_url=lmcache_metrics_url,
+            engine_metrics_file=engine_metrics_file,
+            lmcache_metrics_file=lmcache_metrics_file,
+            lmcache_health_url=lmcache_health_url,
+            lmcache_status_url=lmcache_status_url,
+            engine_log_file=engine_log_file,
+            lmcache_log_file=lmcache_log_file,
+            expect_mode=expect_mode,
+            l2_configured=l2_configured,
+            timeout_seconds=timeout_seconds,
+            mp_observability={
+                "prometheus_port": mp_prometheus_port,
+                "event_bus_queue_size": mp_event_bus_queue_size,
+                "metrics_sample_rate": mp_metrics_sample_rate,
+                "service_instance_id": mp_service_instance_id,
+                "observability_disabled": mp_observability_disabled,
+                "metrics_disabled": mp_metrics_disabled,
+                "logging_disabled": mp_logging_disabled,
+                "tracing_enabled": mp_tracing_enabled,
+                "trace_recording_enabled": mp_trace_recording_enabled,
+            },
+        )
+    )
+    if json_out:
+        typer.echo(json.dumps(manifest, indent=2, sort_keys=True))
+    else:
+        typer.echo(
+            "inferguard collect-lmcache: "
+            f"detected_mode={manifest.get('detected_mode')} "
+            f"claim_status={manifest.get('claim_status')} "
+            f"artifacts={len(manifest.get('artifacts') or {})} "
+            f"errors={len(manifest.get('scrape_errors') or [])} "
+            f"output_dir={output_dir}"
+        )
+    raise typer.Exit(code=0)
+
+
 @app.command("agentx-ingest")
 @app.command("ingest-agentx")
 def agentx_ingest_cmd(
