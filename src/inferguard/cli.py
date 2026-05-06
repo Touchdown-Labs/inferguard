@@ -1848,6 +1848,138 @@ def collect_lmcache_cmd(
     raise typer.Exit(code=0)
 
 
+@app.command("observability-coverage")
+def observability_coverage_cmd(
+    engine_metrics_url: Annotated[
+        str | None,
+        typer.Option("--engine-metrics-url", help="Optional vLLM/SGLang Prometheus metrics URL."),
+    ] = None,
+    lmcache_metrics_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-metrics-url", help="Optional LMCache Prometheus metrics URL."),
+    ] = None,
+    engine_metrics_file: Annotated[
+        Path | None,
+        typer.Option("--engine-metrics-file", help="Optional saved vLLM/SGLang metrics scrape."),
+    ] = None,
+    lmcache_metrics_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-metrics-file", help="Optional saved LMCache metrics scrape."),
+    ] = None,
+    expected_engine: Annotated[
+        str,
+        typer.Option("--expected-engine", help="Expected engine: auto, vllm, or sglang."),
+    ] = "auto",
+    expect_lmcache_mode: Annotated[
+        str,
+        typer.Option("--expect-lmcache-mode", help="Expected LMCache mode: auto, mp, or embedded."),
+    ] = "auto",
+    external_cache_configured: Annotated[
+        bool,
+        typer.Option("--external-cache-configured", help="Require external prefix/KV cache families."),
+    ] = False,
+    cpu_offload_configured: Annotated[
+        bool,
+        typer.Option("--cpu-offload-configured", help="Require vLLM CPU offload metric families."),
+    ] = False,
+    l2_configured: Annotated[
+        bool,
+        typer.Option("--l2-configured", help="Require LMCache MP L2 metric families."),
+    ] = False,
+    disaggregated_or_external_cache: Annotated[
+        bool,
+        typer.Option(
+            "--disaggregated-or-external-cache",
+            help="Require KV transfer families for disaggregated/external-cache paths.",
+        ),
+    ] = False,
+    timeout_seconds: Annotated[
+        float,
+        typer.Option("--timeout-seconds", help="HTTP timeout per scrape."),
+    ] = 10.0,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report path."),
+    ] = None,
+    json_out: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the full coverage report as JSON."),
+    ] = False,
+) -> None:
+    """Report observability family coverage across vLLM, SGLang, and LMCache."""
+    from inferguard.observability_coverage import (
+        build_observability_coverage_report_from_paths,
+        build_observability_coverage_report_from_urls,
+        dumps_report,
+        write_observability_coverage_report,
+    )
+
+    if expected_engine not in {"auto", "vllm", "sglang"}:
+        raise typer.BadParameter("--expected-engine must be one of auto|vllm|sglang")
+    if expect_lmcache_mode not in {"auto", "mp", "embedded"}:
+        raise typer.BadParameter("--expect-lmcache-mode must be one of auto|mp|embedded")
+    if timeout_seconds <= 0:
+        raise typer.BadParameter("--timeout-seconds must be positive")
+    if not any([engine_metrics_url, lmcache_metrics_url, engine_metrics_file, lmcache_metrics_file]):
+        raise typer.BadParameter(
+            "pass at least one of --engine-metrics-url, --lmcache-metrics-url, "
+            "--engine-metrics-file, or --lmcache-metrics-file"
+        )
+    kwargs = {
+        "expected_engine": expected_engine,
+        "expect_lmcache_mode": expect_lmcache_mode,
+        "external_cache_configured": external_cache_configured,
+        "cpu_offload_configured": cpu_offload_configured,
+        "l2_configured": l2_configured,
+        "disaggregated_or_external_cache": disaggregated_or_external_cache,
+    }
+    if engine_metrics_url or lmcache_metrics_url:
+        report = build_observability_coverage_report_from_urls(
+            engine_metrics_url=engine_metrics_url,
+            lmcache_metrics_url=lmcache_metrics_url,
+            timeout_seconds=timeout_seconds,
+            **kwargs,
+        )
+    else:
+        report = build_observability_coverage_report_from_paths(
+            engine_metrics_file=engine_metrics_file,
+            lmcache_metrics_file=lmcache_metrics_file,
+            **kwargs,
+        )
+    if output is not None:
+        write_observability_coverage_report(report, output)
+    if json_out:
+        typer.echo(dumps_report(report))
+    else:
+        table = Table(title="InferGuard Observability Coverage")
+        table.add_column("Surface")
+        table.add_column("Status")
+        table.add_column("Families")
+        table.add_column("Populated")
+        table.add_column("Zero")
+        table.add_column("Missing")
+        table.add_column("N/A")
+        for surface, row in sorted(report["surfaces"].items()):
+            table.add_row(
+                surface,
+                str(row["status"]),
+                str(row["family_count"]),
+                str(row["populated"]),
+                str(row["zero"]),
+                str(row["missing"]),
+                str(row.get("not_applicable", 0)),
+            )
+        Console().print(table)
+        typer.echo(
+            f"detected_engines={','.join(report.get('detected_engines') or []) or 'unknown'} "
+            f"detected_lmcache_mode={report.get('detected_lmcache_mode')} "
+            f"coverage_gaps={len(report.get('coverage_gaps') or [])}"
+        )
+        if output is not None:
+            typer.echo(f"wrote {output}")
+    raise typer.Exit(code=0)
+
+
 @app.command("agentx-ingest")
 @app.command("ingest-agentx")
 def agentx_ingest_cmd(

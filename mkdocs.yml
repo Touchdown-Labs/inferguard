@@ -85,6 +85,7 @@ nav:
       - Analyze a Run: guides/analyze.md
       - Run the Harness: guides/harness.md
       - LMCache Compatibility: guides/lmcache-compatibility.md
+      - Observability Coverage Matrix: guides/observability-coverage-matrix.md
       - Troubleshooting: guides/troubleshooting.md
   - Reference:
       - CLI Reference: reference/cli.md
