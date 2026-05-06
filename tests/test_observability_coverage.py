@@ -105,3 +105,42 @@ vllm:prefix_cache_hits_total 8
     assert payload["schema_version"] == "inferguard-observability-coverage/v1"
     assert payload["detected_engines"] == ["vllm"]
     assert output.exists()
+
+
+def test_observability_coverage_includes_lmcache_non_prometheus_evidence() -> None:
+    report = build_observability_coverage_report(
+        lmcache_http_evidence={"booleans": {"is_healthy": True}, "endpoints": {"health": {}}},
+        lmcache_trace_evidence={"present": True, "claim_status": "measured", "record_count": 2},
+        lmcache_otel_evidence={"present": True, "claim_status": "measured", "lmcache_span_count": 3},
+    )
+
+    assert report["surfaces"]["lmcache_http"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_trace_recording"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_otel"]["status"] == "complete"
+
+
+def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
+    http = tmp_path / "http.json"
+    trace = tmp_path / "trace.json"
+    otel = tmp_path / "otel.json"
+    http.write_text('{"booleans": {"is_healthy": true}, "endpoints": {"health": {}}}', encoding="utf-8")
+    trace.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
+    otel.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "lmcache-compat",
+            "--lmcache-http-evidence-file",
+            str(http),
+            "--lmcache-trace-evidence-file",
+            str(trace),
+            "--lmcache-otel-evidence-file",
+            str(otel),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["surfaces"]["lmcache_http"]["status"] == "complete"

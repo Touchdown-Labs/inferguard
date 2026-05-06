@@ -1501,6 +1501,18 @@ def lmcache_compat_cmd(
         Path | None,
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache metrics scrape."),
     ] = None,
+    lmcache_http_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
+    ] = None,
+    lmcache_trace_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
+    ] = None,
+    lmcache_otel_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", help="Optional JSON report path."),
@@ -1589,10 +1601,20 @@ def lmcache_compat_cmd(
         raise typer.BadParameter("--expect-mode must be one of auto|mp|embedded")
     if fail_on not in valid_fail_on:
         raise typer.BadParameter("--fail-on must be one of never|mode-mismatch|missing-required")
-    if not any([engine_metrics_url, lmcache_metrics_url, engine_metrics_file, lmcache_metrics_file]):
+    if not any(
+        [
+            engine_metrics_url,
+            lmcache_metrics_url,
+            engine_metrics_file,
+            lmcache_metrics_file,
+            lmcache_http_evidence_file,
+            lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file,
+        ]
+    ):
         raise typer.BadParameter(
             "pass at least one of --engine-metrics-url, --lmcache-metrics-url, "
-            "--engine-metrics-file, or --lmcache-metrics-file"
+            "--engine-metrics-file, --lmcache-metrics-file, or an evidence file"
         )
     if mp_metrics_sample_rate is not None and not (0 < mp_metrics_sample_rate <= 1.0):
         raise typer.BadParameter("--mp-metrics-sample-rate must be in (0, 1.0]")
@@ -1618,6 +1640,9 @@ def lmcache_compat_cmd(
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             mp_observability=mp_observability,
+            lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_trace_evidence_file=lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file=lmcache_otel_evidence_file,
         )
     else:
         report = build_compat_report_from_paths(
@@ -1626,6 +1651,9 @@ def lmcache_compat_cmd(
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             mp_observability=mp_observability,
+            lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_trace_evidence_file=lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file=lmcache_otel_evidence_file,
         )
     if output is not None:
         write_compat_report(report, output)
@@ -1700,9 +1728,17 @@ def collect_lmcache_cmd(
         str | None,
         typer.Option("--lmcache-health-url", help="Optional LMCache MP HTTP healthcheck URL."),
     ] = None,
+    lmcache_health_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-health-file", help="Optional saved LMCache MP healthcheck response."),
+    ] = None,
     lmcache_status_url: Annotated[
         str | None,
         typer.Option("--lmcache-status-url", help="Optional LMCache MP HTTP status URL."),
+    ] = None,
+    lmcache_status_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-status-file", help="Optional saved LMCache MP status response."),
     ] = None,
     engine_log_file: Annotated[
         Path | None,
@@ -1711,6 +1747,14 @@ def collect_lmcache_cmd(
     lmcache_log_file: Annotated[
         Path | None,
         typer.Option("--lmcache-log-file", help="Optional LMCache log file to copy into the packet."),
+    ] = None,
+    lmcache_trace_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-trace-file", help="Optional LMCache MP .lct trace recording file."),
+    ] = None,
+    lmcache_otel_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-otel-file", help="Optional JSONL export of LMCache OTel spans."),
     ] = None,
     expect_mode: Annotated[
         str,
@@ -1801,9 +1845,13 @@ def collect_lmcache_cmd(
             engine_metrics_file,
             lmcache_metrics_file,
             lmcache_health_url,
+            lmcache_health_file,
             lmcache_status_url,
+            lmcache_status_file,
             engine_log_file,
             lmcache_log_file,
+            lmcache_trace_file,
+            lmcache_otel_file,
         ]
     ):
         raise typer.BadParameter("pass at least one URL or file input to collect")
@@ -1815,9 +1863,13 @@ def collect_lmcache_cmd(
             engine_metrics_file=engine_metrics_file,
             lmcache_metrics_file=lmcache_metrics_file,
             lmcache_health_url=lmcache_health_url,
+            lmcache_health_file=lmcache_health_file,
             lmcache_status_url=lmcache_status_url,
+            lmcache_status_file=lmcache_status_file,
             engine_log_file=engine_log_file,
             lmcache_log_file=lmcache_log_file,
+            lmcache_trace_file=lmcache_trace_file,
+            lmcache_otel_file=lmcache_otel_file,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             timeout_seconds=timeout_seconds,
@@ -1865,6 +1917,18 @@ def observability_coverage_cmd(
     lmcache_metrics_file: Annotated[
         Path | None,
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache metrics scrape."),
+    ] = None,
+    lmcache_http_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
+    ] = None,
+    lmcache_trace_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
+    ] = None,
+    lmcache_otel_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
     ] = None,
     expected_engine: Annotated[
         str,
@@ -1920,10 +1984,20 @@ def observability_coverage_cmd(
         raise typer.BadParameter("--expect-lmcache-mode must be one of auto|mp|embedded")
     if timeout_seconds <= 0:
         raise typer.BadParameter("--timeout-seconds must be positive")
-    if not any([engine_metrics_url, lmcache_metrics_url, engine_metrics_file, lmcache_metrics_file]):
+    if not any(
+        [
+            engine_metrics_url,
+            lmcache_metrics_url,
+            engine_metrics_file,
+            lmcache_metrics_file,
+            lmcache_http_evidence_file,
+            lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file,
+        ]
+    ):
         raise typer.BadParameter(
             "pass at least one of --engine-metrics-url, --lmcache-metrics-url, "
-            "--engine-metrics-file, or --lmcache-metrics-file"
+            "--engine-metrics-file, --lmcache-metrics-file, or an evidence file"
         )
     kwargs = {
         "expected_engine": expected_engine,
@@ -1938,12 +2012,18 @@ def observability_coverage_cmd(
             engine_metrics_url=engine_metrics_url,
             lmcache_metrics_url=lmcache_metrics_url,
             timeout_seconds=timeout_seconds,
+            lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_trace_evidence_file=lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             **kwargs,
         )
     else:
         report = build_observability_coverage_report_from_paths(
             engine_metrics_file=engine_metrics_file,
             lmcache_metrics_file=lmcache_metrics_file,
+            lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_trace_evidence_file=lmcache_trace_evidence_file,
+            lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             **kwargs,
         )
     if output is not None:

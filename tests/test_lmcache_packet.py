@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import struct
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -13,6 +14,10 @@ def test_collect_lmcache_packet_writes_partial_first_artifacts(tmp_path: Path) -
     lmcache_metrics = tmp_path / "lmcache.prom"
     engine_metrics = tmp_path / "engine.prom"
     lmcache_log = tmp_path / "lmcache.log"
+    lmcache_health = tmp_path / "health.json"
+    lmcache_status = tmp_path / "status.json"
+    lmcache_trace = tmp_path / "trace.lct"
+    lmcache_otel = tmp_path / "otel.jsonl"
     lmcache_metrics.write_text(
         """
 target_info{service_instance_id="mp-a"} 1
@@ -31,6 +36,16 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
         encoding="utf-8",
     )
     lmcache_log.write_text("Prefetch request completed (L1+L2): 4/10 prefix hits\n", encoding="utf-8")
+    lmcache_health.write_text('{"is_healthy": true, "status": "ok"}', encoding="utf-8")
+    lmcache_status.write_text('{"engine_type": "mp", "chunk_size": 256}', encoding="utf-8")
+    _write_lct(
+        lmcache_trace,
+        [
+            {"magic": "LMCT", "trace_level": "storage"},
+            {"qualname": "StorageManager.reserve_write", "relative_ts": 0.1},
+        ],
+    )
+    lmcache_otel.write_text('{"name": "mp.store", "duration_ms": 3}\n', encoding="utf-8")
     output_dir = tmp_path / "packet"
 
     manifest = collect_lmcache_packet(
@@ -38,7 +53,11 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
             output_dir=output_dir,
             engine_metrics_file=engine_metrics,
             lmcache_metrics_file=lmcache_metrics,
+            lmcache_health_file=lmcache_health,
+            lmcache_status_file=lmcache_status,
             lmcache_log_file=lmcache_log,
+            lmcache_trace_file=lmcache_trace,
+            lmcache_otel_file=lmcache_otel,
             expect_mode="mp",
             mp_observability={"event_bus_queue_size": 10000, "metrics_sample_rate": 0.01},
         )
@@ -50,8 +69,14 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     assert (output_dir / "engine_metrics.prom").exists()
     assert (output_dir / "lmcache_metrics.prom").exists()
     assert (output_dir / "lmcache.log").exists()
+    assert (output_dir / "lmcache_http_evidence.json").exists()
     assert (output_dir / "lmcache_log_evidence.json").exists()
+    assert (output_dir / "lmcache_trace_evidence.json").exists()
+    assert (output_dir / "lmcache_otel_evidence.json").exists()
+    assert manifest["http_evidence"]["booleans"]["is_healthy"] is True
     assert manifest["log_evidence"]["event_counts"]["prefetch_complete"] == 1
+    assert manifest["trace_evidence"]["claim_status"] == "measured"
+    assert manifest["otel_evidence"]["claim_status"] == "measured"
     report = json.loads((output_dir / "lmcache_compat_report.json").read_text(encoding="utf-8"))
     assert report["lmcache_mp_observability"]["service_instance_ids"] == ["mp-a"]
     assert report["lmcache_mp_observability"]["cache_salt_values"] == ["tenant-a"]
@@ -96,3 +121,11 @@ def test_collect_lmcache_cli_writes_packet(tmp_path: Path) -> None:
     payload = json.loads(result.output)
     assert payload["detected_mode"] == "mp"
     assert (output_dir / "packet_manifest.json").exists()
+
+
+def _write_lct(path: Path, records: list[dict[str, object]]) -> None:
+    chunks = []
+    for record in records:
+        payload = json.dumps(record).encode("utf-8")
+        chunks.append(struct.pack(">I", len(payload)) + payload)
+    path.write_bytes(b"".join(chunks))

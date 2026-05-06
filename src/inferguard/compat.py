@@ -39,8 +39,13 @@ class MetricFamilySpec:
 LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_embedded", "legacy_lookup", ("lmcache:lookup_*", "lmcache_lookup_*")),
     MetricFamilySpec("lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")),
+    MetricFamilySpec("lmcache_embedded", "production_requests", ("lmcache:num_*_requests*", "lmcache_num_*_requests*")),
+    MetricFamilySpec("lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")),
     MetricFamilySpec("lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")),
     MetricFamilySpec("lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")),
+    MetricFamilySpec("lmcache_embedded", "production_p2p", ("lmcache:*p2p*", "lmcache_*p2p*"), required_when="optional"),
+    MetricFamilySpec("lmcache_embedded", "production_health", ("lmcache:is_healthy", "lmcache_is_healthy"), required_when="optional"),
+    MetricFamilySpec("lmcache_embedded", "chunk_stats", ("lmcache:*chunk*", "lmcache_*chunk*"), required_when="optional"),
     MetricFamilySpec("lmcache_mp", "storage_manager", ("lmcache_mp_sm_*",)),
     MetricFamilySpec("lmcache_mp", "lookup_tokens", ("lmcache_mp_lookup_*_tokens_total",)),
     MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys_total",)),
@@ -91,6 +96,9 @@ def build_compat_report(
     expect_mode: str = "auto",
     l2_configured: bool = False,
     mp_observability: dict[str, Any] | None = None,
+    lmcache_http_evidence: dict[str, Any] | None = None,
+    lmcache_trace_evidence: dict[str, Any] | None = None,
+    lmcache_otel_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
@@ -118,12 +126,27 @@ def build_compat_report(
         )
         for spec in COMPAT_REGISTRY
     ]
+    families.extend(
+        _evidence_family_rows(
+            lmcache_http_evidence=lmcache_http_evidence,
+            lmcache_trace_evidence=lmcache_trace_evidence,
+            lmcache_otel_evidence=lmcache_otel_evidence,
+        )
+    )
     upstream_questions = _upstream_questions(families, samples, mp_observability_report)
     failures = _failures(
         families,
         detected_mode=detected_mode,
         expect_mode=expect_mode,
         mp_observability=mp_observability_report,
+    )
+    failures.extend(
+        _evidence_failures(
+            lmcache_http_evidence=lmcache_http_evidence,
+            lmcache_trace_evidence=lmcache_trace_evidence,
+            lmcache_otel_evidence=lmcache_otel_evidence,
+            mp_observability=mp_observability_report,
+        )
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -144,6 +167,9 @@ def build_compat_report(
             ),
         },
         "lmcache_mp_observability": mp_observability_report,
+        "lmcache_http_evidence": lmcache_http_evidence,
+        "lmcache_trace_evidence": lmcache_trace_evidence,
+        "lmcache_otel_evidence": lmcache_otel_evidence,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -160,6 +186,9 @@ def build_compat_report_from_paths(
     expect_mode: str = "auto",
     l2_configured: bool = False,
     mp_observability: dict[str, Any] | None = None,
+    lmcache_http_evidence_file: Path | None = None,
+    lmcache_trace_evidence_file: Path | None = None,
+    lmcache_otel_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -173,6 +202,9 @@ def build_compat_report_from_paths(
         expect_mode=expect_mode,
         l2_configured=l2_configured,
         mp_observability=mp_observability,
+        lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
+        lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
     )
 
 
@@ -184,6 +216,9 @@ def build_compat_report_from_urls(
     expect_mode: str = "auto",
     l2_configured: bool = False,
     mp_observability: dict[str, Any] | None = None,
+    lmcache_http_evidence_file: Path | None = None,
+    lmcache_trace_evidence_file: Path | None = None,
+    lmcache_otel_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -193,6 +228,9 @@ def build_compat_report_from_urls(
         expect_mode=expect_mode,
         l2_configured=l2_configured,
         mp_observability=mp_observability,
+        lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
+        lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
     )
 
 
@@ -274,6 +312,43 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         elif row["zero"]:
             row["status"] = "zero"
     return rows
+
+
+def _evidence_family_rows(
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_trace_evidence: dict[str, Any] | None,
+    lmcache_otel_evidence: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    return [
+        _evidence_family_row("lmcache_http", "mp_http_api", lmcache_http_evidence),
+        _evidence_family_row("lmcache_trace_recording", "storage_lct", lmcache_trace_evidence),
+        _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
+    ]
+
+
+def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
+    status = "missing"
+    count = 0
+    populated = 0
+    if evidence:
+        count = 1
+        if evidence.get("claim_status") == "measured" or evidence.get("booleans", {}).get("is_healthy"):
+            status = "populated"
+            populated = 1
+        elif evidence.get("present") or evidence.get("endpoints"):
+            status = "zero"
+    return {
+        "surface": surface,
+        "family": family,
+        "patterns": (),
+        "required_when": "optional",
+        "applicable": True,
+        "status": status,
+        "series_count": count,
+        "populated_series_count": populated,
+        "matched_metrics": [],
+    }
 
 
 def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -> str:
@@ -517,6 +592,53 @@ def _sum_matching(samples: list[LabeledSample], pattern: str) -> float:
 def _read_url(url: str, timeout_seconds: float) -> str:
     with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310
         return response.read().decode("utf-8", errors="replace")
+
+
+def _read_json_object(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _evidence_failures(
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_trace_evidence: dict[str, Any] | None,
+    lmcache_otel_evidence: dict[str, Any] | None,
+    mp_observability: dict[str, Any],
+) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    for item in (lmcache_http_evidence or {}).get("failure_reasons", []) or []:
+        if isinstance(item, dict):
+            failures.append(
+                {
+                    "code": item.get("code") or "lmcache_http_unhealthy",
+                    "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy",
+                }
+            )
+    if (mp_observability.get("config") or {}).get("trace_recording_enabled") and not (
+        lmcache_trace_evidence and lmcache_trace_evidence.get("claim_status") == "measured"
+    ):
+        failures.append(
+            {
+                "code": "lmcache_mp_trace_enabled_but_no_trace_artifact",
+                "message": "LMCache MP trace recording is marked enabled, but no parseable .lct evidence was provided.",
+            }
+        )
+    if (mp_observability.get("config") or {}).get("tracing_enabled") and not (
+        lmcache_otel_evidence and lmcache_otel_evidence.get("claim_status") == "measured"
+    ):
+        failures.append(
+            {
+                "code": "otel_tracing_enabled_but_no_spans",
+                "message": "LMCache MP OTel tracing is marked enabled, but no LMCache span evidence was provided.",
+            }
+        )
+    return failures
 
 
 __all__ = [

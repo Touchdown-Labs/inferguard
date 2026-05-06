@@ -50,6 +50,27 @@ class LmcacheMetrics:
     lmcache_remote_bytes_sent: int | None = None
     lmcache_remote_bytes_received: int | None = None
     lmcache_queue_depth: int | None = None
+    lmcache_num_retrieve_requests: int | None = None
+    lmcache_num_store_requests: int | None = None
+    lmcache_num_lookup_requests: int | None = None
+    lmcache_num_requested_tokens: int | None = None
+    lmcache_num_hit_tokens: int | None = None
+    lmcache_num_lookup_tokens: int | None = None
+    lmcache_num_lookup_hits: int | None = None
+    lmcache_is_healthy: bool | None = None
+    lmcache_storage_event_count: int | None = None
+    lmcache_remote_read_bytes: int | None = None
+    lmcache_remote_write_bytes: int | None = None
+    lmcache_remote_ping_latency_ms: float | None = None
+    lmcache_remote_ping_errors: int | None = None
+    lmcache_p2p_requests: int | None = None
+    lmcache_p2p_transferred_tokens: int | None = None
+    lmcache_p2p_time_to_transfer_ms: float | None = None
+    lmcache_p2p_transfer_speed: float | None = None
+    lmcache_chunk_stats_enabled: bool | None = None
+    lmcache_total_chunk_requests: int | None = None
+    lmcache_total_chunks: int | None = None
+    lmcache_unique_chunks: int | None = None
     lmcache_lookup_requested_tokens: int | None = None
     lmcache_lookup_hit_tokens: int | None = None
     lmcache_sm_read_requests: int | None = None
@@ -229,6 +250,122 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache:queue_depth", "type": "int"},
         {"name": "lmcache_queue_depth", "type": "int"},
         {"name": "lmcache_mp_event_bus_queue_depth", "type": "int"},
+    ),
+    "lmcache_num_retrieve_requests": (
+        {"name": "lmcache:num_retrieve_requests", "type": "int"},
+        {"name": "lmcache_num_retrieve_requests", "type": "int"},
+        {"name": "lmcache:num_retrieve_requests_total", "type": "int"},
+        {"name": "lmcache_num_retrieve_requests_total", "type": "int"},
+    ),
+    "lmcache_num_store_requests": (
+        {"name": "lmcache:num_store_requests", "type": "int"},
+        {"name": "lmcache_num_store_requests", "type": "int"},
+        {"name": "lmcache:num_store_requests_total", "type": "int"},
+        {"name": "lmcache_num_store_requests_total", "type": "int"},
+    ),
+    "lmcache_num_lookup_requests": (
+        {"name": "lmcache:num_lookup_requests", "type": "int"},
+        {"name": "lmcache_num_lookup_requests", "type": "int"},
+        {"name": "lmcache:num_lookup_requests_total", "type": "int"},
+        {"name": "lmcache_num_lookup_requests_total", "type": "int"},
+    ),
+    "lmcache_num_requested_tokens": (
+        {"name": "lmcache:num_requested_tokens", "type": "int"},
+        {"name": "lmcache_num_requested_tokens", "type": "int"},
+        {"name": "lmcache:num_requested_tokens_total", "type": "int"},
+        {"name": "lmcache_num_requested_tokens_total", "type": "int"},
+    ),
+    "lmcache_num_hit_tokens": (
+        {"name": "lmcache:num_hit_tokens", "type": "int"},
+        {"name": "lmcache_num_hit_tokens", "type": "int"},
+        {"name": "lmcache:num_hit_tokens_total", "type": "int"},
+        {"name": "lmcache_num_hit_tokens_total", "type": "int"},
+    ),
+    "lmcache_num_lookup_tokens": (
+        {"name": "lmcache:num_lookup_tokens", "type": "int"},
+        {"name": "lmcache_num_lookup_tokens", "type": "int"},
+        {"name": "lmcache:num_lookup_tokens_total", "type": "int"},
+        {"name": "lmcache_num_lookup_tokens_total", "type": "int"},
+    ),
+    "lmcache_num_lookup_hits": (
+        {"name": "lmcache:num_lookup_hits", "type": "int"},
+        {"name": "lmcache_num_lookup_hits", "type": "int"},
+        {"name": "lmcache:num_lookup_hits_total", "type": "int"},
+        {"name": "lmcache_num_lookup_hits_total", "type": "int"},
+    ),
+    "lmcache_is_healthy": (
+        {"name": "lmcache:is_healthy", "type": "bool"},
+        {"name": "lmcache_is_healthy", "type": "bool"},
+    ),
+    "lmcache_storage_event_count": (
+        {"name": "lmcache:storage_event_count", "type": "int"},
+        {"name": "lmcache_storage_event_count", "type": "int"},
+        {"name": "lmcache:storage_event_count_total", "type": "int"},
+        {"name": "lmcache_storage_event_count_total", "type": "int"},
+    ),
+    "lmcache_remote_read_bytes": (
+        {"name": "lmcache:remote_read_bytes", "type": "int"},
+        {"name": "lmcache_remote_read_bytes", "type": "int"},
+        {"name": "lmcache:remote_read_bytes_total", "type": "int"},
+        {"name": "lmcache_remote_read_bytes_total", "type": "int"},
+    ),
+    "lmcache_remote_write_bytes": (
+        {"name": "lmcache:remote_write_bytes", "type": "int"},
+        {"name": "lmcache_remote_write_bytes", "type": "int"},
+        {"name": "lmcache:remote_write_bytes_total", "type": "int"},
+        {"name": "lmcache_remote_write_bytes_total", "type": "int"},
+    ),
+    "lmcache_remote_ping_latency_ms": (
+        {"name": "lmcache:remote_ping_latency_ms", "type": "float"},
+        {"name": "lmcache_remote_ping_latency_ms", "type": "float"},
+        {"name": "lmcache:remote_ping_latency_seconds", "type": "float", "convert": "seconds_to_ms"},
+        {"name": "lmcache_remote_ping_latency_seconds", "type": "float", "convert": "seconds_to_ms"},
+    ),
+    "lmcache_remote_ping_errors": (
+        {"name": "lmcache:remote_ping_errors", "type": "int"},
+        {"name": "lmcache_remote_ping_errors", "type": "int"},
+        {"name": "lmcache:remote_ping_errors_total", "type": "int"},
+        {"name": "lmcache_remote_ping_errors_total", "type": "int"},
+    ),
+    "lmcache_p2p_requests": (
+        {"name": "lmcache:num_p2p_requests", "type": "int"},
+        {"name": "lmcache_num_p2p_requests", "type": "int"},
+        {"name": "lmcache:num_p2p_requests_total", "type": "int"},
+        {"name": "lmcache_num_p2p_requests_total", "type": "int"},
+    ),
+    "lmcache_p2p_transferred_tokens": (
+        {"name": "lmcache:num_p2p_transferred_tokens", "type": "int"},
+        {"name": "lmcache_num_p2p_transferred_tokens", "type": "int"},
+        {"name": "lmcache:num_p2p_transferred_tokens_total", "type": "int"},
+        {"name": "lmcache_num_p2p_transferred_tokens_total", "type": "int"},
+    ),
+    "lmcache_p2p_time_to_transfer_ms": (
+        {"name": "lmcache:p2p_time_to_transfer", "type": "float"},
+        {"name": "lmcache_p2p_time_to_transfer", "type": "float"},
+        {"name": "lmcache:p2p_time_to_transfer_seconds", "type": "float", "convert": "seconds_to_ms"},
+        {"name": "lmcache_p2p_time_to_transfer_seconds", "type": "float", "convert": "seconds_to_ms"},
+    ),
+    "lmcache_p2p_transfer_speed": (
+        {"name": "lmcache:p2p_transfer_speed", "type": "float"},
+        {"name": "lmcache_p2p_transfer_speed", "type": "float"},
+    ),
+    "lmcache_chunk_stats_enabled": (
+        {"name": "lmcache:chunk_stats_enabled", "type": "bool"},
+        {"name": "lmcache_chunk_stats_enabled", "type": "bool"},
+    ),
+    "lmcache_total_chunk_requests": (
+        {"name": "lmcache:total_chunk_requests", "type": "int"},
+        {"name": "lmcache_total_chunk_requests", "type": "int"},
+        {"name": "lmcache:total_chunk_requests_total", "type": "int"},
+        {"name": "lmcache_total_chunk_requests_total", "type": "int"},
+    ),
+    "lmcache_total_chunks": (
+        {"name": "lmcache:total_chunks", "type": "int"},
+        {"name": "lmcache_total_chunks", "type": "int"},
+    ),
+    "lmcache_unique_chunks": (
+        {"name": "lmcache:unique_chunks", "type": "int"},
+        {"name": "lmcache_unique_chunks", "type": "int"},
     ),
     "lmcache_lookup_requested_tokens": (
         {"name": "lmcache_mp_lookup_requested_tokens_total", "type": "int"},

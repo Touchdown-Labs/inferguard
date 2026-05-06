@@ -123,6 +123,27 @@ class DisaggSnapshot:
     lmcache_remote_bytes_sent: int | None = None
     lmcache_remote_bytes_received: int | None = None
     lmcache_queue_depth: int | None = None
+    lmcache_num_retrieve_requests: int | None = None
+    lmcache_num_store_requests: int | None = None
+    lmcache_num_lookup_requests: int | None = None
+    lmcache_num_requested_tokens: int | None = None
+    lmcache_num_hit_tokens: int | None = None
+    lmcache_num_lookup_tokens: int | None = None
+    lmcache_num_lookup_hits: int | None = None
+    lmcache_is_healthy: bool | None = None
+    lmcache_storage_event_count: int | None = None
+    lmcache_remote_read_bytes: int | None = None
+    lmcache_remote_write_bytes: int | None = None
+    lmcache_remote_ping_latency_ms: float | None = None
+    lmcache_remote_ping_errors: int | None = None
+    lmcache_p2p_requests: int | None = None
+    lmcache_p2p_transferred_tokens: int | None = None
+    lmcache_p2p_time_to_transfer_ms: float | None = None
+    lmcache_p2p_transfer_speed: float | None = None
+    lmcache_chunk_stats_enabled: bool | None = None
+    lmcache_total_chunk_requests: int | None = None
+    lmcache_total_chunks: int | None = None
+    lmcache_unique_chunks: int | None = None
     lmcache_lookup_requested_tokens: int | None = None
     lmcache_lookup_hit_tokens: int | None = None
     lmcache_sm_read_requests: int | None = None
@@ -252,6 +273,27 @@ class DisaggSnapshot:
             "lmcache_remote_bytes_sent": self.lmcache_remote_bytes_sent,
             "lmcache_remote_bytes_received": self.lmcache_remote_bytes_received,
             "lmcache_queue_depth": self.lmcache_queue_depth,
+            "lmcache_num_retrieve_requests": self.lmcache_num_retrieve_requests,
+            "lmcache_num_store_requests": self.lmcache_num_store_requests,
+            "lmcache_num_lookup_requests": self.lmcache_num_lookup_requests,
+            "lmcache_num_requested_tokens": self.lmcache_num_requested_tokens,
+            "lmcache_num_hit_tokens": self.lmcache_num_hit_tokens,
+            "lmcache_num_lookup_tokens": self.lmcache_num_lookup_tokens,
+            "lmcache_num_lookup_hits": self.lmcache_num_lookup_hits,
+            "lmcache_is_healthy": self.lmcache_is_healthy,
+            "lmcache_storage_event_count": self.lmcache_storage_event_count,
+            "lmcache_remote_read_bytes": self.lmcache_remote_read_bytes,
+            "lmcache_remote_write_bytes": self.lmcache_remote_write_bytes,
+            "lmcache_remote_ping_latency_ms": self.lmcache_remote_ping_latency_ms,
+            "lmcache_remote_ping_errors": self.lmcache_remote_ping_errors,
+            "lmcache_p2p_requests": self.lmcache_p2p_requests,
+            "lmcache_p2p_transferred_tokens": self.lmcache_p2p_transferred_tokens,
+            "lmcache_p2p_time_to_transfer_ms": self.lmcache_p2p_time_to_transfer_ms,
+            "lmcache_p2p_transfer_speed": self.lmcache_p2p_transfer_speed,
+            "lmcache_chunk_stats_enabled": self.lmcache_chunk_stats_enabled,
+            "lmcache_total_chunk_requests": self.lmcache_total_chunk_requests,
+            "lmcache_total_chunks": self.lmcache_total_chunks,
+            "lmcache_unique_chunks": self.lmcache_unique_chunks,
             "lmcache_lookup_requested_tokens": self.lmcache_lookup_requested_tokens,
             "lmcache_lookup_hit_tokens": self.lmcache_lookup_hit_tokens,
             "lmcache_sm_read_requests": self.lmcache_sm_read_requests,

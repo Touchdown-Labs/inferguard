@@ -172,6 +172,9 @@ def build_observability_coverage_report(
     l2_configured: bool = False,
     disaggregated_or_external_cache: bool = False,
     mp_observability: dict[str, Any] | None = None,
+    lmcache_http_evidence: dict[str, Any] | None = None,
+    lmcache_trace_evidence: dict[str, Any] | None = None,
+    lmcache_otel_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a single coverage report for engine and LMCache telemetry."""
 
@@ -198,6 +201,9 @@ def build_observability_coverage_report(
         expect_mode=expect_lmcache_mode,
         l2_configured=l2_configured,
         mp_observability=mp_observability,
+        lmcache_http_evidence=lmcache_http_evidence,
+        lmcache_trace_evidence=lmcache_trace_evidence,
+        lmcache_otel_evidence=lmcache_otel_evidence,
     )
     surfaces = _surface_rows(engine_families)
     for surface, row in lmcache_report.get("surfaces", {}).items():
@@ -232,6 +238,9 @@ def build_observability_coverage_report_from_paths(
     *,
     engine_metrics_file: Path | None = None,
     lmcache_metrics_file: Path | None = None,
+    lmcache_http_evidence_file: Path | None = None,
+    lmcache_trace_evidence_file: Path | None = None,
+    lmcache_otel_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -243,6 +252,9 @@ def build_observability_coverage_report_from_paths(
         else "",
         engine_source=str(engine_metrics_file or ""),
         lmcache_source=str(lmcache_metrics_file or ""),
+        lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
+        lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         **kwargs,
     )
 
@@ -252,6 +264,9 @@ def build_observability_coverage_report_from_urls(
     engine_metrics_url: str | None = None,
     lmcache_metrics_url: str | None = None,
     timeout_seconds: float = 10.0,
+    lmcache_http_evidence_file: Path | None = None,
+    lmcache_trace_evidence_file: Path | None = None,
+    lmcache_otel_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -259,6 +274,9 @@ def build_observability_coverage_report_from_urls(
         lmcache_text=_read_url(lmcache_metrics_url, timeout_seconds) if lmcache_metrics_url else "",
         engine_source=engine_metrics_url or "",
         lmcache_source=lmcache_metrics_url or "",
+        lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
+        lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         **kwargs,
     )
 
@@ -397,6 +415,16 @@ def _read_url(url: str | None, timeout_seconds: float) -> str:
         return ""
     with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310 - operator-supplied metrics URL
         return response.read().decode("utf-8", errors="replace")
+
+
+def _read_json_object(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def dumps_report(report: dict[str, Any]) -> str:

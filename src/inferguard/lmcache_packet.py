@@ -11,8 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from inferguard.compat import build_compat_report, write_compat_report
+from inferguard.lmcache_http import parse_lmcache_http_payloads
 from inferguard.io import atomic_write_json, atomic_write_text
 from inferguard.lmcache_logs import parse_lmcache_logs
+from inferguard.lmcache_otel import parse_lmcache_otel_jsonl
+from inferguard.lmcache_trace import parse_lmcache_trace_file
 
 PACKET_SCHEMA_VERSION = "inferguard-lmcache-packet/v1"
 
@@ -27,9 +30,13 @@ class LmcachePacketOptions:
     engine_metrics_file: Path | None = None
     lmcache_metrics_file: Path | None = None
     lmcache_health_url: str | None = None
+    lmcache_health_file: Path | None = None
     lmcache_status_url: str | None = None
+    lmcache_status_file: Path | None = None
     engine_log_file: Path | None = None
     lmcache_log_file: Path | None = None
+    lmcache_trace_file: Path | None = None
+    lmcache_otel_file: Path | None = None
     expect_mode: str = "auto"
     l2_configured: bool = False
     timeout_seconds: float = 10.0
@@ -69,24 +76,35 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         sources=sources,
         errors=errors,
     )
-    _capture_url(
+    health_text = _capture_text(
         destination=output_dir / "lmcache_health.txt",
         source_name="lmcache_health",
         url=options.lmcache_health_url,
+        source_file=options.lmcache_health_file,
         timeout_seconds=options.timeout_seconds,
         artifacts=artifacts,
         sources=sources,
         errors=errors,
     )
-    _capture_url(
+    status_text = _capture_text(
         destination=output_dir / "lmcache_status.txt",
         source_name="lmcache_status",
         url=options.lmcache_status_url,
+        source_file=options.lmcache_status_file,
         timeout_seconds=options.timeout_seconds,
         artifacts=artifacts,
         sources=sources,
         errors=errors,
     )
+    http_evidence: dict[str, Any] | None = None
+    if health_text or status_text:
+        http_evidence = parse_lmcache_http_payloads(
+            health_text=health_text,
+            status_text=status_text,
+        )
+        http_evidence_path = output_dir / "lmcache_http_evidence.json"
+        atomic_write_json(http_evidence_path, http_evidence)
+        artifacts["lmcache_http_evidence"] = str(http_evidence_path)
     engine_log_text = _copy_file(
         destination=output_dir / "engine.log",
         source_name="engine_log",
@@ -110,6 +128,35 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         log_evidence_path = output_dir / "lmcache_log_evidence.json"
         atomic_write_json(log_evidence_path, log_evidence)
         artifacts["lmcache_log_evidence"] = str(log_evidence_path)
+    trace_evidence: dict[str, Any] | None = None
+    if options.lmcache_trace_file is not None:
+        trace_destination = output_dir / "lmcache_trace.lct"
+        _copy_file(
+            destination=trace_destination,
+            source_name="lmcache_trace",
+            source_file=options.lmcache_trace_file,
+            artifacts=artifacts,
+            sources=sources,
+            errors=errors,
+        )
+        trace_evidence = parse_lmcache_trace_file(options.lmcache_trace_file)
+        trace_evidence_path = output_dir / "lmcache_trace_evidence.json"
+        atomic_write_json(trace_evidence_path, trace_evidence)
+        artifacts["lmcache_trace_evidence"] = str(trace_evidence_path)
+    otel_evidence: dict[str, Any] | None = None
+    if options.lmcache_otel_file is not None:
+        _copy_file(
+            destination=output_dir / "lmcache_otel.jsonl",
+            source_name="lmcache_otel",
+            source_file=options.lmcache_otel_file,
+            artifacts=artifacts,
+            sources=sources,
+            errors=errors,
+        )
+        otel_evidence = parse_lmcache_otel_jsonl(options.lmcache_otel_file)
+        otel_evidence_path = output_dir / "lmcache_otel_evidence.json"
+        atomic_write_json(otel_evidence_path, otel_evidence)
+        artifacts["lmcache_otel_evidence"] = str(otel_evidence_path)
 
     report = build_compat_report(
         engine_text=engine_text,
@@ -119,6 +166,9 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         expect_mode=options.expect_mode,
         l2_configured=options.l2_configured,
         mp_observability=options.mp_observability,
+        lmcache_http_evidence=http_evidence,
+        lmcache_trace_evidence=trace_evidence,
+        lmcache_otel_evidence=otel_evidence,
     )
     compat_path = output_dir / "lmcache_compat_report.json"
     write_compat_report(report, compat_path)
@@ -139,7 +189,10 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
             "upstream_questions": report.get("upstream_questions", []),
             "surfaces": report.get("surfaces", {}),
         },
+        "http_evidence": http_evidence,
         "log_evidence": log_evidence,
+        "trace_evidence": trace_evidence,
+        "otel_evidence": otel_evidence,
     }
     manifest_path = output_dir / "packet_manifest.json"
     atomic_write_json(manifest_path, manifest)
@@ -160,6 +213,38 @@ def _capture_metrics(
     if source_file is not None:
         try:
             text = source_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            _record_error(errors, source_name, str(source_file), exc)
+            return ""
+        atomic_write_text(destination, text)
+        artifacts[source_name] = str(destination)
+        sources[source_name] = str(source_file)
+        return text
+    return _capture_url(
+        destination=destination,
+        source_name=source_name,
+        url=url,
+        timeout_seconds=timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+
+
+def _capture_text(
+    *,
+    destination: Path,
+    source_name: str,
+    url: str | None,
+    source_file: Path | None,
+    timeout_seconds: float,
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+) -> str:
+    if source_file is not None:
+        try:
+            text = source_file.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             _record_error(errors, source_name, str(source_file), exc)
             return ""

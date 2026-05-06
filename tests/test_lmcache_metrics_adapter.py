@@ -165,6 +165,56 @@ def test_lmcache_unknown_metrics_are_preserved() -> None:
     assert snap.raw_metrics_extra["lmcache_experimental_fragmentation_score"] == 0.42
 
 
+def test_lmcache_production_observability_metrics_parse() -> None:
+    metrics = parse_lmcache_prometheus(
+        """
+lmcache:num_retrieve_requests_total 11
+lmcache:num_store_requests_total 7
+lmcache:num_lookup_requests_total 13
+lmcache:num_requested_tokens_total 1000
+lmcache:num_hit_tokens_total 600
+lmcache:num_lookup_tokens_total 900
+lmcache:num_lookup_hits_total 500
+lmcache:is_healthy 1
+lmcache:storage_event_count_total 99
+lmcache:remote_read_bytes_total 1024
+lmcache:remote_write_bytes_total 2048
+lmcache:remote_ping_latency_seconds 0.004
+lmcache:remote_ping_errors_total 2
+lmcache:num_p2p_requests_total 3
+lmcache:num_p2p_transferred_tokens_total 128
+lmcache:p2p_time_to_transfer_seconds 0.05
+lmcache:p2p_transfer_speed 10
+lmcache:chunk_stats_enabled 1
+lmcache:total_chunk_requests_total 44
+lmcache:total_chunks 30
+lmcache:unique_chunks 20
+"""
+    )
+
+    assert metrics.lmcache_num_retrieve_requests == 11
+    assert metrics.lmcache_num_store_requests == 7
+    assert metrics.lmcache_num_lookup_requests == 13
+    assert metrics.lmcache_num_requested_tokens == 1000
+    assert metrics.lmcache_num_hit_tokens == 600
+    assert metrics.lmcache_num_lookup_tokens == 900
+    assert metrics.lmcache_num_lookup_hits == 500
+    assert metrics.lmcache_is_healthy is True
+    assert metrics.lmcache_storage_event_count == 99
+    assert metrics.lmcache_remote_read_bytes == 1024
+    assert metrics.lmcache_remote_write_bytes == 2048
+    assert metrics.lmcache_remote_ping_latency_ms == 4
+    assert metrics.lmcache_remote_ping_errors == 2
+    assert metrics.lmcache_p2p_requests == 3
+    assert metrics.lmcache_p2p_transferred_tokens == 128
+    assert metrics.lmcache_p2p_time_to_transfer_ms == 50
+    assert metrics.lmcache_p2p_transfer_speed == 10
+    assert metrics.lmcache_chunk_stats_enabled is True
+    assert metrics.lmcache_total_chunk_requests == 44
+    assert metrics.lmcache_total_chunks == 30
+    assert metrics.lmcache_unique_chunks == 20
+
+
 def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:
     from inferguard.analyze.operator_brief import (
         build_operator_brief,
