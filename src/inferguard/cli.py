@@ -1513,6 +1513,57 @@ def lmcache_compat_cmd(
         bool,
         typer.Option("--l2-configured", help="Treat MP L2 metric families as expected."),
     ] = False,
+    mp_prometheus_port: Annotated[
+        int | None,
+        typer.Option("--mp-prometheus-port", help="LMCache MP Prometheus port from launch/config."),
+    ] = None,
+    mp_event_bus_queue_size: Annotated[
+        int | None,
+        typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
+    ] = None,
+    mp_metrics_sample_rate: Annotated[
+        float | None,
+        typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
+    ] = None,
+    mp_service_instance_id: Annotated[
+        str | None,
+        typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
+    ] = None,
+    mp_observability_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-observability-disabled/--mp-observability-enabled",
+            help="Whether LMCache MP was launched with --disable-observability.",
+        ),
+    ] = False,
+    mp_metrics_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-metrics-disabled/--mp-metrics-enabled",
+            help="Whether LMCache MP was launched with --disable-metrics.",
+        ),
+    ] = False,
+    mp_logging_disabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-logging-disabled/--mp-logging-enabled",
+            help="Whether LMCache MP was launched with --disable-logging.",
+        ),
+    ] = False,
+    mp_tracing_enabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-tracing-enabled/--mp-tracing-disabled",
+            help="Whether LMCache MP tracing was launched with --enable-tracing.",
+        ),
+    ] = False,
+    mp_trace_recording_enabled: Annotated[
+        bool,
+        typer.Option(
+            "--mp-trace-recording-enabled/--mp-trace-recording-disabled",
+            help="Whether LMCache MP trace recording was launched with --trace-level storage.",
+        ),
+    ] = False,
     fail_on: Annotated[
         str,
         typer.Option(
@@ -1543,12 +1594,30 @@ def lmcache_compat_cmd(
             "pass at least one of --engine-metrics-url, --lmcache-metrics-url, "
             "--engine-metrics-file, or --lmcache-metrics-file"
         )
+    if mp_metrics_sample_rate is not None and not (0 < mp_metrics_sample_rate <= 1.0):
+        raise typer.BadParameter("--mp-metrics-sample-rate must be in (0, 1.0]")
+    if mp_event_bus_queue_size is not None and mp_event_bus_queue_size < 0:
+        raise typer.BadParameter("--mp-event-bus-queue-size must be non-negative")
+    if mp_prometheus_port is not None and not (0 < mp_prometheus_port <= 65535):
+        raise typer.BadParameter("--mp-prometheus-port must be a valid TCP port")
+    mp_observability = {
+        "prometheus_port": mp_prometheus_port,
+        "event_bus_queue_size": mp_event_bus_queue_size,
+        "metrics_sample_rate": mp_metrics_sample_rate,
+        "service_instance_id": mp_service_instance_id,
+        "observability_disabled": mp_observability_disabled,
+        "metrics_disabled": mp_metrics_disabled,
+        "logging_disabled": mp_logging_disabled,
+        "tracing_enabled": mp_tracing_enabled,
+        "trace_recording_enabled": mp_trace_recording_enabled,
+    }
     if engine_metrics_url or lmcache_metrics_url:
         report = build_compat_report_from_urls(
             engine_metrics_url=engine_metrics_url,
             lmcache_metrics_url=lmcache_metrics_url,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
+            mp_observability=mp_observability,
         )
     else:
         report = build_compat_report_from_paths(
@@ -1556,6 +1625,7 @@ def lmcache_compat_cmd(
             lmcache_metrics_file=lmcache_metrics_file,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
+            mp_observability=mp_observability,
         )
     if output is not None:
         write_compat_report(report, output)

@@ -18,7 +18,7 @@ from inferguard.collect_metrics import (
 )
 from inferguard.collect_metrics.normalize import VLLM_LOCKED_METRICS, build_metrics_summary
 from inferguard.collect_metrics.types import ENGINE_GROUPS, GpuMetricsSample
-from inferguard.compat import build_compat_report_from_paths
+from inferguard.compat import build_compat_report, build_compat_report_from_paths
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -209,6 +209,59 @@ def test_lmcache_compat_report_marks_l2_required_when_configured() -> None:
         item["code"] == "lmcache_mp_family_missing" and item["family"] == "l2_counters"
         for item in report["failure_reasons"]
     )
+
+
+def test_lmcache_compat_report_captures_mp_observability_contract() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+target_info{service_instance_id="mp-a"} 1
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_sm_write_requests_total 5
+lmcache_mp_l1_read_keys_total 9
+lmcache_mp_l1_write_keys_total 7
+lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant-a"} 100
+lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant-a"} 40
+lmcache_mp_l2_store_completed_total{l2_name="fs"} 3
+lmcache_mp_num_inflight_l2_stores{l2_name="fs",adapter_index="0"} 0
+""",
+        expect_mode="mp",
+        l2_configured=True,
+        mp_observability={
+            "event_bus_queue_size": 10000,
+            "metrics_sample_rate": 0.01,
+            "prometheus_port": 9090,
+            "tracing_enabled": True,
+        },
+    )
+
+    mp_obs = report["lmcache_mp_observability"]
+    assert mp_obs["config"]["prometheus_port"] == 9090
+    assert mp_obs["config"]["tracing_enabled"] is True
+    assert mp_obs["service_instance_ids"] == ["mp-a"]
+    assert mp_obs["cache_salt_values"] == ["tenant-a"]
+    assert mp_obs["cache_salt_cardinality"] == 1
+    assert mp_obs["l2_names"] == ["fs"]
+    assert mp_obs["adapter_indices"] == ["0"]
+    assert mp_obs["event_bus_taildrop_risk"] is True
+    assert mp_obs["sampled_histogram_sparse"] is True
+    assert {
+        item["code"] for item in report["upstream_questions"]
+    } >= {"lmcache_mp_eventbus_taildrop_risk", "lmcache_mp_sampled_histogram_sparse"}
+
+
+def test_lmcache_compat_report_explains_disabled_mp_metrics() -> None:
+    report = build_compat_report(
+        lmcache_text="",
+        expect_mode="mp",
+        mp_observability={
+            "observability_disabled": True,
+            "metrics_disabled": True,
+        },
+    )
+
+    assert any(item["code"] == "lmcache_mp_observability_disabled" for item in report["failure_reasons"])
+    assert report["surfaces"]["lmcache_mp"]["status"] == "not_applicable"
+    assert report["lmcache_mp_observability"]["config"]["metrics_disabled"] is True
 
 
 def test_dynamo_kvbm() -> None:

@@ -45,14 +45,18 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_mp", "lookup_tokens", ("lmcache_mp_lookup_*_tokens_total",)),
     MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys_total",)),
     MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes",)),
-    MetricFamilySpec("lmcache_mp", "l1_lifecycle", ("lmcache_mp_l1_chunk_*_seconds*",)),
-    MetricFamilySpec("lmcache_mp", "l0_lifecycle", ("lmcache_mp_l0_block_*_seconds*",)),
-    MetricFamilySpec("lmcache_mp", "real_reuse", ("lmcache_mp_real_reuse_gap_*",)),
+    MetricFamilySpec(
+        "lmcache_mp", "l1_lifecycle", ("lmcache_mp_l1_chunk_*_seconds*",), required_when="sampled"
+    ),
+    MetricFamilySpec(
+        "lmcache_mp", "l0_lifecycle", ("lmcache_mp_l0_block_*_seconds*",), required_when="sampled"
+    ),
+    MetricFamilySpec("lmcache_mp", "real_reuse", ("lmcache_mp_real_reuse_gap_*",), required_when="sampled"),
     MetricFamilySpec("lmcache_mp", "l2_counters", ("lmcache_mp_l2_*",), required_when="l2_configured"),
     MetricFamilySpec(
-        "lmcache_mp", "l0_l1_throughput", ("lmcache_mp_l0_l1_*_throughput_gbs*",)
+        "lmcache_mp", "l0_l1_throughput", ("lmcache_mp_l0_l1_*_throughput_gbs*",), required_when="sampled"
     ),
-    MetricFamilySpec("lmcache_mp", "engine_counters", ("lmcache_mp_num_chunks_loaded_total",)),
+    MetricFamilySpec("lmcache_mp", "engine_counters", ("lmcache_mp_num_chunks_loaded_total",), required_when="optional"),
     MetricFamilySpec(
         "lmcache_mp",
         "gauges",
@@ -61,8 +65,9 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp_num_inflight_l2_*",
             "lmcache_mp_inflight_load_memory_usage_bytes",
         ),
+        required_when="optional",
     ),
-    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*",)),
+    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*",), required_when="optional"),
 )
 
 VLLM_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
@@ -85,6 +90,7 @@ def build_compat_report(
     lmcache_source: str = "",
     expect_mode: str = "auto",
     l2_configured: bool = False,
+    mp_observability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
@@ -97,12 +103,28 @@ def build_compat_report(
         for name in observed_names
     )
     detected_mode = _detected_mode(observed_lmcache_mp, observed_lmcache_embedded)
+    mp_observability_report = _mp_observability_report(
+        samples,
+        observed_lmcache_mp=observed_lmcache_mp,
+        explicit=mp_observability or {},
+    )
     families = [
-        _family_row(spec, samples, detected_mode=detected_mode, l2_configured=l2_configured)
+        _family_row(
+            spec,
+            samples,
+            detected_mode=detected_mode,
+            l2_configured=l2_configured,
+            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled")),
+        )
         for spec in COMPAT_REGISTRY
     ]
-    upstream_questions = _upstream_questions(families, samples)
-    failures = _failures(families, detected_mode=detected_mode, expect_mode=expect_mode)
+    upstream_questions = _upstream_questions(families, samples, mp_observability_report)
+    failures = _failures(
+        families,
+        detected_mode=detected_mode,
+        expect_mode=expect_mode,
+        mp_observability=mp_observability_report,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "engine_source": engine_source,
@@ -121,6 +143,7 @@ def build_compat_report(
                 {sample.name for sample in samples if sample.value != 0.0}
             ),
         },
+        "lmcache_mp_observability": mp_observability_report,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -136,6 +159,7 @@ def build_compat_report_from_paths(
     lmcache_metrics_file: Path | None = None,
     expect_mode: str = "auto",
     l2_configured: bool = False,
+    mp_observability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -148,6 +172,7 @@ def build_compat_report_from_paths(
         lmcache_source=str(lmcache_metrics_file or ""),
         expect_mode=expect_mode,
         l2_configured=l2_configured,
+        mp_observability=mp_observability,
     )
 
 
@@ -158,6 +183,7 @@ def build_compat_report_from_urls(
     timeout_seconds: float = 10.0,
     expect_mode: str = "auto",
     l2_configured: bool = False,
+    mp_observability: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -166,6 +192,7 @@ def build_compat_report_from_urls(
         lmcache_source=lmcache_metrics_url or "",
         expect_mode=expect_mode,
         l2_configured=l2_configured,
+        mp_observability=mp_observability,
     )
 
 
@@ -189,6 +216,7 @@ def _family_row(
     *,
     detected_mode: str,
     l2_configured: bool,
+    mp_metrics_disabled: bool,
 ) -> dict[str, Any]:
     matches = [
         sample
@@ -197,7 +225,12 @@ def _family_row(
     ]
     matched_names = sorted({sample.name for sample in matches})
     nonzero_names = sorted({sample.name for sample in matches if sample.value != 0.0})
-    applicable = _is_applicable(spec, detected_mode=detected_mode, l2_configured=l2_configured)
+    applicable = _is_applicable(
+        spec,
+        detected_mode=detected_mode,
+        l2_configured=l2_configured,
+        mp_metrics_disabled=mp_metrics_disabled,
+    )
     status = "missing"
     if not applicable:
         status = "not_applicable"
@@ -253,7 +286,15 @@ def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -
     return "unknown"
 
 
-def _is_applicable(spec: MetricFamilySpec, *, detected_mode: str, l2_configured: bool) -> bool:
+def _is_applicable(
+    spec: MetricFamilySpec,
+    *,
+    detected_mode: str,
+    l2_configured: bool,
+    mp_metrics_disabled: bool,
+) -> bool:
+    if spec.surface == "lmcache_mp" and mp_metrics_disabled:
+        return False
     if spec.surface == "lmcache_mp" and detected_mode not in {"mp", "mixed"}:
         return False
     if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed"}:
@@ -264,9 +305,21 @@ def _is_applicable(spec: MetricFamilySpec, *, detected_mode: str, l2_configured:
 
 
 def _failures(
-    families: list[dict[str, Any]], *, detected_mode: str, expect_mode: str
+    families: list[dict[str, Any]],
+    *,
+    detected_mode: str,
+    expect_mode: str,
+    mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     failures: list[dict[str, Any]] = []
+    mp_config = mp_observability.get("config") or {}
+    if mp_config.get("observability_disabled") or mp_config.get("metrics_disabled"):
+        failures.append(
+            {
+                "code": "lmcache_mp_observability_disabled",
+                "message": "LMCache MP launch/config disables observability or metrics, so lmcache_mp_* cannot prove runtime behavior.",
+            }
+        )
     if expect_mode != "auto" and detected_mode != expect_mode:
         failures.append(
             {
@@ -276,6 +329,8 @@ def _failures(
         )
     for family in families:
         if not family.get("applicable"):
+            continue
+        if family.get("required_when") in {"optional", "sampled"}:
             continue
         if family["surface"] == "lmcache_mp" and family["status"] == "missing":
             failures.append(
@@ -289,7 +344,9 @@ def _failures(
 
 
 def _upstream_questions(
-    families: list[dict[str, Any]], samples: list[LabeledSample]
+    families: list[dict[str, Any]],
+    samples: list[LabeledSample],
+    mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     by_key = {(row["surface"], row["family"]): row for row in families}
     questions: list[dict[str, Any]] = []
@@ -314,6 +371,20 @@ def _upstream_questions(
                 "owner_question": "Which LMCache release should expose EventBus queue depth, dropped events, drain lag, and subscriber exception metrics?",
             }
         )
+    if mp_observability.get("event_bus_taildrop_risk"):
+        questions.append(
+            {
+                "code": "lmcache_mp_eventbus_taildrop_risk",
+                "owner_question": "Can LMCache expose stable EventBus queue depth, dropped events, drain lag, and subscriber exception counters for MP observability?",
+            }
+        )
+    if mp_observability.get("sampled_histogram_sparse"):
+        questions.append(
+            {
+                "code": "lmcache_mp_sampled_histogram_sparse",
+                "owner_question": "This MP scrape has counters but sparse sampled lifecycle/throughput histograms; should this lab raise --metrics-sample-rate for validation runs?",
+            }
+        )
     external_queries = _sum_matching(samples, "vllm:external_prefix_cache_queries_total")
     external_hits = _sum_matching(samples, "vllm:external_prefix_cache_hits_total")
     external_transfer_tokens = _sum_matching(
@@ -332,6 +403,111 @@ def _upstream_questions(
             }
         )
     return questions
+
+
+def _mp_observability_report(
+    samples: list[LabeledSample],
+    *,
+    observed_lmcache_mp: bool,
+    explicit: dict[str, Any],
+) -> dict[str, Any]:
+    config = {
+        "observability_disabled": _none_to_false(explicit.get("observability_disabled")),
+        "metrics_disabled": _none_to_false(explicit.get("metrics_disabled")),
+        "logging_disabled": _none_to_false(explicit.get("logging_disabled")),
+        "tracing_enabled": _none_to_false(explicit.get("tracing_enabled")),
+        "trace_recording_enabled": _none_to_false(explicit.get("trace_recording_enabled")),
+        "prometheus_port": explicit.get("prometheus_port") or 9090,
+        "event_bus_queue_size": explicit.get("event_bus_queue_size") or 10000,
+        "metrics_sample_rate": explicit.get("metrics_sample_rate") or 0.01,
+    }
+    service_instance_ids = sorted(
+        {
+            sample.labels["service_instance_id"]
+            for sample in samples
+            if sample.name == "target_info" and sample.labels.get("service_instance_id")
+        }
+        | {
+            sample.labels["service.instance.id"]
+            for sample in samples
+            if sample.name == "target_info" and sample.labels.get("service.instance.id")
+        }
+    )
+    if explicit.get("service_instance_id"):
+        service_instance_ids = sorted(set(service_instance_ids) | {str(explicit["service_instance_id"])})
+    cache_salts = sorted(
+        {
+            sample.labels.get("cache_salt", "")
+            for sample in samples
+            if sample.name.startswith("lmcache_mp_") and "cache_salt" in sample.labels
+        }
+    )
+    l2_names = sorted(
+        {
+            sample.labels["l2_name"]
+            for sample in samples
+            if sample.name.startswith("lmcache_mp_") and sample.labels.get("l2_name")
+        }
+    )
+    adapter_indices = sorted(
+        {
+            sample.labels["adapter_index"]
+            for sample in samples
+            if sample.name.startswith("lmcache_mp_") and sample.labels.get("adapter_index")
+        }
+    )
+    event_bus_metric_names = sorted(
+        {sample.name for sample in samples if sample.name.startswith("lmcache_mp_event_bus_")}
+    )
+    counter_names = {
+        sample.name
+        for sample in samples
+        if sample.name.startswith("lmcache_mp_")
+        and (sample.name.endswith("_total") or "_requests" in sample.name or "_keys" in sample.name)
+        and sample.value != 0.0
+    }
+    sampled_histogram_names = {
+        sample.name
+        for sample in samples
+        if sample.name.startswith("lmcache_mp_")
+        and (
+            "_l1_chunk_" in sample.name
+            or "_l0_block_" in sample.name
+            or "_throughput_gbs" in sample.name
+            or "_real_reuse_gap_" in sample.name
+        )
+        and sample.value != 0.0
+    }
+    event_bus_taildrop_risk = (
+        observed_lmcache_mp
+        and bool(config["event_bus_queue_size"])
+        and int(config["event_bus_queue_size"]) > 0
+        and not event_bus_metric_names
+    )
+    sampled_histogram_sparse = (
+        observed_lmcache_mp
+        and bool(counter_names)
+        and not sampled_histogram_names
+        and float(config["metrics_sample_rate"]) <= 0.01
+    )
+    return {
+        "config": config,
+        "service_instance_ids": service_instance_ids,
+        "service_instance_id_source": "target_info_or_cli" if service_instance_ids else "missing",
+        "cache_salt_values": cache_salts,
+        "cache_salt_cardinality": len(cache_salts),
+        "cache_salt_cardinality_risk": len(cache_salts) > 100,
+        "l2_names": l2_names,
+        "adapter_indices": adapter_indices,
+        "event_bus_metric_names": event_bus_metric_names,
+        "event_bus_taildrop_risk": event_bus_taildrop_risk,
+        "sampled_histogram_names": sorted(sampled_histogram_names),
+        "sampled_histogram_sparse": sampled_histogram_sparse,
+    }
+
+
+def _none_to_false(value: Any) -> bool:
+    return bool(value) if value is not None else False
 
 
 def _sum_matching(samples: list[LabeledSample], pattern: str) -> float:

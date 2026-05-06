@@ -52,6 +52,24 @@ Use `--l2-configured` only when the run actually configured an MP L2 adapter.
 Without that flag, L2 families are reported as `not_applicable` so an L1-only
 lab is not treated as a failed L2 proof.
 
+For MP runs, pass the observability settings from the launch command when they
+are known:
+
+```bash
+inferguard lmcache-compat \
+  --lmcache-metrics-file lmcache.prom \
+  --expect-mode mp \
+  --mp-prometheus-port 9090 \
+  --mp-event-bus-queue-size 10000 \
+  --mp-metrics-sample-rate 0.01 \
+  --mp-tracing-enabled
+```
+
+The JSON report includes an `lmcache_mp_observability` section with
+`service_instance_ids` from Prometheus `target_info`, `cache_salt` cardinality,
+L2 adapter labels, EventBus tail-drop risk, sampled-histogram sparsity, and
+whether metrics/tracing/logging were disabled by config.
+
 ## Metric Surfaces
 
 ### Embedded / Production `lmcache:*`
@@ -83,6 +101,12 @@ Standalone MP mode uses `lmcache server` and exposes `lmcache_mp_*` metrics from
 - observable gauges for active prefetch jobs, L1 memory, and in-flight L2 work.
 
 MP runs often produce a mix of populated, zero, and missing families. For example, an L1-only run should not be expected to populate L2 throughput. A run that populates StorageManager/L1 counters but never emits lookup token counters is an integration or workload question, not automatic proof that caching failed.
+
+MP metrics are sampled in several places. Lifecycle and throughput histograms
+default to a 1% sample rate, while counters count all events. Missing sampled
+histograms should be explained separately from missing always-counted counters.
+EventBus is also bounded; if EventBus self-metrics are absent, InferGuard flags
+tail-drop observability risk instead of pretending drops are impossible.
 
 ## Mode Detection Rules
 
