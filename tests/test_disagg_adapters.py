@@ -84,18 +84,30 @@ def test_parse_sglang_no_metrics_returns_error() -> None:
 
 
 def test_parse_vllm_offload_fields() -> None:
-    text = (
-        _fixture("vllm.txt")
-        + """
+    text = _fixture("vllm.txt") + """
 vllm:kv_offload_dma_bytes_per_second 83400000000
 vllm:kv_offload_async_queue_depth 5
 vllm:kv_offload_eviction_count_total 11
 """
-    )
     snap = _parse_vllm(text, url="http://p", role="prefill")
     assert snap.vllm_offload_dma_bytes_per_sec == 83400000000.0
     assert snap.vllm_offload_async_queue_depth == 5
     assert snap.vllm_offload_eviction_count == 11
+
+
+def test_parse_vllm_simple_cpu_offload_fixture() -> None:
+    snap = _parse_vllm(_fixture("vllm_simple_cpu_offload.prom"), url="http://p", role="prefill")
+
+    assert snap.endpoint.engine == "vllm"
+    assert snap.kv_offload_bytes_gpu_to_cpu == 13870000000.0
+    assert snap.kv_offload_bytes_cpu_to_gpu == 4770000000.0
+    assert snap.kv_offload_time_gpu_to_cpu == 0.42
+    assert snap.kv_offload_time_cpu_to_gpu == 0.19
+    assert snap.simple_cpu_offload_total_blocks == 1024
+    assert snap.simple_cpu_offload_used_blocks == 768
+    assert snap.simple_cpu_offload_usage_perc == 0.75
+    assert snap.simple_cpu_offload_pending_loads == 2
+    assert snap.simple_cpu_offload_pending_stores == 3
 
 
 def test_parse_lmcache_fixture() -> None:

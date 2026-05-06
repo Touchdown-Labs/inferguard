@@ -18,6 +18,7 @@ from inferguard.collect_metrics import (
 )
 from inferguard.collect_metrics.normalize import VLLM_LOCKED_METRICS, build_metrics_summary
 from inferguard.collect_metrics.types import ENGINE_GROUPS, GpuMetricsSample
+from inferguard.compat import build_compat_report_from_paths
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -122,6 +123,67 @@ def test_lmcache_connector_v1() -> None:
     summary = _summary_from_engine("lmcache", _fixture("lmcache_metrics/with_v1_connector.prom"))
 
     assert summary["lmcache"]["connector"] == "LMCacheConnectorV1"
+
+
+def test_lmcache_mp_metrics_are_measured() -> None:
+    summary = _summary_from_engine("lmcache", _fixture("lmcache_metrics/mp.prom"))
+
+    lmcache = summary["lmcache"]
+    assert lmcache["claim_status"] == "measured"
+    assert lmcache["mp_mode_enabled"] is True
+    assert lmcache["connector"] == "LMCacheMPConnector"
+    assert lmcache["backend"] == "mp"
+    assert lmcache["lookup_requested_tokens"] == 10000
+    assert lmcache["lookup_hit_tokens"] == 6200
+    assert lmcache["lookup_hit_rate"] == 0.62
+    assert lmcache["l1_memory_usage_bytes"] == 2147483648
+    assert lmcache["l1_chunk_reuse_gap_seconds"] == 3.0
+    assert lmcache["l2_store_completed"] == 7
+    assert lmcache["event_bus_queue_depth"] == 0
+
+
+def test_real_modal_mp_slice_surfaces_storage_l0_and_vllm_external_prefix() -> None:
+    summary = _summary_from_engine("lmcache", _fixture("lmcache_metrics/mp_modal_real_slice.prom"))
+
+    lmcache = summary["lmcache"]
+    prefix = summary["prefix_cache"]
+    assert lmcache["claim_status"] == "measured"
+    assert lmcache["mp_mode_enabled"] is True
+    assert lmcache["sm_read_requests"] == 149
+    assert lmcache["sm_write_succeed_keys"] == 1843
+    assert lmcache["l1_evicted_keys"] == 1650
+    assert lmcache["l0_block_lifetime_seconds"] > 400
+    assert prefix["external_queries"] == 643697
+    assert prefix["external_hits"] == 0
+    assert prefix["prompt_tokens_external_kv_transfer"] == 0
+    assert prefix["prompt_tokens_cached_total"] == 1281008
+
+
+def test_vllm_simple_cpu_offload_metrics_are_normalized() -> None:
+    summary = _summary_from_engine("vllm", _fixture("vllm_simple_cpu_offload.prom"))
+
+    kv_cache = summary["kv_cache"]
+    assert kv_cache["claim_status"] == "measured"
+    assert kv_cache["kv_offload_bytes_gpu_to_cpu"] == 13870000000
+    assert kv_cache["kv_offload_bytes_cpu_to_gpu"] == 4770000000
+    assert kv_cache["simple_cpu_offload_total_blocks"] == 1024
+    assert kv_cache["simple_cpu_offload_usage_perc"] == 0.75
+    assert kv_cache["simple_cpu_offload_pending_loads"] == 2
+    assert kv_cache["simple_cpu_offload_pending_stores"] == 3
+
+
+def test_lmcache_compat_report_distinguishes_mp_and_external_prefix() -> None:
+    report = build_compat_report_from_paths(
+        engine_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
+        lmcache_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",
+    )
+
+    assert report["observed"]["lmcache_mp"] is True
+    assert report["observed"]["lmcache_embedded"] is False
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_mp", "storage_manager")]["status"] == "populated"
+    assert families[("lmcache_mp", "lookup_tokens")]["status"] == "missing"
+    assert families[("vllm_prefix_cache", "external_prefix")]["status"] == "populated"
 
 
 def test_dynamo_kvbm() -> None:
@@ -231,9 +293,7 @@ def test_dcgm_schema_locked(tmp_path: Path) -> None:
     finally:
         server.stop()
 
-    first = json.loads(
-        (tmp_path / "gpu_metrics_timeline.jsonl").read_text(encoding="utf-8").splitlines()[0]
-    )
+    first = json.loads((tmp_path / "gpu_metrics_timeline.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert first["schema_version"] == "dcgm-correlated/v1"
 
 

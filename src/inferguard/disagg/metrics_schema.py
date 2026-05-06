@@ -50,6 +50,30 @@ class LmcacheMetrics:
     lmcache_remote_bytes_sent: int | None = None
     lmcache_remote_bytes_received: int | None = None
     lmcache_queue_depth: int | None = None
+    lmcache_lookup_requested_tokens: int | None = None
+    lmcache_lookup_hit_tokens: int | None = None
+    lmcache_sm_read_requests: int | None = None
+    lmcache_sm_read_succeed_keys: int | None = None
+    lmcache_sm_read_failed_keys: int | None = None
+    lmcache_sm_write_requests: int | None = None
+    lmcache_sm_write_succeed_keys: int | None = None
+    lmcache_sm_write_failed_keys: int | None = None
+    lmcache_l1_read_keys: int | None = None
+    lmcache_l1_write_keys: int | None = None
+    lmcache_l1_evicted_keys: int | None = None
+    lmcache_l1_memory_usage_bytes: int | None = None
+    lmcache_l0_block_lifetime_seconds: float | None = None
+    lmcache_l0_block_idle_before_evict_seconds: float | None = None
+    lmcache_l0_block_reuse_gap_seconds: float | None = None
+    lmcache_l2_store_completed: int | None = None
+    lmcache_l2_store_failed_keys: int | None = None
+    lmcache_l2_prefetch_hit_keys: int | None = None
+    lmcache_l2_prefetch_loaded_keys: int | None = None
+    lmcache_active_prefetch_jobs: int | None = None
+    lmcache_num_inflight_l2_stores: int | None = None
+    lmcache_num_inflight_l2_loads: int | None = None
+    lmcache_event_bus_queue_depth: int | None = None
+    lmcache_event_bus_dropped_events_total: int | None = None
     raw_metrics_extra: dict[str, float] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -74,6 +98,7 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_hits_total", "type": "int"},
         {"name": "lmcache_lookup_hits_total", "type": "int"},
         {"name": "lmcache_retrieve_hit_count_total", "type": "int"},
+        {"name": "lmcache_mp_lookup_hit_tokens_total", "type": "int"},
     ),
     "lmcache_miss_count": (
         {"name": "lmcache:miss_count", "type": "int"},
@@ -94,6 +119,7 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_eviction_count", "type": "int"},
         {"name": "lmcache_evictions_total", "type": "int"},
         {"name": "lmcache_cache_evictions_total", "type": "int"},
+        {"name": "lmcache_mp_l1_evicted_keys_total", "type": "int"},
     ),
     "lmcache_save_count": (
         {"name": "lmcache:save_count", "type": "int"},
@@ -119,6 +145,7 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_tier_usage_bytes", "labels": {"tier": "cpu"}, "type": "int"},
         {"name": "lmcache_tier_cpu_bytes", "type": "int"},
         {"name": "lmcache_local_cpu_bytes", "type": "int"},
+        {"name": "lmcache_mp_l1_memory_usage_bytes", "type": "int"},
     ),
     "lmcache_tier_disk_bytes": (
         {"name": "lmcache:tier_usage", "labels": {"tier": "local_disk"}, "type": "int"},
@@ -145,32 +172,17 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.5"}, "type": "float"},
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.50"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.5"}, "type": "float"},
-        {
-            "name": "lmcache_retrieve_latency_seconds",
-            "labels": {"quantile": "0.5"},
-            "type": "float",
-            "convert": "seconds_to_ms",
-        },
+        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.5"}, "type": "float", "convert": "seconds_to_ms"},
     ),
     "lmcache_retrieve_latency_ms_p95": (
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.95"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.95"}, "type": "float"},
-        {
-            "name": "lmcache_retrieve_latency_seconds",
-            "labels": {"quantile": "0.95"},
-            "type": "float",
-            "convert": "seconds_to_ms",
-        },
+        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.95"}, "type": "float", "convert": "seconds_to_ms"},
     ),
     "lmcache_retrieve_latency_ms_p99": (
         {"name": "lmcache_retrieve_latency_ms", "labels": {"quantile": "0.99"}, "type": "float"},
         {"name": "lmcache:retrieve_latency_ms", "labels": {"quantile": "0.99"}, "type": "float"},
-        {
-            "name": "lmcache_retrieve_latency_seconds",
-            "labels": {"quantile": "0.99"},
-            "type": "float",
-            "convert": "seconds_to_ms",
-        },
+        {"name": "lmcache_retrieve_latency_seconds", "labels": {"quantile": "0.99"}, "type": "float", "convert": "seconds_to_ms"},
     ),
     "lmcache_nixl_transfer_bytes": (
         {"name": "lmcache:nixl_transfer_bytes", "type": "int"},
@@ -180,11 +192,7 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_nixl_transfer_latency_ms": (
         {"name": "lmcache:nixl_transfer_latency_ms", "type": "float"},
         {"name": "lmcache_nixl_transfer_latency_ms", "type": "float"},
-        {
-            "name": "lmcache_nixl_transfer_latency_seconds",
-            "type": "float",
-            "convert": "seconds_to_ms",
-        },
+        {"name": "lmcache_nixl_transfer_latency_seconds", "type": "float", "convert": "seconds_to_ms"},
     ),
     "lmcache_remote_bytes_sent": (
         {"name": "lmcache:remote_bytes_sent_total", "type": "int"},
@@ -197,6 +205,79 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_queue_depth": (
         {"name": "lmcache:queue_depth", "type": "int"},
         {"name": "lmcache_queue_depth", "type": "int"},
+        {"name": "lmcache_mp_event_bus_queue_depth", "type": "int"},
+    ),
+    "lmcache_lookup_requested_tokens": (
+        {"name": "lmcache_mp_lookup_requested_tokens_total", "type": "int"},
+    ),
+    "lmcache_lookup_hit_tokens": (
+        {"name": "lmcache_mp_lookup_hit_tokens_total", "type": "int"},
+    ),
+    "lmcache_sm_read_requests": (
+        {"name": "lmcache_mp_sm_read_requests_total", "type": "int"},
+    ),
+    "lmcache_sm_read_succeed_keys": (
+        {"name": "lmcache_mp_sm_read_succeed_keys_total", "type": "int"},
+    ),
+    "lmcache_sm_read_failed_keys": (
+        {"name": "lmcache_mp_sm_read_failed_keys_total", "type": "int"},
+    ),
+    "lmcache_sm_write_requests": (
+        {"name": "lmcache_mp_sm_write_requests_total", "type": "int"},
+    ),
+    "lmcache_sm_write_succeed_keys": (
+        {"name": "lmcache_mp_sm_write_succeed_keys_total", "type": "int"},
+    ),
+    "lmcache_sm_write_failed_keys": (
+        {"name": "lmcache_mp_sm_write_failed_keys_total", "type": "int"},
+    ),
+    "lmcache_l1_read_keys": (
+        {"name": "lmcache_mp_l1_read_keys_total", "type": "int"},
+    ),
+    "lmcache_l1_write_keys": (
+        {"name": "lmcache_mp_l1_write_keys_total", "type": "int"},
+    ),
+    "lmcache_l1_evicted_keys": (
+        {"name": "lmcache_mp_l1_evicted_keys_total", "type": "int"},
+    ),
+    "lmcache_l1_memory_usage_bytes": (
+        {"name": "lmcache_mp_l1_memory_usage_bytes", "type": "int"},
+    ),
+    "lmcache_l0_block_lifetime_seconds": (
+        {"name": "lmcache_mp_l0_block_lifetime_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l0_block_idle_before_evict_seconds": (
+        {"name": "lmcache_mp_l0_block_idle_before_evict_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l0_block_reuse_gap_seconds": (
+        {"name": "lmcache_mp_l0_block_reuse_gap_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_l2_store_completed": (
+        {"name": "lmcache_mp_l2_store_completed_total", "type": "int"},
+    ),
+    "lmcache_l2_store_failed_keys": (
+        {"name": "lmcache_mp_l2_store_failed_keys_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_hit_keys": (
+        {"name": "lmcache_mp_l2_prefetch_hit_keys_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_loaded_keys": (
+        {"name": "lmcache_mp_l2_prefetch_loaded_keys_total", "type": "int"},
+    ),
+    "lmcache_active_prefetch_jobs": (
+        {"name": "lmcache_mp_active_prefetch_jobs", "type": "int"},
+    ),
+    "lmcache_num_inflight_l2_stores": (
+        {"name": "lmcache_mp_num_inflight_l2_stores", "type": "int"},
+    ),
+    "lmcache_num_inflight_l2_loads": (
+        {"name": "lmcache_mp_num_inflight_l2_loads", "type": "int"},
+    ),
+    "lmcache_event_bus_queue_depth": (
+        {"name": "lmcache_mp_event_bus_queue_depth", "type": "int"},
+    ),
+    "lmcache_event_bus_dropped_events_total": (
+        {"name": "lmcache_mp_event_bus_dropped_events_total", "type": "int"},
     ),
     "lmcache_cacheblend_enabled": (
         {"name": "lmcache:cacheblend_enabled", "type": "bool"},
@@ -218,6 +299,7 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache:connector_info", "label": "connector", "type": "str_label"},
         {"name": "lmcache_connector_info", "label": "connector", "type": "str_label"},
         {"name": "lmcache_nixl_transfer_bytes_total", "const": "nixl", "type": "str_const"},
+        {"name": "lmcache_mp_lookup_requested_tokens_total", "const": "LMCacheMPConnector", "type": "str_const"},
     ),
     "lmcache_cache_salt_enabled": (
         {"name": "lmcache:cache_salt_enabled", "type": "bool"},
@@ -238,19 +320,33 @@ def parse_lmcache_prometheus(text: str) -> LmcacheMetrics:
             values[field_name] = value
             matched_names.update(names)
     if values.get("lmcache_hit_rate") is None:
-        hit = values.get("lmcache_hit_count")
+        hit = values.get("lmcache_lookup_hit_tokens") or values.get("lmcache_hit_count")
+        requested = values.get("lmcache_lookup_requested_tokens")
+        if isinstance(hit, int) and isinstance(requested, int) and requested > 0:
+            values["lmcache_hit_rate"] = hit / requested
+            if values.get("lmcache_miss_count") is None:
+                values["lmcache_miss_count"] = max(requested - hit, 0)
         miss = values.get("lmcache_miss_count")
         if isinstance(hit, int) and isinstance(miss, int) and hit + miss > 0:
             values["lmcache_hit_rate"] = hit / (hit + miss)
+    if values.get("lmcache_hit_count") is None and values.get("lmcache_lookup_hit_tokens") is not None:
+        values["lmcache_hit_count"] = values["lmcache_lookup_hit_tokens"]
+    if any(sample.name.startswith("lmcache_mp_") for sample in samples):
+        values["lmcache_mp_mode_enabled"] = True
+        values.setdefault("lmcache_enabled", True)
+        values.setdefault("lmcache_connector_type", "LMCacheMPConnector")
     values["raw_metrics_extra"] = _raw_extra(samples, matched_names)
     return LmcacheMetrics(**values)
 
 
-def _first_alias(
-    samples: list[LabeledSample], aliases: tuple[dict[str, Any], ...]
-) -> tuple[Any | None, set[str]]:
+def _first_alias(samples: list[LabeledSample], aliases: tuple[dict[str, Any], ...]) -> tuple[Any | None, set[str]]:
     seen: set[str] = set()
     for alias in aliases:
+        if alias.get("type") == "hist_avg":
+            value = _hist_avg(samples, str(alias["name"]))
+            if value is not None:
+                return value, {str(alias["name"])}
+            continue
         for sample in samples:
             if sample.name != alias["name"]:
                 continue
@@ -261,6 +357,19 @@ def _first_alias(
                 seen.add(sample.name)
                 return value, seen
     return None, seen
+
+
+def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
+    total = None
+    count = None
+    for sample in samples:
+        if sample.name == f"{base_name}_sum":
+            total = sample.value
+        elif sample.name == f"{base_name}_count":
+            count = sample.value
+    if total is None or count is None or count <= 0:
+        return None
+    return total / count
 
 
 def _labels_match(sample: LabeledSample, expected: dict[str, str]) -> bool:
@@ -275,6 +384,8 @@ def _coerce(sample: LabeledSample, alias: dict[str, Any]) -> Any | None:
     if alias_type == "int":
         return int(value)
     if alias_type == "float":
+        return float(value)
+    if alias_type == "hist_avg":
         return float(value)
     if alias_type == "bool":
         return bool(value)

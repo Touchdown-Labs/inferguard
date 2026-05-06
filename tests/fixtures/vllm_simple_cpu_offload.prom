@@ -1,0 +1,13 @@
+vllm:cache_config_info{model_name="Qwen/Qwen3-8B",kv_connector="SimpleCPUOffloadConnector"} 1
+vllm:kv_offload_total_bytes{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="GPU_to_CPU"} 13870000000
+vllm:kv_offload_total_bytes{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="CPU_to_GPU"} 4770000000
+vllm:kv_offload_total_time{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="GPU_to_CPU"} 0.42
+vllm:kv_offload_total_time{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="CPU_to_GPU"} 0.19
+vllm:kv_offload_size_sum{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="GPU_to_CPU"} 13870000000
+vllm:kv_offload_size_count{engine="0",model_name="Qwen/Qwen3-8B",transfer_type="GPU_to_CPU"} 10
+vllm:simple_cpu_offload_total_blocks{engine="0",model_name="Qwen/Qwen3-8B"} 1024
+vllm:simple_cpu_offload_free_blocks{engine="0",model_name="Qwen/Qwen3-8B"} 256
+vllm:simple_cpu_offload_used_blocks{engine="0",model_name="Qwen/Qwen3-8B"} 768
+vllm:simple_cpu_offload_usage_perc{engine="0",model_name="Qwen/Qwen3-8B"} 0.75
+vllm:simple_cpu_offload_pending_loads{engine="0",model_name="Qwen/Qwen3-8B"} 2
+vllm:simple_cpu_offload_pending_stores{engine="0",model_name="Qwen/Qwen3-8B"} 3

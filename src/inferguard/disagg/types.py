@@ -80,11 +80,23 @@ class DisaggSnapshot:
     prefix_cache_queries: int | None = None
     cpu_prefix_cache_hits: int | None = None
     cpu_prefix_cache_queries: int | None = None
+    external_prefix_cache_hits: int | None = None
+    external_prefix_cache_queries: int | None = None
+    prompt_tokens_cached_total: int | None = None
+    prompt_tokens_local_compute: int | None = None
+    prompt_tokens_local_cache_hit: int | None = None
+    prompt_tokens_external_kv_transfer: int | None = None
     kv_offload_bytes_gpu_to_cpu: float | None = None
     kv_offload_bytes_cpu_to_gpu: float | None = None
     kv_offload_time_gpu_to_cpu: float | None = None
     kv_offload_time_cpu_to_gpu: float | None = None
     cpu_kv_cache_usage_pct: float | None = None
+    simple_cpu_offload_total_blocks: int | None = None
+    simple_cpu_offload_free_blocks: int | None = None
+    simple_cpu_offload_used_blocks: int | None = None
+    simple_cpu_offload_usage_perc: float | None = None
+    simple_cpu_offload_pending_loads: int | None = None
+    simple_cpu_offload_pending_stores: int | None = None
     lmcache_enabled: bool | None = None
     lmcache_hit_count: int | None = None
     lmcache_miss_count: int | None = None
@@ -111,6 +123,30 @@ class DisaggSnapshot:
     lmcache_remote_bytes_sent: int | None = None
     lmcache_remote_bytes_received: int | None = None
     lmcache_queue_depth: int | None = None
+    lmcache_lookup_requested_tokens: int | None = None
+    lmcache_lookup_hit_tokens: int | None = None
+    lmcache_sm_read_requests: int | None = None
+    lmcache_sm_read_succeed_keys: int | None = None
+    lmcache_sm_read_failed_keys: int | None = None
+    lmcache_sm_write_requests: int | None = None
+    lmcache_sm_write_succeed_keys: int | None = None
+    lmcache_sm_write_failed_keys: int | None = None
+    lmcache_l1_read_keys: int | None = None
+    lmcache_l1_write_keys: int | None = None
+    lmcache_l1_evicted_keys: int | None = None
+    lmcache_l1_memory_usage_bytes: int | None = None
+    lmcache_l0_block_lifetime_seconds: float | None = None
+    lmcache_l0_block_idle_before_evict_seconds: float | None = None
+    lmcache_l0_block_reuse_gap_seconds: float | None = None
+    lmcache_l2_store_completed: int | None = None
+    lmcache_l2_store_failed_keys: int | None = None
+    lmcache_l2_prefetch_hit_keys: int | None = None
+    lmcache_l2_prefetch_loaded_keys: int | None = None
+    lmcache_active_prefetch_jobs: int | None = None
+    lmcache_num_inflight_l2_stores: int | None = None
+    lmcache_num_inflight_l2_loads: int | None = None
+    lmcache_event_bus_queue_depth: int | None = None
+    lmcache_event_bus_dropped_events_total: int | None = None
     raw_metrics_extra: dict[str, float] = field(default_factory=dict)
     dynamo_block_residency_seconds: float | None = None
     dynamo_block_l1_count: int | None = None
@@ -150,11 +186,23 @@ class DisaggSnapshot:
             "prefix_cache_queries": self.prefix_cache_queries,
             "cpu_prefix_cache_hits": self.cpu_prefix_cache_hits,
             "cpu_prefix_cache_queries": self.cpu_prefix_cache_queries,
+            "external_prefix_cache_hits": self.external_prefix_cache_hits,
+            "external_prefix_cache_queries": self.external_prefix_cache_queries,
+            "prompt_tokens_cached_total": self.prompt_tokens_cached_total,
+            "prompt_tokens_local_compute": self.prompt_tokens_local_compute,
+            "prompt_tokens_local_cache_hit": self.prompt_tokens_local_cache_hit,
+            "prompt_tokens_external_kv_transfer": self.prompt_tokens_external_kv_transfer,
             "kv_offload_bytes_gpu_to_cpu": self.kv_offload_bytes_gpu_to_cpu,
             "kv_offload_bytes_cpu_to_gpu": self.kv_offload_bytes_cpu_to_gpu,
             "kv_offload_time_gpu_to_cpu": self.kv_offload_time_gpu_to_cpu,
             "kv_offload_time_cpu_to_gpu": self.kv_offload_time_cpu_to_gpu,
             "cpu_kv_cache_usage_pct": self.cpu_kv_cache_usage_pct,
+            "simple_cpu_offload_total_blocks": self.simple_cpu_offload_total_blocks,
+            "simple_cpu_offload_free_blocks": self.simple_cpu_offload_free_blocks,
+            "simple_cpu_offload_used_blocks": self.simple_cpu_offload_used_blocks,
+            "simple_cpu_offload_usage_perc": self.simple_cpu_offload_usage_perc,
+            "simple_cpu_offload_pending_loads": self.simple_cpu_offload_pending_loads,
+            "simple_cpu_offload_pending_stores": self.simple_cpu_offload_pending_stores,
             "lmcache_enabled": self.lmcache_enabled,
             "lmcache_hit_count": self.lmcache_hit_count,
             "lmcache_miss_count": self.lmcache_miss_count,
@@ -181,6 +229,30 @@ class DisaggSnapshot:
             "lmcache_remote_bytes_sent": self.lmcache_remote_bytes_sent,
             "lmcache_remote_bytes_received": self.lmcache_remote_bytes_received,
             "lmcache_queue_depth": self.lmcache_queue_depth,
+            "lmcache_lookup_requested_tokens": self.lmcache_lookup_requested_tokens,
+            "lmcache_lookup_hit_tokens": self.lmcache_lookup_hit_tokens,
+            "lmcache_sm_read_requests": self.lmcache_sm_read_requests,
+            "lmcache_sm_read_succeed_keys": self.lmcache_sm_read_succeed_keys,
+            "lmcache_sm_read_failed_keys": self.lmcache_sm_read_failed_keys,
+            "lmcache_sm_write_requests": self.lmcache_sm_write_requests,
+            "lmcache_sm_write_succeed_keys": self.lmcache_sm_write_succeed_keys,
+            "lmcache_sm_write_failed_keys": self.lmcache_sm_write_failed_keys,
+            "lmcache_l1_read_keys": self.lmcache_l1_read_keys,
+            "lmcache_l1_write_keys": self.lmcache_l1_write_keys,
+            "lmcache_l1_evicted_keys": self.lmcache_l1_evicted_keys,
+            "lmcache_l1_memory_usage_bytes": self.lmcache_l1_memory_usage_bytes,
+            "lmcache_l0_block_lifetime_seconds": self.lmcache_l0_block_lifetime_seconds,
+            "lmcache_l0_block_idle_before_evict_seconds": self.lmcache_l0_block_idle_before_evict_seconds,
+            "lmcache_l0_block_reuse_gap_seconds": self.lmcache_l0_block_reuse_gap_seconds,
+            "lmcache_l2_store_completed": self.lmcache_l2_store_completed,
+            "lmcache_l2_store_failed_keys": self.lmcache_l2_store_failed_keys,
+            "lmcache_l2_prefetch_hit_keys": self.lmcache_l2_prefetch_hit_keys,
+            "lmcache_l2_prefetch_loaded_keys": self.lmcache_l2_prefetch_loaded_keys,
+            "lmcache_active_prefetch_jobs": self.lmcache_active_prefetch_jobs,
+            "lmcache_num_inflight_l2_stores": self.lmcache_num_inflight_l2_stores,
+            "lmcache_num_inflight_l2_loads": self.lmcache_num_inflight_l2_loads,
+            "lmcache_event_bus_queue_depth": self.lmcache_event_bus_queue_depth,
+            "lmcache_event_bus_dropped_events_total": self.lmcache_event_bus_dropped_events_total,
             "raw_metrics_extra": dict(self.raw_metrics_extra),
             "dynamo_block_residency_seconds": self.dynamo_block_residency_seconds,
             "dynamo_block_l1_count": self.dynamo_block_l1_count,

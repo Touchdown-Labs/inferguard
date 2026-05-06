@@ -1,0 +1,35 @@
+# HELP lmcache_mp_lookup_requested_tokens_total Total tokens submitted for lookup.
+# TYPE lmcache_mp_lookup_requested_tokens_total counter
+lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt=""} 10000
+# HELP lmcache_mp_lookup_hit_tokens_total Total lookup tokens found in L1 or L2.
+# TYPE lmcache_mp_lookup_hit_tokens_total counter
+lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt=""} 6200
+# TYPE lmcache_mp_l1_read_keys_total counter
+lmcache_mp_l1_read_keys_total 42
+# TYPE lmcache_mp_l1_write_keys_total counter
+lmcache_mp_l1_write_keys_total 55
+# TYPE lmcache_mp_l1_evicted_keys_total counter
+lmcache_mp_l1_evicted_keys_total 3
+# TYPE lmcache_mp_l1_memory_usage_bytes gauge
+lmcache_mp_l1_memory_usage_bytes 2147483648
+# TYPE lmcache_mp_l1_chunk_reuse_gap_seconds histogram
+lmcache_mp_l1_chunk_reuse_gap_seconds_sum 12
+lmcache_mp_l1_chunk_reuse_gap_seconds_count 4
+# TYPE lmcache_mp_l2_store_completed_total counter
+lmcache_mp_l2_store_completed_total{l2_name="fs"} 7
+# TYPE lmcache_mp_l2_store_failed_keys_total counter
+lmcache_mp_l2_store_failed_keys_total 1
+# TYPE lmcache_mp_l2_prefetch_hit_keys_total counter
+lmcache_mp_l2_prefetch_hit_keys_total 5
+# TYPE lmcache_mp_l2_prefetch_loaded_keys_total counter
+lmcache_mp_l2_prefetch_loaded_keys_total 4
+# TYPE lmcache_mp_num_inflight_l2_stores gauge
+lmcache_mp_num_inflight_l2_stores{l2_name="fs",adapter_index="0"} 2
+# TYPE lmcache_mp_num_inflight_l2_loads gauge
+lmcache_mp_num_inflight_l2_loads{l2_name="fs",adapter_index="0"} 1
+# TYPE lmcache_mp_active_prefetch_jobs gauge
+lmcache_mp_active_prefetch_jobs 1
+# TYPE lmcache_mp_event_bus_queue_depth gauge
+lmcache_mp_event_bus_queue_depth 0
+# TYPE lmcache_mp_event_bus_dropped_events_total counter
+lmcache_mp_event_bus_dropped_events_total 0

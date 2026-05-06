@@ -64,11 +64,20 @@ VLLM_FIELD_MAP: dict[str, str] = {
     "prefix_cache_queries": "vllm:prefix_cache_queries_total",
     "cpu_prefix_cache_hits": "vllm:cpu_prefix_cache_hits_total",
     "cpu_prefix_cache_queries": "vllm:cpu_prefix_cache_queries_total",
+    "external_prefix_cache_hits": "vllm:external_prefix_cache_hits_total",
+    "external_prefix_cache_queries": "vllm:external_prefix_cache_queries_total",
+    "prompt_tokens_cached_total": "vllm:prompt_tokens_cached_total",
     "kv_offload_bytes_gpu_to_cpu": "vllm:kv_offload_bytes_gpu_to_cpu",
     "kv_offload_bytes_cpu_to_gpu": "vllm:kv_offload_bytes_cpu_to_gpu",
     "kv_offload_time_gpu_to_cpu": "vllm:kv_offload_time_gpu_to_cpu",
     "kv_offload_time_cpu_to_gpu": "vllm:kv_offload_time_cpu_to_gpu",
     "cpu_kv_cache_usage_pct": "vllm:cpu_kv_cache_usage_pct",
+    "simple_cpu_offload_total_blocks": "vllm:simple_cpu_offload_total_blocks",
+    "simple_cpu_offload_free_blocks": "vllm:simple_cpu_offload_free_blocks",
+    "simple_cpu_offload_used_blocks": "vllm:simple_cpu_offload_used_blocks",
+    "simple_cpu_offload_usage_perc": "vllm:simple_cpu_offload_usage_perc",
+    "simple_cpu_offload_pending_loads": "vllm:simple_cpu_offload_pending_loads",
+    "simple_cpu_offload_pending_stores": "vllm:simple_cpu_offload_pending_stores",
 }
 _VLLM_TTFT_PREFIX = "vllm:time_to_first_token_seconds"
 _VLLM_TPOT_PREFIX = "vllm:time_per_output_token_seconds"
@@ -143,6 +152,17 @@ _INT_FIELDS = {
     "prefix_cache_queries",
     "cpu_prefix_cache_hits",
     "cpu_prefix_cache_queries",
+    "external_prefix_cache_hits",
+    "external_prefix_cache_queries",
+    "prompt_tokens_cached_total",
+    "prompt_tokens_local_compute",
+    "prompt_tokens_local_cache_hit",
+    "prompt_tokens_external_kv_transfer",
+    "simple_cpu_offload_total_blocks",
+    "simple_cpu_offload_free_blocks",
+    "simple_cpu_offload_used_blocks",
+    "simple_cpu_offload_pending_loads",
+    "simple_cpu_offload_pending_stores",
     "lmcache_eviction_count",
     "lmcache_tier_cpu_bytes",
     "lmcache_tier_local_disk_bytes",
@@ -209,7 +229,9 @@ async def scrape(
     if resolved_engine == "lmcache":
         return _parse_lmcache(text, url, role)
     if resolved_engine == "llm-d":
-        return _parse_with_map(text, url, role, engine="llm-d", field_map=LLMD_FIELD_MAP)
+        return _parse_with_map(
+            text, url, role, engine="llm-d", field_map=LLMD_FIELD_MAP
+        )
     # Unknown / unidentified: still return what we can so the caller sees
     # endpoint is reachable; detect.py will emit ``engine_unidentified``.
     return DisaggSnapshot(
@@ -233,6 +255,7 @@ def _parse_vllm(text: str, url: str, role: Role) -> DisaggSnapshot:
     labeled = parse_labeled_prometheus_text(text)
     connector = _detect_connector(labeled, prefix="vllm:kv_transfer")
     base = _extract_base_fields(metrics, VLLM_FIELD_MAP)
+    base.update(_extract_vllm_labeled_fields(labeled))
     base["ttft_avg_seconds"] = histogram_avg(metrics, _VLLM_TTFT_PREFIX)
     base["tpot_avg_seconds"] = histogram_avg(metrics, _VLLM_TPOT_PREFIX)
     return DisaggSnapshot(
@@ -240,6 +263,41 @@ def _parse_vllm(text: str, url: str, role: Role) -> DisaggSnapshot:
         scraped_at=time.time(),
         **base,
     )
+
+
+def _extract_vllm_labeled_fields(samples: list[LabeledSample]) -> dict[str, float | int | None]:
+    fields = {
+        "kv_offload_bytes_gpu_to_cpu": _labeled_metric(
+            samples, "vllm:kv_offload_total_bytes", {"transfer_type": "GPU_to_CPU"}
+        ),
+        "kv_offload_bytes_cpu_to_gpu": _labeled_metric(
+            samples, "vllm:kv_offload_total_bytes", {"transfer_type": "CPU_to_GPU"}
+        ),
+        "kv_offload_time_gpu_to_cpu": _labeled_metric(
+            samples, "vllm:kv_offload_total_time", {"transfer_type": "GPU_to_CPU"}
+        ),
+        "kv_offload_time_cpu_to_gpu": _labeled_metric(
+            samples, "vllm:kv_offload_total_time", {"transfer_type": "CPU_to_GPU"}
+        ),
+        "prompt_tokens_local_compute": _as_int(
+            _labeled_metric(
+                samples, "vllm:prompt_tokens_by_source_total", {"source": "local_compute"}
+            )
+        ),
+        "prompt_tokens_local_cache_hit": _as_int(
+            _labeled_metric(
+                samples, "vllm:prompt_tokens_by_source_total", {"source": "local_cache_hit"}
+            )
+        ),
+        "prompt_tokens_external_kv_transfer": _as_int(
+            _labeled_metric(
+                samples,
+                "vllm:prompt_tokens_by_source_total",
+                {"source": "external_kv_transfer"},
+            )
+        ),
+    }
+    return {key: value for key, value in fields.items() if value is not None}
 
 
 def _parse_sglang(text: str, url: str, role: Role) -> DisaggSnapshot:
@@ -281,7 +339,9 @@ def _parse_dynamo(text: str, url: str, role: Role) -> DisaggSnapshot:
     base = snap.as_dict()
     base.pop("endpoint")
     base.pop("scraped_at")
-    base["dynamo_block_residency_seconds"] = histogram_avg(metrics, _DYNAMO_RESIDENCY_PREFIX)
+    base["dynamo_block_residency_seconds"] = histogram_avg(
+        metrics, _DYNAMO_RESIDENCY_PREFIX
+    )
     return DisaggSnapshot(
         endpoint=snap.endpoint,
         scraped_at=snap.scraped_at,
@@ -359,6 +419,21 @@ def _lookup_metric(
         ):
             return sample.value
     return None
+
+
+def _labeled_metric(
+    samples: list[LabeledSample], name: str, labels: dict[str, str]
+) -> float | None:
+    values = [
+        sample.value
+        for sample in samples
+        if sample.name == name and all(sample.labels.get(key) == value for key, value in labels.items())
+    ]
+    return sum(values) if values else None
+
+
+def _as_int(value: float | None) -> int | None:
+    return int(value) if value is not None else None
 
 
 def _parse_selector(raw: str) -> dict[str, str]:

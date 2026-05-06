@@ -36,9 +36,7 @@ def test_lmcache_prometheus_fixture_parses_normalized_fields() -> None:
 
 
 def test_lmcache_adapter_snapshot_exposes_normalized_fields() -> None:
-    snap = _parse_lmcache(
-        (FIXTURES / "full.prom").read_text(encoding="utf-8"), url="http://lmcache", role="transfer"
-    )
+    snap = _parse_lmcache((FIXTURES / "full.prom").read_text(encoding="utf-8"), url="http://lmcache", role="transfer")
 
     assert snap.endpoint.engine == "lmcache"
     assert snap.endpoint.connector == "nixl"
@@ -49,12 +47,43 @@ def test_lmcache_adapter_snapshot_exposes_normalized_fields() -> None:
     assert snap.scrape_error == ""
 
 
+def test_lmcache_mp_prometheus_fixture_parses_normalized_fields() -> None:
+    metrics = parse_lmcache_prometheus((FIXTURES / "mp.prom").read_text(encoding="utf-8"))
+
+    assert metrics.lmcache_enabled is True
+    assert metrics.lmcache_mp_mode_enabled is True
+    assert metrics.lmcache_connector_type == "LMCacheMPConnector"
+    assert metrics.lmcache_lookup_requested_tokens == 10000
+    assert metrics.lmcache_lookup_hit_tokens == 6200
+    assert metrics.lmcache_hit_count == 6200
+    assert metrics.lmcache_miss_count == 3800
+    assert metrics.lmcache_hit_rate == 0.62
+    assert metrics.lmcache_eviction_count == 3
+    assert metrics.lmcache_tier_cpu_bytes == 2147483648
+    assert metrics.lmcache_l1_memory_usage_bytes == 2147483648
+    assert metrics.lmcache_l2_store_completed == 7
+    assert metrics.lmcache_l2_store_failed_keys == 1
+    assert metrics.lmcache_event_bus_queue_depth == 0
+    assert metrics.lmcache_event_bus_dropped_events_total == 0
+
+
+def test_lmcache_real_modal_mp_slice_parses_storage_and_l0_fields() -> None:
+    metrics = parse_lmcache_prometheus((FIXTURES / "mp_modal_real_slice.prom").read_text(encoding="utf-8"))
+
+    assert metrics.lmcache_enabled is True
+    assert metrics.lmcache_mp_mode_enabled is True
+    assert metrics.lmcache_connector_type == "LMCacheMPConnector"
+    assert metrics.lmcache_sm_read_requests == 149
+    assert metrics.lmcache_sm_read_succeed_keys == 3335
+    assert metrics.lmcache_sm_write_failed_keys == 1655
+    assert metrics.lmcache_l1_read_keys == 3545
+    assert metrics.lmcache_l1_evicted_keys == 1650
+    assert metrics.lmcache_l0_block_lifetime_seconds is not None
+    assert metrics.lmcache_l0_block_lifetime_seconds > 400
+
+
 def test_lmcache_unknown_metrics_are_preserved() -> None:
-    snap = _parse_lmcache(
-        (FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"),
-        url="http://lmcache",
-        role="prefill",
-    )
+    snap = _parse_lmcache((FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"), url="http://lmcache", role="prefill")
 
     assert snap.lmcache_hit_rate == 0.625
     assert snap.lmcache_tier_cpu_bytes == 1024
@@ -95,9 +124,7 @@ def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:
                 "topology": {"cache_mode": "lmcache-cpu"},
                 "completion": {"success_rate": 1.0},
                 "metrics": {"p99_ttft": 1.2},
-                "artifacts": {
-                    "inferguard_bench_metrics_timeline_jsonl": "cells/lmcache/metrics_timeline.jsonl"
-                },
+                "artifacts": {"inferguard_bench_metrics_timeline_jsonl": "cells/lmcache/metrics_timeline.jsonl"},
             },
         ],
         "findings": [],
