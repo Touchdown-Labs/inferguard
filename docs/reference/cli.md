@@ -86,18 +86,36 @@ inferguard observability-coverage \
 ```
 
 Coverage accounting remains **58 / 100** until a live packet proves the missing
-signals. Use these exact next commands when updating endpoint, signal, or rule
-status:
+signals. The active score source is
+`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`,
+which supersedes the earlier docs 188/189/190 trackers.
+
+Run Packet A from the full InferGuard repo checkout, not from the old
+Touchdown-Labs OSS mirror:
+
+```bash
+cd /Users/chen/Projects/inferguard
+python scripts/lmcache_mp_packet_commands.py
+modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
+```
+
+B1 status as of 2026-05-07: the previous pinned-package blocker is
+addressed by local-source Modal packaging, so the runner now targets the current
+InferGuard repo contents. B1 still remains unscored until a live Packet A run is
+collected, replayed through the report commands, imported as compact fixtures,
+and pinned by passing tests.
+
+Use these exact next commands when updating endpoint, signal, or rule status:
 
 | Lane | Status now | Missing proof | Exact next command |
 | --- | --- | --- | --- |
 | Safe MP HTTP endpoints | partial | Live captures for root, config, version, quota, threads, periodic threads, and periodic thread health. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
-| MP Prometheus signals | partial | Live L2, nonzero lookup, sampled lifecycle, and throughput packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-lmcache-mode mp` |
+| MP Prometheus signals | partial | Live L2, nonzero lookup, sampled lifecycle, and throughput packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-mode mp` |
 | Embedded LMCache signals | partial | Live vLLM embedded and SGLang `--enable-lmcache` fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
 | Trace, OTel, replay, lookup-hash evidence | partial | Real `.lct`, collector OTel export, replay output, and live lookup-hash JSONL. | `inferguard collect-lmcache --output-dir "$PACKET_DIR" --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
 | Log, P2P, and PD evidence | partial | Live MP logs plus two-engine P2P and prefiller/decoder packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
-| Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/bottleneck_diagnosis.json"` |
-| Packet A score gate | partial | Clean live vLLM + standalone LMCache MP packet imported as compact fixtures. | `modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+| Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
+| Packet A score gate | partial | Local-source Modal packaging is in place; B1 still needs clean live vLLM + standalone LMCache MP artifacts imported as compact fixtures. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
 
 Current source-backed caveats:
 
@@ -141,6 +159,8 @@ Use this exact status language in CLI output reviews and release notes:
 Full docs/CLI closeout command set:
 
 ```bash
+cd /Users/chen/Projects/inferguard
+python scripts/lmcache_mp_packet_commands.py
 modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
 
 inferguard collect-lmcache \
@@ -188,8 +208,9 @@ inferguard observability-coverage \
   --expect-lmcache-mode mp \
   --json
 
-inferguard diagnose-bottleneck "$JOB_DIR" \
-  --output "$PACKET_DIR/bottleneck_diagnosis.json"
+inferguard diagnose-bottleneck \
+  --job-dir "$JOB_DIR" \
+  --output-dir "$PACKET_DIR/diagnose-bottleneck"
 ```
 
 Every 100% checklist update must account for these metric families:

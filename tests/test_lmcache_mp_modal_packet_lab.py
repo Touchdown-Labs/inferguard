@@ -13,17 +13,37 @@ def _load_lab_module():
         return sys.modules[module_name]
 
     class _FakeImage:
+        def __init__(self):
+            self.calls = []
+
         @classmethod
-        def debian_slim(cls, **_kwargs):
-            return cls()
+        def debian_slim(cls, **kwargs):
+            image = cls()
+            image.calls.append(("debian_slim", (), kwargs))
+            return image
 
-        def apt_install(self, *_args):
+        def apt_install(self, *args):
+            self.calls.append(("apt_install", args, {}))
             return self
 
-        def pip_install(self, *_args):
+        def pip_install(self, *args):
+            self.calls.append(("pip_install", args, {}))
             return self
 
-        def env(self, _env):
+        def add_local_file(self, **kwargs):
+            self.calls.append(("add_local_file", (), kwargs))
+            return self
+
+        def add_local_dir(self, **kwargs):
+            self.calls.append(("add_local_dir", (), kwargs))
+            return self
+
+        def run_commands(self, *args):
+            self.calls.append(("run_commands", args, {}))
+            return self
+
+        def env(self, env):
+            self.calls.append(("env", (env,), {}))
             return self
 
     class _FakeVolume:
@@ -45,7 +65,7 @@ def _load_lab_module():
             return lambda fn: fn
 
     fake_modal = types.SimpleNamespace(Image=_FakeImage, Volume=_FakeVolume, App=_FakeApp)
-    sys.modules.setdefault("modal", fake_modal)
+    sys.modules["modal"] = fake_modal
 
     path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_mp_modal_packet_lab.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -55,6 +75,55 @@ def _load_lab_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def test_modal_image_installs_current_local_inferguard_source() -> None:
+    lab = _load_lab_module()
+
+    assert not hasattr(lab, "INFERGUARD_PACKAGE")
+    assert lab.REPO_ROOT == Path(__file__).resolve().parents[1]
+    assert lab.MODAL_INFERGUARD_SOURCE == "/opt/inferguard"
+    assert lab.MODAL_INFERGUARD_FILES == ("pyproject.toml", "README.md", "LICENSE")
+    assert lab.MODAL_INFERGUARD_PACKAGE_DIR == "src/inferguard"
+    assert lab.INFERGUARD_LOCAL_INSTALL_COMMAND == "python -m pip install -e /opt/inferguard"
+
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    assert "inferguard" not in pip_install_args
+    assert not any("git+https://github.com/Touchdown-Labs/inferguard" in arg for arg in pip_install_args)
+
+    add_local_files = [kwargs for name, _args, kwargs in calls if name == "add_local_file"]
+    assert add_local_files == [
+        {
+            "local_path": str(lab.REPO_ROOT / "pyproject.toml"),
+            "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/pyproject.toml",
+            "copy": True,
+        },
+        {
+            "local_path": str(lab.REPO_ROOT / "README.md"),
+            "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/README.md",
+            "copy": True,
+        },
+        {
+            "local_path": str(lab.REPO_ROOT / "LICENSE"),
+            "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/LICENSE",
+            "copy": True,
+        },
+    ]
+    add_local_dir = next(kwargs for name, _args, kwargs in calls if name == "add_local_dir")
+    assert add_local_dir == {
+        "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
+        "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
+        "copy": True,
+    }
+    assert add_local_dir["local_path"] != str(lab.REPO_ROOT)
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+    assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
+
+    call_names = [name for name, _args, _kwargs in calls]
+    assert call_names.index("add_local_file") > call_names.index("pip_install")
+    assert call_names.index("add_local_dir") > call_names.index("add_local_file")
+    assert call_names.index("run_commands") > call_names.index("add_local_dir")
 
 
 def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) -> None:

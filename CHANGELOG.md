@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- Aligned LMCache coverage docs and CLI references to SDLC 195 as the active
+  58/100 score source, pointed operators at the full repo Modal packet runner in
+  `/Users/chen/Projects/inferguard`, normalized score-moving snippets to the
+  current CLI flags, and clarified that local-source Modal packaging addressed
+  the previous pinned-package blocker while B1 still needs live proof.
+
 ## [0.7.1] - 2026-05-04
 
 ### Fixed

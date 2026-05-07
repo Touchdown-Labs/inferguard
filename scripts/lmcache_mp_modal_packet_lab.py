@@ -51,11 +51,11 @@ TRACE_REPLAY_DIR = "trace-replay"
 LOOKUP_HASH_DIR = "lookup_hashes"
 L2_CONFIG_FILE = "lmcache_l2_config.json"
 
-INFERGUARD_PACKAGE = (
-    "inferguard @ "
-    "git+https://github.com/Touchdown-Labs/inferguard.git@"
-    "cf1d669ad5eabcffd6eac25b903f9f348f8b6308"
-)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
+MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
+MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
+INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
@@ -68,8 +68,28 @@ image = (
         "hf-transfer",
         "huggingface-hub",
         "nvidia-cuda-runtime-cu12",
-        INFERGUARD_PACKAGE,
     )
+    .add_local_file(
+        local_path=str(REPO_ROOT / "pyproject.toml"),
+        remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
+        copy=True,
+    )
+    .add_local_file(
+        local_path=str(REPO_ROOT / "README.md"),
+        remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
+        copy=True,
+    )
+    .add_local_file(
+        local_path=str(REPO_ROOT / "LICENSE"),
+        remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
+        copy=True,
+    )
+    .add_local_dir(
+        local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
+        remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
+        copy=True,
+    )
+    .run_commands(INFERGUARD_LOCAL_INSTALL_COMMAND)
     .env(
         {
             "HF_HUB_ENABLE_HF_TRANSFER": "1",
