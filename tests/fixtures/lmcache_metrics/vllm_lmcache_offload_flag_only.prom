@@ -1,0 +1,6 @@
+# vLLM launch/config evidence for the LMCache offload flag path without embedded LMCache metrics.
+vllm:cache_config_info{model_name="mock-dsv4",kv_role="kv_both",kv_offloading_backend="lmcache"} 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 20
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5

@@ -1,0 +1,15 @@
+# SGLang HiCache evidence only. This is not LMCache compatibility proof.
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 1000
+sglang:generation_tokens_total 250
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.55
+sglang:token_usage 0.64
+sglang:hicache_l1_hit_count_total 900
+sglang:hicache_l2_hit_count_total 120
+sglang:hicache_l3_hit_count_total 30
+sglang:hicache_lookup_count_total 1100
+sglang:hicache_l2_bytes 4294967296
+sglang:hicache_l3_bytes 8589934592

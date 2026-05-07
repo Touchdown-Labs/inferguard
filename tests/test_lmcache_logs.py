@@ -94,9 +94,54 @@ INFO cache warming finished
         "prefetch_complete": 0,
         "p2p_peer": 0,
         "p2p_transfer": 0,
+        "p2p_transfer_failure": 0,
+        "p2p_transfer_speed": 0,
         "pd_sender": 0,
         "pd_receiver": 0,
+        "pd_role_mismatch": 0,
+        "pd_stall": 0,
+        "nixl_proxy": 0,
+        "nixl_request": 0,
         "health_startup": 0,
     }
     assert report["mode_candidates"] == []
     assert report["config"]["connectors"] == []
+
+
+def test_parse_lmcache_logs_extracts_p2p_failures_speed_and_nixl_request_findings() -> None:
+    report = parse_lmcache_logs(
+        """
+WARN p2p transfer failed request_id=req-7 peer=decode-1 error=connection refused retry=1
+INFO P2P transfer bandwidth 12.5 GB/s peer=decode-1 tokens=8192
+INFO NIXL proxy started for disaggregated prefill port=7676
+INFO NIXL transfer request request_id=req-8 state=queued
+"""
+    )
+
+    assert report["event_counts"]["p2p_transfer_failure"] == 1
+    assert report["event_counts"]["p2p_transfer_speed"] == 1
+    assert report["event_counts"]["nixl_proxy"] == 1
+    assert report["event_counts"]["nixl_request"] == 1
+    assert report["numeric_hints"]["p2p_transfer_speed"][0]["value"] == 12.5
+    assert report["numeric_hints"]["p2p_transfer_speed"][0]["unit"] == "GB/s"
+    codes = {finding["code"] for finding in report["findings"]}
+    assert "lmcache_log_p2p_transfer_failure" in codes
+    assert "lmcache_log_p2p_transfer_speed_hint" in codes
+    assert "lmcache_log_nixl_proxy_indicator" in codes
+    assert "lmcache_log_nixl_request_indicator" in codes
+    assert {finding["evidence_status"] for finding in report["findings"]} == {"parser_only"}
+    assert report["mode_candidates"] == ["disaggregated_prefill", "p2p"]
+
+
+def test_parse_lmcache_logs_extracts_pd_role_mismatch_and_stall_findings() -> None:
+    report = parse_lmcache_logs(
+        """
+ERROR NIXL PD role mismatch expected prefill got decode kv_role=kv_consumer endpoint=prefill-a
+WARN disaggregated prefill stalled waiting for decode response request_id=req-9 timeout_ms=5000
+"""
+    )
+
+    assert report["event_counts"]["pd_role_mismatch"] == 1
+    assert report["event_counts"]["pd_stall"] == 1
+    codes = [finding["code"] for finding in report["findings"]]
+    assert codes == ["lmcache_log_pd_role_mismatch", "lmcache_log_pd_stall"]

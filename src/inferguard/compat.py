@@ -85,8 +85,23 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lmcache_mp", "l0_lifecycle", ("lmcache_mp_l0_block_*_seconds*",), required_when="sampled"
     ),
     MetricFamilySpec("lmcache_mp", "real_reuse", ("lmcache_mp_real_reuse_gap_*",), required_when="sampled"),
-    MetricFamilySpec("lmcache_mp", "l2_counters", ("lmcache_mp_l2_*",), required_when="l2_configured"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l2_counters",
+        (
+            "lmcache_mp_l2_store_*_total",
+            "lmcache_mp_l2_prefetch_*_total",
+            "lmcache_mp_l2_load_completed_total",
+        ),
+        required_when="l2_configured",
+    ),
     MetricFamilySpec("lmcache_mp", "l2_failures", ("lmcache_mp_l2_*_failure*",), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l2_throughput",
+        ("lmcache_mp_l2_store_throughput_gbs*", "lmcache_mp_l2_load_throughput_gbs*"),
+        required_when="l2_configured",
+    ),
     MetricFamilySpec(
         "lmcache_mp", "l0_l1_throughput", ("lmcache_mp_l0_l1_*_throughput_gbs*",), required_when="sampled"
     ),
@@ -100,6 +115,16 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp_inflight_load_memory_usage_bytes",
         ),
         required_when="optional",
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l2_inflight_gauges",
+        (
+            "lmcache_mp_active_prefetch_jobs",
+            "lmcache_mp_num_inflight_l2_*",
+            "lmcache_mp_inflight_load_memory_usage_bytes",
+        ),
+        required_when="l2_configured",
     ),
     MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*",), required_when="optional"),
     MetricFamilySpec(
@@ -246,9 +271,13 @@ def build_compat_report(
         samples,
         mp_observability=mp_observability_report,
     )
+    l2_summary = _l2_summary(samples)
+    cacheblend_summary = _cacheblend_summary(samples)
+    diagnostic_findings.extend(_architecture_diagnostic_findings(architecture))
     diagnostic_findings.extend(
         _evidence_diagnostic_findings(
             lmcache_http_evidence=lmcache_http_evidence,
+            lmcache_log_evidence=lmcache_log_evidence,
             lmcache_trace_evidence=lmcache_trace_evidence,
             lmcache_otel_evidence=lmcache_otel_evidence,
             mp_observability=mp_observability_report,
@@ -291,6 +320,8 @@ def build_compat_report(
             ),
         },
         "lmcache_mp_observability": mp_observability_report,
+        "lmcache_l2_summary": l2_summary,
+        "lmcache_cacheblend_summary": cacheblend_summary,
         "lmcache_http_evidence": lmcache_http_evidence,
         "lmcache_log_evidence": lmcache_log_evidence,
         "lmcache_trace_evidence": lmcache_trace_evidence,
@@ -526,12 +557,52 @@ def _architecture_detection(
     names = {sample.name for sample in samples}
     has_vllm = any(name.startswith("vllm:") for name in names)
     has_sglang = any(name.startswith("sglang:") for name in names)
+    connector_label_keys = {
+        "connector",
+        "kv_connector",
+        "cache_connector",
+        "lmcache_connector",
+        "kv_connector_class",
+    }
+    cache_label_keys = {
+        "cache_backend",
+        "cache_class",
+        "radix_cache",
+        "radix_cache_class",
+        "cache_type",
+    }
     connector_labels = sorted(
         {
             str(value)
             for sample in samples
             for key, value in sample.labels.items()
-            if key in {"connector", "kv_connector"} and value
+            if key in connector_label_keys and value
+        }
+    )
+    cache_labels = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in cache_label_keys and value
+        }
+    )
+    offload_backend_labels = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"kv_offloading_backend", "kv_offload_backend", "offloading_backend"}
+            and value
+        }
+    )
+    sglang_enable_lmcache_labels = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"enable_lmcache", "lmcache_enabled", "sglang_enable_lmcache"}
+            and value
         }
     )
     has_mp_connector = "LMCacheMPConnector" in connector_labels
@@ -539,10 +610,23 @@ def _architecture_detection(
         connector in {"LMCacheConnectorV1", "LMCacheConnectorV1Dynamic"}
         for connector in connector_labels
     )
+    has_vllm_lmcache_offload_backend = any(
+        value.lower() == "lmcache" for value in offload_backend_labels
+    )
     has_stale_lmcache_connector = "LMCacheConnector" in connector_labels
     has_sglang_lmcache_connector = any(
         connector in {"LMCacheLayerwiseConnector", "LMCacheConnector"}
         for connector in connector_labels
+    )
+    has_sglang_lmcradix_cache = "LMCRadixCache" in cache_labels
+    has_sglang_enable_lmcache = any(
+        value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels
+    ) or "sglang:lmcache_enabled" in names
+    has_sglang_hicache_metrics = any(name.startswith("sglang:hicache_") for name in names)
+    has_sglang_lmcache_signal = (
+        has_sglang_lmcache_connector
+        or has_sglang_lmcradix_cache
+        or has_sglang_enable_lmcache
     )
     label = "unknown"
     confidence = "not_proven"
@@ -550,13 +634,17 @@ def _architecture_detection(
     if has_vllm and (observed_mp_like or has_mp_connector):
         label = "vllm_mp_lmcache"
         confidence = "measured" if observed_mp_like and has_mp_connector else "inferred"
-    elif has_vllm and (observed_lmcache_embedded or has_vllm_embedded_connector):
+    elif has_vllm and (
+        observed_lmcache_embedded
+        or has_vllm_embedded_connector
+        or has_vllm_lmcache_offload_backend
+    ):
         label = "vllm_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
     elif has_sglang and observed_mp_like:
         label = "sglang_mp_lmcache_candidate"
         confidence = "inferred"
-    elif has_sglang and (observed_lmcache_embedded or has_sglang_lmcache_connector):
+    elif has_sglang and (observed_lmcache_embedded or has_sglang_lmcache_signal):
         label = "sglang_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
     elif observed_mp_like:
@@ -573,13 +661,19 @@ def _architecture_detection(
         "lmcache_embedded_metrics": observed_lmcache_embedded,
         "lmcache_mp_connector_label": has_mp_connector,
         "vllm_embedded_connector_label": has_vllm_embedded_connector,
+        "vllm_lmcache_offload_backend_label": has_vllm_lmcache_offload_backend,
         "sglang_lmcache_connector_label": has_sglang_lmcache_connector,
+        "sglang_enable_lmcache_label": has_sglang_enable_lmcache,
+        "sglang_lmcradix_cache_label": has_sglang_lmcradix_cache,
+        "sglang_hicache_metrics": has_sglang_hicache_metrics,
         "stale_lmcache_connector_label": has_stale_lmcache_connector,
     }
     return {
         "label": label,
         "claim_status": confidence,
         "connector_labels": connector_labels,
+        "cache_labels": cache_labels,
+        "offload_backend_labels": offload_backend_labels,
         "signals": signals,
     }
 
@@ -837,6 +931,66 @@ def _diagnostic_findings(
                 "recommendation": "Check the configured L2 adapter, backend throughput, credentials, and per-adapter in-flight gauges.",
             }
         )
+    l2_store_tasks = _sum_matching(samples, "lmcache_mp_l2_store_tasks_total")
+    l2_store_completed = _sum_matching(samples, "lmcache_mp_l2_store_completed_total")
+    inflight_l2_stores = _sum_matching(samples, "lmcache_mp_num_inflight_l2_stores")
+    if inflight_l2_stores > 0 and (l2_store_completed <= 0 or l2_store_completed < l2_store_tasks):
+        findings.append(
+            {
+                "code": "lmcache_mp_l2_store_backlog",
+                "severity": "warning",
+                "message": "LMCache MP reports in-flight L2 stores while completed store counters lag submitted work.",
+                "metrics": {
+                    "lmcache_mp_num_inflight_l2_stores": inflight_l2_stores,
+                    "lmcache_mp_l2_store_tasks_total": l2_store_tasks,
+                    "lmcache_mp_l2_store_completed_total": l2_store_completed,
+                },
+                "recommendation": "Check the L2 adapter backend, queue depth, and per-adapter store completion rate.",
+            }
+        )
+    l2_load_tasks = _sum_matching(samples, "lmcache_mp_l2_prefetch_load_tasks_total")
+    l2_load_completed = _sum_matching(samples, "lmcache_mp_l2_load_completed_total")
+    l2_loaded_keys = _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total")
+    inflight_l2_loads = _sum_matching(samples, "lmcache_mp_num_inflight_l2_loads")
+    active_prefetch_jobs = _sum_matching(samples, "lmcache_mp_active_prefetch_jobs")
+    if (inflight_l2_loads > 0 or active_prefetch_jobs > 0) and (
+        l2_load_completed <= 0 or l2_loaded_keys < _sum_matching(samples, "lmcache_mp_l2_prefetch_load_keys_total")
+    ):
+        findings.append(
+            {
+                "code": "lmcache_mp_l2_load_backlog",
+                "severity": "warning",
+                "message": "LMCache MP reports in-flight L2 loads or active prefetch jobs while load completion counters lag.",
+                "metrics": {
+                    "lmcache_mp_num_inflight_l2_loads": inflight_l2_loads,
+                    "lmcache_mp_active_prefetch_jobs": active_prefetch_jobs,
+                    "lmcache_mp_l2_prefetch_load_tasks_total": l2_load_tasks,
+                    "lmcache_mp_l2_load_completed_total": l2_load_completed,
+                    "lmcache_mp_l2_prefetch_loaded_keys_total": l2_loaded_keys,
+                },
+                "recommendation": "Inspect L2 read latency, prefetch controller health, and adapter-specific in-flight load state.",
+            }
+        )
+    store_throughput = _hist_avg(samples, "lmcache_mp_l2_store_throughput_gbs")
+    load_throughput = _hist_avg(samples, "lmcache_mp_l2_load_throughput_gbs")
+    low_store = store_throughput is not None and store_throughput < 0.1 and inflight_l2_stores > 0
+    low_load = load_throughput is not None and load_throughput < 0.1 and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
+    if low_store or low_load:
+        findings.append(
+            {
+                "code": "lmcache_mp_l2_throughput_low",
+                "severity": "warning",
+                "message": "LMCache MP L2 throughput is low while L2 work is backlogged.",
+                "metrics": {
+                    "lmcache_mp_l2_store_throughput_gbs": store_throughput,
+                    "lmcache_mp_l2_load_throughput_gbs": load_throughput,
+                    "lmcache_mp_num_inflight_l2_stores": inflight_l2_stores,
+                    "lmcache_mp_num_inflight_l2_loads": inflight_l2_loads,
+                    "lmcache_mp_active_prefetch_jobs": active_prefetch_jobs,
+                },
+                "recommendation": "Compare the L2 backend against expected bandwidth and check object size, serialization, credentials, and network path.",
+            }
+        )
     cacheblend_failures = (
         _sum_matching(samples, "lmcache_blend_retrieve_failures*")
         + _sum_matching(samples, "lmcache_blend_store_pre_computed_failures*")
@@ -856,6 +1010,74 @@ def _diagnostic_findings(
                     "lmcache_blend_lookup_no_gpu_context_errors_total": cacheblend_no_gpu,
                 },
                 "recommendation": "Inspect CacheBlend GPU context propagation, fingerprint registration, and stale chunk eviction before attributing reuse economics.",
+            }
+        )
+    return findings
+
+
+def _architecture_diagnostic_findings(architecture: dict[str, Any]) -> list[dict[str, Any]]:
+    signals = architecture.get("signals") or {}
+    findings: list[dict[str, Any]] = []
+    if signals.get("stale_lmcache_connector_label"):
+        findings.append(
+            {
+                "code": "lmcache_stale_connector",
+                "severity": "warning",
+                "message": "LMCacheConnector was observed without the V1/Dynamic suffix.",
+                "metrics": {"connector_labels": architecture.get("connector_labels", [])},
+                "recommendation": (
+                    "Treat this as stale or pinned-stack evidence; current vLLM "
+                    "embedded LMCache should use LMCacheConnectorV1 or LMCacheConnectorV1Dynamic."
+                ),
+            }
+        )
+    if (
+        signals.get("vllm_lmcache_offload_backend_label")
+        and not signals.get("vllm_embedded_connector_label")
+        and not signals.get("lmcache_embedded_metrics")
+    ):
+        findings.append(
+            {
+                "code": "vllm_lmcache_offload_flag_without_metrics",
+                "severity": "info",
+                "message": "vLLM reports kv_offloading_backend=lmcache, but no embedded lmcache:* metrics were observed.",
+                "metrics": {"offload_backend_labels": architecture.get("offload_backend_labels", [])},
+                "recommendation": "Capture engine /metrics and inline LMCache logs before claiming embedded LMCache runtime behavior.",
+            }
+        )
+    if (
+        signals.get("sglang_hicache_metrics")
+        and not signals.get("sglang_lmcache_connector_label")
+        and not signals.get("sglang_enable_lmcache_label")
+        and not signals.get("lmcache_embedded_metrics")
+        and not signals.get("lmcache_mp_metrics")
+    ):
+        findings.append(
+            {
+                "code": "sglang_hicache_not_lmcache",
+                "severity": "info",
+                "message": (
+                    "SGLang HiCache metrics were observed, but no SGLang LMCache connector, "
+                    "--enable-lmcache, or lmcache:* evidence was present."
+                ),
+                "metrics": {"cache_labels": architecture.get("cache_labels", [])},
+                "recommendation": "Keep HiCache/local tier findings separate from embedded LMCache compatibility until LMCache-specific launch or metric evidence is captured.",
+            }
+        )
+    if (
+        architecture.get("label") == "sglang_embedded_lmcache"
+        and signals.get("sglang_hicache_metrics")
+    ):
+        findings.append(
+            {
+                "code": "sglang_lmcache_with_hicache_metrics",
+                "severity": "info",
+                "message": "SGLang embedded LMCache evidence and HiCache metrics are both present.",
+                "metrics": {
+                    "connector_labels": architecture.get("connector_labels", []),
+                    "cache_labels": architecture.get("cache_labels", []),
+                },
+                "recommendation": "Interpret HiCache tier counters as SGLang cache/storage context, not as standalone LMCache MP proof.",
             }
         )
     return findings
@@ -970,6 +1192,87 @@ def _sum_matching(samples: list[LabeledSample], pattern: str) -> float:
     return sum(sample.value for sample in samples if fnmatch.fnmatchcase(sample.name, pattern))
 
 
+def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
+    total = _sum_matching(samples, f"{base_name}_sum")
+    count = _sum_matching(samples, f"{base_name}_count")
+    if count <= 0:
+        return None
+    return total / count
+
+
+def _l2_summary(samples: list[LabeledSample]) -> dict[str, Any]:
+    store_throughput = _hist_avg(samples, "lmcache_mp_l2_store_throughput_gbs")
+    load_throughput = _hist_avg(samples, "lmcache_mp_l2_load_throughput_gbs")
+    store_tasks = _sum_matching(samples, "lmcache_mp_l2_store_tasks_total")
+    load_tasks = _sum_matching(samples, "lmcache_mp_l2_prefetch_load_tasks_total")
+    store_completed = _sum_matching(samples, "lmcache_mp_l2_store_completed_total")
+    load_completed = _sum_matching(samples, "lmcache_mp_l2_load_completed_total")
+    inflight_stores = _sum_matching(samples, "lmcache_mp_num_inflight_l2_stores")
+    inflight_loads = _sum_matching(samples, "lmcache_mp_num_inflight_l2_loads")
+    active_prefetch = _sum_matching(samples, "lmcache_mp_active_prefetch_jobs")
+    observed = any(
+        sample.name.startswith("lmcache_mp_l2_")
+        or sample.name in {
+            "lmcache_mp_num_inflight_l2_stores",
+            "lmcache_mp_num_inflight_l2_loads",
+            "lmcache_mp_inflight_load_memory_usage_bytes",
+            "lmcache_mp_active_prefetch_jobs",
+        }
+        for sample in samples
+    )
+    return {
+        "observed": observed,
+        "store_tasks": store_tasks,
+        "store_completed": store_completed,
+        "store_failed_keys": _sum_matching(samples, "lmcache_mp_l2_store_failed_keys_total"),
+        "prefetch_load_tasks": load_tasks,
+        "load_completed": load_completed,
+        "prefetch_loaded_keys": _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total"),
+        "prefetch_failed_keys": _sum_matching(samples, "lmcache_mp_l2_prefetch_failed_keys_total"),
+        "prefetch_failures": _sum_matching(samples, "lmcache_mp_l2_prefetch_failure_total"),
+        "num_inflight_l2_stores": inflight_stores,
+        "num_inflight_l2_loads": inflight_loads,
+        "active_prefetch_jobs": active_prefetch,
+        "inflight_load_memory_usage_bytes": _sum_matching(samples, "lmcache_mp_inflight_load_memory_usage_bytes"),
+        "store_backlog": inflight_stores > 0 and (store_completed <= 0 or store_completed < store_tasks),
+        "load_backlog": (inflight_loads > 0 or active_prefetch > 0) and (
+            load_completed <= 0
+            or _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total")
+            < _sum_matching(samples, "lmcache_mp_l2_prefetch_load_keys_total")
+        ),
+        "store_throughput_gbs": store_throughput,
+        "load_throughput_gbs": load_throughput,
+    }
+
+
+def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
+    lookup_requests = _sum_matching(samples, "lmcache_blend_lookup_requests*")
+    fingerprint_hits = _sum_matching(samples, "lmcache_blend_lookup_fingerprint_hits*")
+    storage_hits = _sum_matching(samples, "lmcache_blend_lookup_storage_hits*")
+    failures = (
+        _sum_matching(samples, "lmcache_blend_retrieve_failures*")
+        + _sum_matching(samples, "lmcache_blend_store_pre_computed_failures*")
+        + _sum_matching(samples, "lmcache_blend_store_final_failures*")
+    )
+    return {
+        "observed": any(sample.name.startswith("lmcache_blend_") for sample in samples),
+        "lookup_requests": lookup_requests,
+        "lookup_fingerprint_hits": fingerprint_hits,
+        "lookup_storage_hits": storage_hits,
+        "lookup_fingerprint_hit_rate": fingerprint_hits / lookup_requests if lookup_requests > 0 else None,
+        "lookup_storage_hit_rate": storage_hits / lookup_requests if lookup_requests > 0 else None,
+        "lookup_stale_chunks": _sum_matching(samples, "lmcache_blend_lookup_stale_chunks*"),
+        "lookup_no_gpu_context_errors": _sum_matching(samples, "lmcache_blend_lookup_no_gpu_context_errors*"),
+        "retrieve_requests": _sum_matching(samples, "lmcache_blend_retrieve_requests*"),
+        "retrieve_chunks": _sum_matching(samples, "lmcache_blend_retrieve_chunks*"),
+        "store_pre_computed_requests": _sum_matching(samples, "lmcache_blend_store_pre_computed_requests*"),
+        "store_final_requests": _sum_matching(samples, "lmcache_blend_store_final_requests*"),
+        "failures": failures,
+        "fingerprints_registered": _sum_matching(samples, "lmcache_blend_fingerprints_registered*"),
+        "chunks_evicted": _sum_matching(samples, "lmcache_blend_chunks_evicted*"),
+    }
+
+
 def _read_url(url: str, timeout_seconds: float) -> str:
     with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310
         return response.read().decode("utf-8", errors="replace")
@@ -1025,6 +1328,7 @@ def _evidence_failures(
 def _evidence_diagnostic_findings(
     *,
     lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_log_evidence: dict[str, Any] | None,
     lmcache_trace_evidence: dict[str, Any] | None,
     lmcache_otel_evidence: dict[str, Any] | None,
     mp_observability: dict[str, Any],
@@ -1038,6 +1342,22 @@ def _evidence_diagnostic_findings(
                     "severity": "warning",
                     "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy.",
                     "recommendation": "Inspect LMCache MP HTTP health/status and periodic thread evidence.",
+                }
+            )
+    for item in (lmcache_log_evidence or {}).get("findings", []) or []:
+        if isinstance(item, dict):
+            findings.append(
+                {
+                    "code": item.get("code") or "lmcache_log_evidence",
+                    "severity": item.get("severity") or "info",
+                    "message": item.get("message") or "LMCache log evidence was detected.",
+                    "metrics": {
+                        "category": item.get("category"),
+                        "event_count": item.get("event_count"),
+                        "numeric_hints": item.get("numeric_hints", []),
+                    },
+                    "evidence_status": item.get("evidence_status") or "parser_only",
+                    "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
                 }
             )
     config = mp_observability.get("config") or {}

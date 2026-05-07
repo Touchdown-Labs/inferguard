@@ -501,47 +501,47 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_mp_real_reuse_gap_chunks", "type": "hist_avg"},
     ),
     "lmcache_l2_store_tasks": (
-        {"name": "lmcache_mp_l2_store_tasks_total", "type": "int"},
+        {"name": "lmcache_mp_l2_store_tasks_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_store_keys": (
-        {"name": "lmcache_mp_l2_store_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_store_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_store_completed": (
-        {"name": "lmcache_mp_l2_store_completed_total", "type": "int"},
+        {"name": "lmcache_mp_l2_store_completed_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_store_succeeded_keys": (
-        {"name": "lmcache_mp_l2_store_succeeded_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_store_succeeded_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_store_failed_keys": (
-        {"name": "lmcache_mp_l2_store_failed_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_store_failed_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_lookups": (
-        {"name": "lmcache_mp_l2_prefetch_lookups_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_lookups_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_lookup_keys": (
-        {"name": "lmcache_mp_l2_prefetch_lookup_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_lookup_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_hit_keys": (
-        {"name": "lmcache_mp_l2_prefetch_hit_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_hit_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_load_tasks": (
-        {"name": "lmcache_mp_l2_prefetch_load_tasks_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_load_tasks_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_load_keys": (
-        {"name": "lmcache_mp_l2_prefetch_load_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_load_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_loaded_keys": (
-        {"name": "lmcache_mp_l2_prefetch_loaded_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_loaded_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_failed_keys": (
-        {"name": "lmcache_mp_l2_prefetch_failed_keys_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_failed_keys_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_prefetch_failure": (
-        {"name": "lmcache_mp_l2_prefetch_failure_total", "type": "int"},
-        {"name": "lmcache_mp_l2_prefetch_failure", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_failure_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_mp_l2_prefetch_failure", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_load_completed": (
-        {"name": "lmcache_mp_l2_load_completed_total", "type": "int"},
+        {"name": "lmcache_mp_l2_load_completed_total", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_l2_store_throughput_gbs": (
         {"name": "lmcache_mp_l2_store_throughput_gbs", "type": "hist_avg"},
@@ -559,16 +559,16 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_mp_num_chunks_loaded_total", "type": "int"},
     ),
     "lmcache_active_prefetch_jobs": (
-        {"name": "lmcache_mp_active_prefetch_jobs", "type": "int"},
+        {"name": "lmcache_mp_active_prefetch_jobs", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_num_inflight_l2_stores": (
-        {"name": "lmcache_mp_num_inflight_l2_stores", "type": "int"},
+        {"name": "lmcache_mp_num_inflight_l2_stores", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_num_inflight_l2_loads": (
-        {"name": "lmcache_mp_num_inflight_l2_loads", "type": "int"},
+        {"name": "lmcache_mp_num_inflight_l2_loads", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_inflight_load_memory_usage_bytes": (
-        {"name": "lmcache_mp_inflight_load_memory_usage_bytes", "type": "int"},
+        {"name": "lmcache_mp_inflight_load_memory_usage_bytes", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_event_bus_queue_depth": (
         {"name": "lmcache_mp_event_bus_queue_depth", "type": "int"},
@@ -611,68 +611,68 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_config_info", "label": "cache_salt", "type": "bool_label"},
     ),
     "lmcache_blend_lookup_requests": (
-        {"name": "lmcache_blend_lookup_requests_total", "type": "int"},
-        {"name": "lmcache_blend_lookup_requests", "type": "int"},
+        {"name": "lmcache_blend_lookup_requests_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_requests", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_lookup_fingerprint_hits": (
-        {"name": "lmcache_blend_lookup_fingerprint_hits_total", "type": "int"},
-        {"name": "lmcache_blend_lookup_fingerprint_hits", "type": "int"},
+        {"name": "lmcache_blend_lookup_fingerprint_hits_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_fingerprint_hits", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_lookup_storage_hits": (
-        {"name": "lmcache_blend_lookup_storage_hits_total", "type": "int"},
-        {"name": "lmcache_blend_lookup_storage_hits", "type": "int"},
+        {"name": "lmcache_blend_lookup_storage_hits_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_storage_hits", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_lookup_stale_chunks": (
-        {"name": "lmcache_blend_lookup_stale_chunks_total", "type": "int"},
-        {"name": "lmcache_blend_lookup_stale_chunks", "type": "int"},
+        {"name": "lmcache_blend_lookup_stale_chunks_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_stale_chunks", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_lookup_no_gpu_context_errors": (
-        {"name": "lmcache_blend_lookup_no_gpu_context_errors_total", "type": "int"},
-        {"name": "lmcache_blend_lookup_no_gpu_context_errors", "type": "int"},
+        {"name": "lmcache_blend_lookup_no_gpu_context_errors_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_no_gpu_context_errors", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_retrieve_requests": (
-        {"name": "lmcache_blend_retrieve_requests_total", "type": "int"},
-        {"name": "lmcache_blend_retrieve_requests", "type": "int"},
+        {"name": "lmcache_blend_retrieve_requests_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_retrieve_requests", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_retrieve_chunks": (
-        {"name": "lmcache_blend_retrieve_chunks_total", "type": "int"},
-        {"name": "lmcache_blend_retrieve_chunks", "type": "int"},
+        {"name": "lmcache_blend_retrieve_chunks_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_retrieve_chunks", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_retrieve_failures": (
-        {"name": "lmcache_blend_retrieve_failures_total", "type": "int"},
-        {"name": "lmcache_blend_retrieve_failures", "type": "int"},
+        {"name": "lmcache_blend_retrieve_failures_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_retrieve_failures", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_pre_computed_requests": (
-        {"name": "lmcache_blend_store_pre_computed_requests_total", "type": "int"},
-        {"name": "lmcache_blend_store_pre_computed_requests", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_requests_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_pre_computed_requests", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_pre_computed_chunks": (
-        {"name": "lmcache_blend_store_pre_computed_chunks_total", "type": "int"},
-        {"name": "lmcache_blend_store_pre_computed_chunks", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_chunks_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_pre_computed_chunks", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_pre_computed_failures": (
-        {"name": "lmcache_blend_store_pre_computed_failures_total", "type": "int"},
-        {"name": "lmcache_blend_store_pre_computed_failures", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_failures_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_pre_computed_failures", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_final_requests": (
-        {"name": "lmcache_blend_store_final_requests_total", "type": "int"},
-        {"name": "lmcache_blend_store_final_requests", "type": "int"},
+        {"name": "lmcache_blend_store_final_requests_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_final_requests", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_final_chunks": (
-        {"name": "lmcache_blend_store_final_chunks_total", "type": "int"},
-        {"name": "lmcache_blend_store_final_chunks", "type": "int"},
+        {"name": "lmcache_blend_store_final_chunks_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_final_chunks", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_store_final_failures": (
-        {"name": "lmcache_blend_store_final_failures_total", "type": "int"},
-        {"name": "lmcache_blend_store_final_failures", "type": "int"},
+        {"name": "lmcache_blend_store_final_failures_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_store_final_failures", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_fingerprints_registered": (
-        {"name": "lmcache_blend_fingerprints_registered_total", "type": "int"},
-        {"name": "lmcache_blend_fingerprints_registered", "type": "int"},
+        {"name": "lmcache_blend_fingerprints_registered_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_fingerprints_registered", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_chunks_evicted": (
-        {"name": "lmcache_blend_chunks_evicted_total", "type": "int"},
-        {"name": "lmcache_blend_chunks_evicted", "type": "int"},
+        {"name": "lmcache_blend_chunks_evicted_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_chunks_evicted", "type": "int", "aggregate": "sum"},
     ),
 }
 
@@ -718,6 +718,16 @@ def _first_alias(samples: list[LabeledSample], aliases: tuple[dict[str, Any], ..
             if value is not None:
                 return value, {str(alias["name"])}
             continue
+        if alias.get("aggregate") == "sum":
+            selected = [
+                sample
+                for sample in samples
+                if sample.name == alias["name"] and _labels_match(sample, alias.get("labels") or {})
+            ]
+            if selected:
+                total = sum(_coerce(sample, alias) or 0 for sample in selected)
+                return total, {sample.name for sample in selected}
+            continue
         for sample in samples:
             if sample.name != alias["name"]:
                 continue
@@ -731,14 +741,14 @@ def _first_alias(samples: list[LabeledSample], aliases: tuple[dict[str, Any], ..
 
 
 def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
-    total = None
-    count = None
+    total = 0.0
+    count = 0.0
     for sample in samples:
         if sample.name == f"{base_name}_sum":
-            total = sample.value
+            total += sample.value
         elif sample.name == f"{base_name}_count":
-            count = sample.value
-    if total is None or count is None or count <= 0:
+            count += sample.value
+    if count <= 0:
         return None
     return total / count
 

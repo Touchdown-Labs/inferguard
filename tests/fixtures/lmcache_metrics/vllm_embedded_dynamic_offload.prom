@@ -1,0 +1,16 @@
+# vLLM embedded LMCache V1Dynamic path with the lmcache offload backend flag.
+vllm:cache_config_info{model_name="mock-dsv4",kv_connector="LMCacheConnectorV1Dynamic",kv_connector_module_path="lmcache.integration.vllm.lmcache_connector_v1",kv_role="kv_both",kv_offloading_backend="lmcache"} 1
+vllm:time_to_first_token_seconds_sum 2
+vllm:time_to_first_token_seconds_count 8
+vllm:prompt_tokens_total 2048
+vllm:generation_tokens_total 512
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.61
+vllm:kv_offload_total_bytes{transfer_type="GPU_to_CPU"} 4096
+vllm:simple_cpu_offload_used_blocks 4
+lmcache:connector_info{connector="LMCacheConnectorV1Dynamic"} 1
+lmcache:num_retrieve_requests 3
+lmcache:num_store_requests 4
+lmcache:num_requested_tokens 4096
+lmcache:num_hit_tokens 1536
+lmcache:local_cpu_hit_bytes 8192

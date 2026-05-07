@@ -1,0 +1,17 @@
+# SGLang embedded LMCache path through --enable-lmcache, LMCRadixCache, and LMCacheLayerwiseConnector.
+sglang:server_config_info{enable_lmcache="true",connector="LMCacheLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 1000
+sglang:generation_tokens_total 250
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.42
+sglang:token_usage 0.67
+sglang:hicache_l1_hit_count_total 20
+sglang:hicache_lookup_count_total 50
+lmcache:connector_info{connector="LMCacheLayerwiseConnector"} 1
+lmcache:num_retrieve_requests 5
+lmcache:num_store_requests 6
+lmcache:num_requested_tokens 1000
+lmcache:num_hit_tokens 420

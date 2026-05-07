@@ -82,6 +82,20 @@ inferguard observability-coverage \
   --json
 ```
 
+Coverage accounting remains **58 / 100** until a live packet proves the missing
+signals. Use these exact next commands when updating endpoint, signal, or rule
+status:
+
+| Lane | Status now | Missing proof | Exact next command |
+| --- | --- | --- | --- |
+| Safe MP HTTP endpoints | partial | Live captures for root, config, version, quota, threads, periodic threads, and periodic thread health. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
+| MP Prometheus signals | partial | Live L2, nonzero lookup, sampled lifecycle, and throughput packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-lmcache-mode mp` |
+| Embedded LMCache signals | partial | Live vLLM embedded and SGLang `--enable-lmcache` fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
+| Trace, OTel, replay, lookup-hash evidence | partial | Real `.lct`, collector OTel export, replay output, and live lookup-hash JSONL. | `inferguard collect-lmcache --output-dir "$PACKET_DIR" --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
+| Log, P2P, and PD evidence | partial | Live MP logs plus two-engine P2P and prefiller/decoder packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
+| Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/bottleneck_diagnosis.json"` |
+| Packet A score gate | partial | Clean live vLLM + standalone LMCache MP packet imported as compact fixtures. | `modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+
 Current source-backed caveats:
 
 - vLLM embedded LMCache uses `LMCacheConnectorV1` or

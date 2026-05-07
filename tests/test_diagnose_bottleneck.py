@@ -241,6 +241,42 @@ def test_lmcache_log_evidence_becomes_specific_diagnosis(tmp_path: Path) -> None
     assert "disaggregated_prefill" in diagnosis["metric_values"]["lmcache_log.mode_candidates"]
 
 
+def test_lmcache_log_parser_only_p2p_failure_becomes_specific_diagnosis(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_log_p2p_failure"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    (root / "metrics" / "lmcache_log_evidence.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-lmcache-logs/v1",
+                "event_counts": {"p2p_transfer_failure": 1, "pd_role_mismatch": 0},
+                "config": {"stale_lmcache_connector_seen": False},
+                "mode_candidates": ["p2p"],
+                "findings": [
+                    {
+                        "code": "lmcache_log_p2p_transfer_failure",
+                        "category": "p2p_transfer_failure",
+                        "severity": "warning",
+                        "message": "P2P transfer failed.",
+                        "event_count": 1,
+                        "evidence_status": "parser_only",
+                    }
+                ],
+                "numeric_hints": {"p2p_transfer_speed": []},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["rule_fired"] == "lmcache_log_p2p_transfer_failure"
+    assert diagnosis["claim_status"] == "inferred"
+    assert diagnosis["metric_values"]["lmcache_log.findings"][0]["evidence_status"] == "parser_only"
+
+
 def test_schema_version_locked() -> None:
     diagnosis = _diagnosis("prefill_bound")
 

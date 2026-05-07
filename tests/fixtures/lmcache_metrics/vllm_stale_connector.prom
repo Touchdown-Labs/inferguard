@@ -1,0 +1,10 @@
+# vLLM embedded LMCache stale v0-style connector evidence.
+vllm:cache_config_info{model_name="mock-dsv4",kv_connector="LMCacheConnector",kv_role="kv_both"} 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 20
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5
+lmcache:connector_info{connector="LMCacheConnector"} 1
+lmcache:num_retrieve_requests 1
+lmcache:num_requested_tokens 100
+lmcache:num_hit_tokens 10

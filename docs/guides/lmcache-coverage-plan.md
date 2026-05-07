@@ -380,28 +380,28 @@ These are the real MP HTTP endpoints confirmed from
 in the common package but is explicitly excluded from MP by
 `_MP_INCOMPATIBLE_MODULES`, so InferGuard should not require it for MP coverage.
 
-| Method | Path | Source | InferGuard support target |
-| --- | --- | --- | --- |
-| GET | `/` | `root_api.py` | Liveness evidence |
-| GET | `/api/healthcheck` | `healthcheck_api.py` | Health evidence and unhealthy reason |
-| GET | `/api/status` | `status_api.py` | Engine/storage status evidence |
-| POST | `/api/clear-cache` | `cache_api.py` | Record availability only; do not call automatically |
-| GET | `/conf` | `conf_api.py` | Config evidence |
-| GET | `/version` | `version_api.py` | Version evidence |
-| GET | `/lmc_version` | `version_api.py` | LMCache package version evidence |
-| GET | `/commit_id` | `version_api.py` | Build commit evidence |
-| GET | `/env` | inherited `env_api.py` | Optional debug evidence; redact before customer use |
-| GET | `/loglevel` | inherited `loglevel_api.py` | Record availability only; mutates when query includes `level` |
-| GET | `/metrics` | inherited `metrics_api.py` | Prometheus scrape |
-| POST | `/metrics/reset` | inherited `metrics_api.py` | Record availability only; do not call automatically |
-| GET | `/threads` | inherited `thread_api.py` | Thread dump evidence |
-| GET | `/periodic-threads` | inherited `periodic_thread_api.py` | Periodic thread status evidence |
-| GET | `/periodic-threads/{thread_name}` | inherited `periodic_thread_api.py` | Per-thread debug evidence |
-| GET | `/periodic-threads-health` | inherited `periodic_thread_api.py` | Periodic thread health evidence |
-| PUT | `/api/quota/{cache_salt}` | `quota_api.py` | Record availability only; do not call automatically |
-| GET | `/api/quota/{cache_salt}` | `quota_api.py` | Per-salt quota evidence |
-| DELETE | `/api/quota/{cache_salt}` | `quota_api.py` | Record availability only; do not call automatically |
-| GET | `/api/quota` | `quota_api.py` | Quota inventory evidence |
+| Method | Path | Source | Status | Missing proof | Exact next command |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/` | `root_api.py` | parser_only | Live MP packet liveness capture. | `curl -fsS "$LMCACHE_HTTP/" -o "$PACKET_DIR/lmcache_root.txt"` |
+| GET | `/api/healthcheck` | `healthcheck_api.py` | fixture_backed | Live MP packet health proof. | `curl -fsS "$LMCACHE_HTTP/api/healthcheck" -o "$PACKET_DIR/lmcache-health.json"` |
+| GET | `/api/status` | `status_api.py` | fixture_backed | Live MP packet status proof. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
+| POST | `/api/clear-cache` | `cache_api.py` | destructive_skipped | Skipped endpoint recorded in packet manifest. | `printf '%s\n' 'POST /api/clear-cache destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
+| GET | `/conf` | `conf_api.py` | parser_only | Live config capture with parsed fields. | `curl -fsS "$LMCACHE_HTTP/conf" -o "$PACKET_DIR/lmcache-conf.json"` |
+| GET | `/version` | `version_api.py` | fixture_backed | Live MP packet endpoint proof. | `curl -fsS "$LMCACHE_HTTP/version" -o "$PACKET_DIR/lmcache-version.txt"` |
+| GET | `/lmc_version` | `version_api.py` | fixture_backed | Live MP packet endpoint proof. | `curl -fsS "$LMCACHE_HTTP/lmc_version" -o "$PACKET_DIR/lmcache-lmc-version.txt"` |
+| GET | `/commit_id` | `version_api.py` | fixture_backed | Live MP packet endpoint proof. | `curl -fsS "$LMCACHE_HTTP/commit_id" -o "$PACKET_DIR/lmcache-commit-id.txt"` |
+| GET | `/env` | inherited `env_api.py` | missing | Opt-in redacted capture policy and fixture. | `curl -fsS "$LMCACHE_HTTP/env" -o "$PACKET_DIR/lmcache_env.raw.json"` |
+| GET | `/loglevel` | inherited `loglevel_api.py` | missing | Verify non-mutating form; never set level by default. | `curl -fsS "$LMCACHE_HTTP/loglevel" -o "$PACKET_DIR/lmcache_loglevel.json"` |
+| GET | `/metrics` | inherited `metrics_api.py` | fixture_backed | Live MP and embedded metric packets. | `curl -fsS "$LMCACHE_METRICS" -o "$PACKET_DIR/lmcache.prom"` |
+| POST | `/metrics/reset` | inherited `metrics_api.py` | destructive_skipped | Skipped endpoint recorded in packet manifest. | `printf '%s\n' 'POST /metrics/reset destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
+| GET | `/threads` | inherited `thread_api.py` | parser_only | Live thread dump summary. | `curl -fsS "$LMCACHE_HTTP/threads" -o "$PACKET_DIR/lmcache-threads.json"` |
+| GET | `/periodic-threads` | inherited `periodic_thread_api.py` | parser_only | Live periodic thread capture. | `curl -fsS "$LMCACHE_HTTP/periodic-threads" -o "$PACKET_DIR/lmcache-periodic-threads.json"` |
+| GET | `/periodic-threads/{thread_name}` | inherited `periodic_thread_api.py` | parser_only | Discovered or operator-provided live thread row. | `curl -fsS "$LMCACHE_HTTP/periodic-threads/$THREAD_NAME" -o "$PACKET_DIR/lmcache-periodic-thread-$THREAD_NAME.json"` |
+| GET | `/periodic-threads-health` | inherited `periodic_thread_api.py` | parser_only | Live periodic thread health capture. | `curl -fsS "$LMCACHE_HTTP/periodic-threads-health" -o "$PACKET_DIR/lmcache-periodic-threads-health.json"` |
+| PUT | `/api/quota/{cache_salt}` | `quota_api.py` | destructive_skipped | Skipped endpoint recorded; do not mutate quota. | `printf '%s\n' 'PUT /api/quota/{cache_salt} destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
+| GET | `/api/quota/{cache_salt}` | `quota_api.py` | parser_only | Per-salt quota live fixture. | `curl -fsS "$LMCACHE_HTTP/api/quota/$CACHE_SALT" -o "$PACKET_DIR/lmcache-quota-$CACHE_SALT.json"` |
+| DELETE | `/api/quota/{cache_salt}` | `quota_api.py` | destructive_skipped | Skipped endpoint recorded; do not mutate quota. | `printf '%s\n' 'DELETE /api/quota/{cache_salt} destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
+| GET | `/api/quota` | `quota_api.py` | fixture_backed | Live MP packet quota proof. | `curl -fsS "$LMCACHE_HTTP/api/quota" -o "$PACKET_DIR/lmcache-quota.json"` |
 
 ### Canonical LMCache MP Metrics To Support
 
@@ -409,24 +409,24 @@ Metric names below use the OpenTelemetry source name. In Prometheus, dots become
 underscores and counters usually gain a `_total` suffix. InferGuard should
 accept both exact scraped names and the OTel-to-Prometheus form.
 
-| Family | Metrics | Source | InferGuard support target |
-| --- | --- | --- | --- |
-| StorageManager counters | `lmcache_mp.sm_read_requests`, `lmcache_mp.sm_read_succeed_keys`, `lmcache_mp.sm_read_failed_keys`, `lmcache_mp.sm_write_requests`, `lmcache_mp.sm_write_succeed_keys`, `lmcache_mp.sm_write_failed_keys` | Official docs and `sm.py` | Parse, report, diagnose read/write failures |
-| L1 counters | `lmcache_mp.l1_read_keys`, `lmcache_mp.l1_write_keys`, `lmcache_mp.l1_evicted_keys` | Official docs and `l1.py` | Parse, report, diagnose eviction pressure |
-| L1 memory gauge | `lmcache_mp.l1_memory_usage_bytes` | Official docs and L1 gauge registration | Parse, report, diagnose no-plateau/leak and capacity pressure |
-| L1 failure counters | `lmcache_mp.l1_allocation_failure`, `lmcache_mp.l1_read_failure` | Source `l1_failures.py` | Add aliases/tests; diagnose OOM and read-lock/read-reserve failures |
-| L1 lifecycle histograms | `lmcache_mp.l1_chunk_lifetime_seconds`, `lmcache_mp.l1_chunk_idle_before_evict_seconds`, `lmcache_mp.l1_chunk_reuse_gap_seconds`, `lmcache_mp.l1_chunk_evict_reuse_gap_seconds` | Official docs and `l1_lifecycle.py` | Parse sampled histograms; do not require nonzero in every run |
-| Real reuse histograms | `lmcache_mp.real_reuse_gap_seconds`, `lmcache_mp.real_reuse_gap_chunks` | Official docs and `sm_lifecycle.py` | Parse by `cache_salt`; diagnose reuse interval and storage volume |
-| L2 counters | `lmcache_mp.l2_store_tasks`, `lmcache_mp.l2_store_keys`, `lmcache_mp.l2_store_completed`, `lmcache_mp.l2_store_succeeded_keys`, `lmcache_mp.l2_store_failed_keys`, `lmcache_mp.l2_load_completed`, `lmcache_mp.l2_prefetch_lookups`, `lmcache_mp.l2_prefetch_lookup_keys`, `lmcache_mp.l2_prefetch_hit_keys`, `lmcache_mp.l2_prefetch_load_tasks`, `lmcache_mp.l2_prefetch_load_keys`, `lmcache_mp.l2_prefetch_loaded_keys`, `lmcache_mp.l2_prefetch_failed_keys` | Official docs and `l2.py` | Parse/report only as required when L2 is configured |
-| L2 failure counter | `lmcache_mp.l2_prefetch_failure` | Source `l2_failures.py` | Add aliases/tests; diagnose L2 prefetch load failures |
-| Lookup hit-rate counters | `lmcache_mp.lookup_requested_tokens`, `lmcache_mp.lookup_hit_tokens` | Official docs and `lookup.py` | Parse by `model_name` and `cache_salt`; compute hit rate |
-| L0 lifecycle histograms | `lmcache_mp.l0_block_lifetime_seconds`, `lmcache_mp.l0_block_idle_before_evict_seconds`, `lmcache_mp.l0_block_reuse_gap_seconds` | Official docs and `l0_lifecycle.py` | Parse sampled GPU-block lifecycle metrics |
-| L0-L1 throughput histograms | `lmcache_mp.l0_l1_store_throughput_gbs`, `lmcache_mp.l0_l1_load_throughput_gbs` | Official docs and `l0_l1_throughput.py` | Parse sampled GPU↔CPU copy throughput |
-| L1-L2 throughput histograms | `lmcache_mp.l2_store_throughput_gbs`, `lmcache_mp.l2_load_throughput_gbs` | Official docs and `l2_throughput.py` | Parse by `l2_name`; diagnose slow backend path |
-| Engine counter | `lmcache_mp.num_chunks_loaded` | Official docs and `engine.py` | Parse by worker/model/salt |
-| Observable gauges | `lmcache_mp.active_prefetch_jobs`, `lmcache_mp.num_inflight_l2_stores`, `lmcache_mp.num_inflight_l2_loads`, `lmcache_mp.inflight_load_memory_usage_bytes` | Official docs and gauge registration | Parse point-in-time pressure and in-flight L2 state |
-| EventBus self-metrics | `lmcache_mp.event_bus.queue_depth`, `lmcache_mp.event_bus.drain_lag_seconds`, `lmcache_mp.event_bus.dropped_events_total`, `lmcache_mp.event_bus.subscriber_exceptions` | Source `event_bus.py` | Parse/report; diagnose tail-drop and subscriber failures |
-| CacheBlend counters | `lmcache_blend.lookup_requests`, `lmcache_blend.lookup_fingerprint_hits`, `lmcache_blend.lookup_storage_hits`, `lmcache_blend.lookup_stale_chunks`, `lmcache_blend.lookup_no_gpu_context_errors`, `lmcache_blend.retrieve_requests`, `lmcache_blend.retrieve_chunks`, `lmcache_blend.retrieve_failures`, `lmcache_blend.store_pre_computed_requests`, `lmcache_blend.store_pre_computed_chunks`, `lmcache_blend.store_pre_computed_failures`, `lmcache_blend.store_final_requests`, `lmcache_blend.store_final_chunks`, `lmcache_blend.store_final_failures`, `lmcache_blend.fingerprints_registered`, `lmcache_blend.chunks_evicted` | Source `cb_server.py` | Support when Blend server / CacheBlend is enabled; do not require for normal MP |
+| Family | Metrics | Source | Status | Missing proof | Exact next command |
+| --- | --- | --- | --- | --- | --- |
+| StorageManager counters | `lmcache_mp.sm_read_requests`, `lmcache_mp.sm_read_succeed_keys`, `lmcache_mp.sm_read_failed_keys`, `lmcache_mp.sm_write_requests`, `lmcache_mp.sm_write_succeed_keys`, `lmcache_mp.sm_write_failed_keys` | Official docs and `sm.py` | fixture_backed | Live MP packet with nonzero read/write evidence. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-lmcache-mode mp` |
+| L1 counters | `lmcache_mp.l1_read_keys`, `lmcache_mp.l1_write_keys`, `lmcache_mp.l1_evicted_keys` | Official docs and `l1.py` | fixture_backed | Live MP packet with L1 read/write/eviction evidence. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/observability_coverage.json" --expect-lmcache-mode mp` |
+| L1 memory gauge | `lmcache_mp.l1_memory_usage_bytes` | Official docs and L1 gauge registration | fixture_backed | Multi-scrape timeline proving plateau or continued growth. | `inferguard collect-metrics --engine lmcache --endpoint "$LMCACHE_METRICS" --samples 6 --interval-seconds 10 --output-dir "$PACKET_DIR/l1-memory-timeline"` |
+| L1 failure counters | `lmcache_mp.l1_allocation_failure`, `lmcache_mp.l1_read_failure` | Source `l1_failures.py` | fixture_backed | Real failure packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_l1_failure.prom" --output "$PACKET_DIR/l1_failure_report.json" --expect-lmcache-mode mp` |
+| L1 lifecycle histograms | `lmcache_mp.l1_chunk_lifetime_seconds`, `lmcache_mp.l1_chunk_idle_before_evict_seconds`, `lmcache_mp.l1_chunk_reuse_gap_seconds`, `lmcache_mp.l1_chunk_evict_reuse_gap_seconds` | Official docs and `l1_lifecycle.py` | fixture_backed | Live sample-rate 1.0 packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_lifecycle.prom" --output "$PACKET_DIR/lifecycle_report.json" --expect-lmcache-mode mp` |
+| Real reuse histograms | `lmcache_mp.real_reuse_gap_seconds`, `lmcache_mp.real_reuse_gap_chunks` | Official docs and `sm_lifecycle.py` | parser_only | Repeated-prefix packet with nonzero reuse buckets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_reuse.prom" --output "$PACKET_DIR/reuse_report.json" --expect-lmcache-mode mp` |
+| L2 counters | `lmcache_mp.l2_store_tasks`, `lmcache_mp.l2_store_keys`, `lmcache_mp.l2_store_completed`, `lmcache_mp.l2_store_succeeded_keys`, `lmcache_mp.l2_store_failed_keys`, `lmcache_mp.l2_load_completed`, `lmcache_mp.l2_prefetch_lookups`, `lmcache_mp.l2_prefetch_lookup_keys`, `lmcache_mp.l2_prefetch_hit_keys`, `lmcache_mp.l2_prefetch_load_tasks`, `lmcache_mp.l2_prefetch_load_keys`, `lmcache_mp.l2_prefetch_loaded_keys`, `lmcache_mp.l2_prefetch_failed_keys` | Official docs and `l2.py` | fixture_backed | Live L2-configured packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_l2.prom" --output "$PACKET_DIR/l2_report.json" --l2-configured --expect-lmcache-mode mp` |
+| L2 failure counter | `lmcache_mp.l2_prefetch_failure` | Source `l2_failures.py` | fixture_backed | Real failed L2 fixture. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/diagnose_l2_failures.json"` |
+| Lookup hit-rate counters | `lmcache_mp.lookup_requested_tokens`, `lmcache_mp.lookup_hit_tokens` | Official docs and `lookup.py` | fixture_backed | Warmup/replay packet with nonzero requested and hit tokens. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/diagnose_lookup.json"` |
+| L0 lifecycle histograms | `lmcache_mp.l0_block_lifetime_seconds`, `lmcache_mp.l0_block_idle_before_evict_seconds`, `lmcache_mp.l0_block_reuse_gap_seconds` | Official docs and `l0_lifecycle.py` | fixture_backed | Live GPU-block lifecycle scrape. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_l0_lifecycle.prom" --output "$PACKET_DIR/l0_lifecycle_report.json" --expect-lmcache-mode mp` |
+| L0-L1 throughput histograms | `lmcache_mp.l0_l1_store_throughput_gbs`, `lmcache_mp.l0_l1_load_throughput_gbs` | Official docs and `l0_l1_throughput.py` | parser_only | Live L0-L1 throughput packet. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache_l0_l1.prom" --output "$PACKET_DIR/l0_l1_throughput_coverage.json" --expect-lmcache-mode mp` |
+| L1-L2 throughput histograms | `lmcache_mp.l2_store_throughput_gbs`, `lmcache_mp.l2_load_throughput_gbs` | Official docs and `l2_throughput.py` | parser_only | Live L2 throughput packet. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache_l2.prom" --output "$PACKET_DIR/l2_throughput_coverage.json" --l2-configured --expect-lmcache-mode mp` |
+| Engine counter | `lmcache_mp.num_chunks_loaded` | Official docs and `engine.py` | parser_only | Live retrieve proof with chunks loaded populated. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_loaded.prom" --output "$PACKET_DIR/chunks_loaded_report.json" --expect-lmcache-mode mp` |
+| Observable gauges | `lmcache_mp.active_prefetch_jobs`, `lmcache_mp.num_inflight_l2_stores`, `lmcache_mp.num_inflight_l2_loads`, `lmcache_mp.inflight_load_memory_usage_bytes` | Official docs and gauge registration | parser_only | Multi-scrape pressure/backlog timeline. | `inferguard collect-metrics --engine lmcache --endpoint "$LMCACHE_METRICS" --samples 6 --interval-seconds 10 --output-dir "$PACKET_DIR/l2-gauge-timeline"` |
+| EventBus self-metrics | `lmcache_mp.event_bus.queue_depth`, `lmcache_mp.event_bus.drain_lag_seconds`, `lmcache_mp.event_bus.dropped_events_total`, `lmcache_mp.event_bus.subscriber_exceptions` | Source `event_bus.py` | fixture_backed | Clean and failing live EventBus packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_eventbus.prom" --output "$PACKET_DIR/eventbus_report.json" --expect-lmcache-mode mp` |
+| CacheBlend counters | `lmcache_blend.lookup_requests`, `lmcache_blend.lookup_fingerprint_hits`, `lmcache_blend.lookup_storage_hits`, `lmcache_blend.lookup_stale_chunks`, `lmcache_blend.lookup_no_gpu_context_errors`, `lmcache_blend.retrieve_requests`, `lmcache_blend.retrieve_chunks`, `lmcache_blend.retrieve_failures`, `lmcache_blend.store_pre_computed_requests`, `lmcache_blend.store_pre_computed_chunks`, `lmcache_blend.store_pre_computed_failures`, `lmcache_blend.store_final_requests`, `lmcache_blend.store_final_chunks`, `lmcache_blend.store_final_failures`, `lmcache_blend.fingerprints_registered`, `lmcache_blend.chunks_evicted` | Source `cb_server.py` | fixture_backed | Live CacheBlend packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/cacheblend.prom" --output "$PACKET_DIR/cacheblend_report.json" --expect-lmcache-mode mp` |
 
 What shipped before `edccffd`:
 
@@ -506,20 +506,20 @@ Result: `17 passed, 18 skipped`.
 InferGuard reaches "100 percent LMCache coverage" when the rows below are all
 `done` with real fixture evidence.
 
-| Area | Required capability | Status |
-| --- | --- | --- |
-| Mode detection | Distinguish `vllm_embedded_lmcache`, `vllm_mp_lmcache`, `sglang_embedded_lmcache`, `sglang_mp_lmcache_candidate`, P2P candidate, disaggregated-prefill candidate, and controller-only packets | partial |
-| MP Prometheus | Parse/report all documented `lmcache_mp_*` families | partial |
-| Embedded Prometheus | Parse/report production `lmcache:*` and exporter-normalized `lmcache_*` families | partial |
-| HTTP API | Parse health/status evidence and explain unhealthy/unreachable states | partial |
-| Trace recording | Capture and summarize `.lct` storage trace artifacts | partial |
-| OTel tracing | Capture and summarize MP store/retrieve/lookup spans | partial |
-| Logs | Parse MP, embedded, P2P, and PD operational logs into structured evidence | partial |
-| Diagnostics | Convert evidence into specific findings, not just coverage rows | missing |
-| Live fixtures | Golden artifacts from real LMCache runs for each supported mode | partial |
-| vLLM bridge | Verify vLLM connector metrics line up with LMCache MP evidence | partial |
-| SGLang bridge | Verify SGLang + external cache/LMCache-adjacent evidence where applicable | partial |
-| Documentation | User-facing docs match the current CLI and support level | partial |
+| Area | Required capability | Status | Missing proof | Exact next command |
+| --- | --- | --- | --- | --- |
+| Mode detection | Distinguish `vllm_embedded_lmcache`, `vllm_mp_lmcache`, `sglang_embedded_lmcache`, `sglang_mp_lmcache_candidate`, P2P candidate, disaggregated-prefill candidate, and controller-only packets | partial | Live packets for every mode, especially P2P, PD, embedded SGLang, and SGLang MP candidate. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/engine.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/mode_coverage.json"` |
+| MP Prometheus | Parse/report all documented `lmcache_mp_*` families | partial | Live L2, nonzero lookup, and sampled lifecycle/throughput packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-lmcache-mode mp` |
+| Embedded Prometheus | Parse/report production `lmcache:*` and exporter-normalized `lmcache_*` families | partial | Live embedded vLLM and SGLang fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
+| HTTP API | Parse health/status evidence and explain unhealthy/unreachable states | partial | Live full safe-endpoint packet. | `inferguard collect-lmcache --output-dir "$PACKET_DIR" --lmcache-health-file "$PACKET_DIR/lmcache-health.json" --lmcache-status-file "$PACKET_DIR/lmcache-status.json"` |
+| Trace recording | Capture and summarize `.lct` storage trace artifacts | partial | Live `.lct` from `--trace-level storage`. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/trace" --lmcache-trace-file "$PACKET_DIR/trace/lmcache-trace.lct"` |
+| OTel tracing | Capture and summarize MP store/retrieve/lookup spans | partial | Real OTel collector export. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/otel" --lmcache-otel-file "$PACKET_DIR/otel/lmcache-otel.jsonl"` |
+| Logs | Parse MP, embedded, P2P, and PD operational logs into structured evidence | partial | Live MP, embedded, P2P, and PD log packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
+| Diagnostics | Convert evidence into specific findings, not just coverage rows | missing | Calibrated rules from live packets. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/bottleneck_diagnosis.json"` |
+| Live fixtures | Golden artifacts from real LMCache runs for each supported mode | partial | Sanitized fixture import for Packet A, L2, CacheBlend, P2P/PD, embedded vLLM, and embedded SGLang. | `modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+| vLLM bridge | Verify vLLM connector metrics line up with LMCache MP evidence | partial | Live vLLM + LMCache MP connector packet and mismatch detector. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
+| SGLang bridge | Verify SGLang + external cache/LMCache-adjacent evidence where applicable | partial | Live SGLang embedded fixture and source-backed MP contract. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
+| Documentation | User-facing docs match the current CLI and support level | partial | CLI examples and release notes after live fixture gates. | `uv run mkdocs build` |
 
 ## Phase 1: Lock The Live MP Baseline
 

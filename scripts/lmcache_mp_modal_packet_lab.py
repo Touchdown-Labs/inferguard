@@ -19,6 +19,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import modal
 
@@ -42,6 +43,9 @@ VLLM_METRICS_URL = f"{VLLM_BASE_URL}/metrics"
 LMCACHE_HTTP_BASE_URL = f"http://127.0.0.1:{LMCACHE_HTTP_PORT}"
 LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/api/healthcheck"
 LMCACHE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
+LMCACHE_TRACE_FILE = "lmcache_trace.lct"
+TRACE_REPLAY_DIR = "trace-replay"
+LOOKUP_HASH_DIR = "lookup_hashes"
 
 INFERGUARD_PACKAGE = (
     "inferguard @ "
@@ -133,10 +137,23 @@ def _run_best_effort(cmd: list[str], log_path: Path, *, timeout: int) -> int:
         return 1
 
 
+def _run_required(cmd: list[str], log_path: Path, *, timeout: int) -> None:
+    result = _run(cmd, log_path, timeout=timeout)
+    if result.returncode != 0:
+        raise RuntimeError(f"required command failed with exit code {result.returncode}: {_quote_cmd(cmd)}")
+
+
 def _curl_to_file(url: str, path: Path, log_path: Path, *, timeout: int = 30) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     result = _run_best_effort(["curl", "-fsS", url, "-o", str(path)], log_path, timeout=timeout)
     return result == 0
+
+
+def _read_json(path: Path) -> Any | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def _wait_for_http(
@@ -180,9 +197,8 @@ def _write_env_snapshot(run_dir: Path) -> None:
     )
 
 
-def _launch_lmcache(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
-    log_handle = (run_dir / "lmcache.log").open("w", encoding="utf-8")
-    cmd = [
+def _build_lmcache_command(run_dir: Path) -> list[str]:
+    return [
         "lmcache",
         "server",
         "--host",
@@ -204,9 +220,9 @@ def _launch_lmcache(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
         "--trace-level",
         "storage",
         "--trace-output",
-        str(run_dir / "lmcache_trace.lct"),
+        str(run_dir / LMCACHE_TRACE_FILE),
         "--lookup-hash-log-dir",
-        str(run_dir / "lookup_hashes"),
+        str(run_dir / LOOKUP_HASH_DIR),
         "--lookup-hash-log-rotation-interval",
         "21600",
         "--lookup-hash-log-rotation-max-size",
@@ -214,6 +230,11 @@ def _launch_lmcache(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
         "--lookup-hash-log-max-files",
         "10",
     ]
+
+
+def _launch_lmcache(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
+    log_handle = (run_dir / "lmcache.log").open("w", encoding="utf-8")
+    cmd = _build_lmcache_command(run_dir)
     (run_dir / "lmcache_command.json").write_text(
         json.dumps(cmd, indent=2) + "\n",
         encoding="utf-8",
@@ -222,8 +243,7 @@ def _launch_lmcache(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
     return proc, log_handle
 
 
-def _launch_vllm(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
-    log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
+def _build_vllm_command() -> list[str]:
     kv_transfer_config = {
         "kv_connector": "LMCacheMPConnector",
         "kv_role": "kv_both",
@@ -234,7 +254,7 @@ def _launch_vllm(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
             "lmcache.mp.mq_timeout": 10,
         },
     }
-    cmd = [
+    return [
         "vllm",
         "serve",
         MODEL,
@@ -248,12 +268,17 @@ def _launch_vllm(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
         "--port",
         str(VLLM_PORT),
     ]
+
+
+def _launch_vllm(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
+    log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
+    cmd = _build_vllm_command()
     (run_dir / "vllm_command.json").write_text(json.dumps(cmd, indent=2) + "\n", encoding="utf-8")
     proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
     return proc, log_handle
 
 
-def _capture_safe_http(run_dir: Path) -> None:
+def _capture_safe_http(run_dir: Path) -> dict[str, dict[str, object]]:
     log_path = run_dir / "capture.log"
     endpoints = {
         "root.txt": "/",
@@ -268,14 +293,79 @@ def _capture_safe_http(run_dir: Path) -> None:
         "periodic_threads.json": "/periodic-threads",
         "periodic_threads_health.json": "/periodic-threads-health",
     }
+    results: dict[str, dict[str, object]] = {}
     for filename, path in endpoints.items():
-        _curl_to_file(f"{LMCACHE_HTTP_BASE_URL}{path}", run_dir / "http" / filename, log_path)
+        target = run_dir / "http" / filename
+        ok = _curl_to_file(f"{LMCACHE_HTTP_BASE_URL}{path}", target, log_path)
+        results[filename] = {"path": path, "ok": ok, "bytes": target.stat().st_size if target.exists() else 0}
+
+    thread_name = _discover_periodic_thread_name(run_dir / "http" / "periodic_threads.json")
+    if thread_name:
+        filename = "periodic_thread.json"
+        path = f"/periodic-threads/{thread_name}"
+        target = run_dir / "http" / filename
+        ok = _curl_to_file(f"{LMCACHE_HTTP_BASE_URL}{path}", target, log_path)
+        results[filename] = {"path": path, "ok": ok, "bytes": target.stat().st_size if target.exists() else 0}
+
+    (run_dir / "http" / "capture_manifest.json").write_text(
+        json.dumps(results, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return results
+
+
+def _discover_periodic_thread_name(path: Path) -> str | None:
+    payload = _read_json(path)
+    if isinstance(payload, list) and payload:
+        return str(payload[0])
+    if not isinstance(payload, dict):
+        return None
+    for key in ("periodic_threads", "threads"):
+        value = payload.get(key)
+        if isinstance(value, list) and value:
+            first = value[0]
+            if isinstance(first, str):
+                return first
+            if isinstance(first, dict) and first.get("name"):
+                return str(first["name"])
+    return None
 
 
 def _capture_metrics(run_dir: Path, suffix: str) -> None:
     log_path = run_dir / "capture.log"
     _curl_to_file(VLLM_METRICS_URL, run_dir / f"vllm_metrics_{suffix}.prom", log_path)
     _curl_to_file(LMCACHE_METRICS_URL, run_dir / f"lmcache_metrics_{suffix}.prom", log_path)
+
+
+def _run_trace_replay(run_dir: Path) -> None:
+    trace_path = run_dir / LMCACHE_TRACE_FILE
+    replay_dir = run_dir / TRACE_REPLAY_DIR
+    log_path = run_dir / "trace_replay.log"
+    if not trace_path.exists() or trace_path.stat().st_size == 0:
+        _append(log_path, f"SKIP: missing or empty {trace_path}\n")
+        return
+
+    replay_dir.mkdir(parents=True, exist_ok=True)
+    _run_required(
+        ["lmcache", "trace", "info", str(trace_path)],
+        replay_dir / "trace_info.txt",
+        timeout=120,
+    )
+    _run_required(
+        [
+            "lmcache",
+            "trace",
+            "replay",
+            str(trace_path),
+            "--output-dir",
+            str(replay_dir),
+            "--json",
+            "--jsonl-out",
+            str(replay_dir / "trace_replay.jsonl"),
+        ],
+        log_path,
+        timeout=10 * 60,
+    )
 
 
 def _drive_traffic(run_dir: Path) -> None:
@@ -313,10 +403,14 @@ for idx in range(10):
     )
 
 
-def _run_inferguard_packet(run_dir: Path) -> None:
+def _maybe_add_existing(cmd: list[str], flag: str, path: Path) -> None:
+    if path.exists():
+        cmd.extend([flag, str(path)])
+
+
+def _build_collect_lmcache_cmd(run_dir: Path) -> list[str]:
     packet_dir = run_dir / "lmcache-packet"
-    commands_log = run_dir / "inferguard_commands.log"
-    collect_cmd = [
+    cmd = [
         "inferguard",
         "collect-lmcache",
         "--output-dir",
@@ -327,12 +421,32 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         str(run_dir / "lmcache_metrics_loaded.prom"),
         "--lmcache-http-base-url",
         LMCACHE_HTTP_BASE_URL,
+        "--lmcache-health-file",
+        str(run_dir / "http" / "healthcheck.json"),
+        "--lmcache-status-file",
+        str(run_dir / "http" / "status.json"),
+        "--lmcache-conf-file",
+        str(run_dir / "http" / "conf.json"),
+        "--lmcache-threads-file",
+        str(run_dir / "http" / "threads.json"),
+        "--lmcache-periodic-threads-file",
+        str(run_dir / "http" / "periodic_threads.json"),
+        "--lmcache-periodic-threads-health-file",
+        str(run_dir / "http" / "periodic_threads_health.json"),
+        "--lmcache-version-file",
+        str(run_dir / "http" / "version.txt"),
+        "--lmcache-lmc-version-file",
+        str(run_dir / "http" / "lmc_version.txt"),
+        "--lmcache-commit-id-file",
+        str(run_dir / "http" / "commit_id.txt"),
+        "--lmcache-quota-file",
+        str(run_dir / "http" / "quota.json"),
         "--engine-log-file",
         str(run_dir / "vllm.log"),
         "--lmcache-log-file",
         str(run_dir / "lmcache.log"),
         "--lmcache-trace-file",
-        str(run_dir / "lmcache_trace.lct"),
+        str(run_dir / LMCACHE_TRACE_FILE),
         "--expect-mode",
         "mp",
         "--mp-prometheus-port",
@@ -344,9 +458,15 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         "--mp-trace-recording-enabled",
         "--json",
     ]
-    _run_best_effort(collect_cmd, commands_log, timeout=180)
+    _maybe_add_existing(cmd, "--lmcache-periodic-thread-file", run_dir / "http" / "periodic_thread.json")
+    _maybe_add_existing(cmd, "--lmcache-trace-replay-output", run_dir / TRACE_REPLAY_DIR)
+    _maybe_add_existing(cmd, "--lmcache-lookup-hash-path", run_dir / LOOKUP_HASH_DIR)
+    return cmd
 
-    compat_cmd = [
+
+def _build_lmcache_compat_cmd(run_dir: Path) -> list[str]:
+    packet_dir = run_dir / "lmcache-packet"
+    cmd = [
         "inferguard",
         "lmcache-compat",
         "--engine-metrics-file",
@@ -355,6 +475,8 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         str(run_dir / "lmcache_metrics_loaded.prom"),
         "--lmcache-http-evidence-file",
         str(packet_dir / "lmcache_http_evidence.json"),
+        "--lmcache-log-evidence-file",
+        str(packet_dir / "lmcache_log_evidence.json"),
         "--lmcache-trace-evidence-file",
         str(packet_dir / "lmcache_trace_evidence.json"),
         "--expect-mode",
@@ -368,11 +490,18 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         "--mp-trace-recording-enabled",
         "--output",
         str(run_dir / "lmcache_compat_report.json"),
+        "--fail-on",
+        "missing-required",
         "--json",
     ]
-    _run_best_effort(compat_cmd, commands_log, timeout=180)
+    _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
+    _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
+    return cmd
 
-    coverage_cmd = [
+
+def _build_observability_coverage_cmd(run_dir: Path) -> list[str]:
+    packet_dir = run_dir / "lmcache-packet"
+    cmd = [
         "inferguard",
         "observability-coverage",
         "--engine-metrics-file",
@@ -381,6 +510,8 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         str(run_dir / "lmcache_metrics_loaded.prom"),
         "--lmcache-http-evidence-file",
         str(packet_dir / "lmcache_http_evidence.json"),
+        "--lmcache-log-evidence-file",
+        str(packet_dir / "lmcache_log_evidence.json"),
         "--lmcache-trace-evidence-file",
         str(packet_dir / "lmcache_trace_evidence.json"),
         "--expected-engine",
@@ -392,7 +523,16 @@ def _run_inferguard_packet(run_dir: Path) -> None:
         str(run_dir / "observability_coverage.json"),
         "--json",
     ]
-    _run_best_effort(coverage_cmd, commands_log, timeout=180)
+    _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
+    _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
+    return cmd
+
+
+def _run_inferguard_packet(run_dir: Path) -> None:
+    commands_log = run_dir / "inferguard_commands.log"
+    _run_required(_build_collect_lmcache_cmd(run_dir), commands_log, timeout=180)
+    _run_required(_build_lmcache_compat_cmd(run_dir), commands_log, timeout=180)
+    _run_required(_build_observability_coverage_cmd(run_dir), commands_log, timeout=180)
 
     job_dir = run_dir / "inferguard-job"
     collect_metrics_cmd = [
@@ -427,6 +567,56 @@ def _run_inferguard_packet(run_dir: Path) -> None:
     _run_best_effort(diagnose_cmd, commands_log, timeout=120)
 
 
+REQUIRED_ARTIFACTS = [
+    "env.txt",
+    "env.redacted.json",
+    "vllm.log",
+    "lmcache.log",
+    "lmcache_command.json",
+    "vllm_command.json",
+    "http/capture_manifest.json",
+    "vllm_metrics_empty.prom",
+    "lmcache_metrics_empty.prom",
+    "vllm_metrics_loaded.prom",
+    "lmcache_metrics_loaded.prom",
+    LMCACHE_TRACE_FILE,
+    "trace-replay/trace_info.txt",
+    "lmcache-packet/packet_manifest.json",
+    "lmcache-packet/lmcache_http_evidence.json",
+    "lmcache-packet/lmcache_log_evidence.json",
+    "lmcache-packet/lmcache_trace_evidence.json",
+    "lmcache-packet/lmcache_trace_replay_evidence.json",
+    "lmcache_compat_report.json",
+    "observability_coverage.json",
+    "artifact_index.json",
+]
+
+OPTIONAL_ARTIFACTS = [
+    "http/periodic_thread.json",
+    "lmcache-packet/lmcache_lookup_hash_evidence.json",
+    "trace-replay/trace_replay.jsonl",
+    "diagnose-bottleneck/bottleneck_diagnosis.json",
+]
+
+
+def _missing_artifacts(run_dir: Path, rel_paths: list[str], *, require_nonempty: bool) -> list[str]:
+    missing = []
+    for rel in rel_paths:
+        path = run_dir / rel
+        if not path.exists():
+            missing.append(rel)
+        elif require_nonempty and path.is_file() and path.stat().st_size == 0:
+            missing.append(f"{rel} (empty)")
+    return missing
+
+
+def _validate_required_artifacts(run_dir: Path) -> None:
+    _write_summary_and_index(run_dir)
+    missing = _missing_artifacts(run_dir, REQUIRED_ARTIFACTS, require_nonempty=True)
+    if missing:
+        raise RuntimeError("Packet A missing required artifacts: " + ", ".join(missing))
+
+
 def _write_summary_and_index(run_dir: Path) -> None:
     artifact_index = []
     for path in sorted(run_dir.rglob("*")):
@@ -441,24 +631,8 @@ def _write_summary_and_index(run_dir: Path) -> None:
         json.dumps(artifact_index, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    required = [
-        "env.txt",
-        "vllm.log",
-        "lmcache.log",
-        "vllm_metrics_empty.prom",
-        "lmcache_metrics_empty.prom",
-        "vllm_metrics_loaded.prom",
-        "lmcache_metrics_loaded.prom",
-        "lmcache_trace.lct",
-        "lmcache-packet/packet_manifest.json",
-        "lmcache-packet/lmcache_http_evidence.json",
-        "lmcache-packet/lmcache_log_evidence.json",
-        "lmcache-packet/lmcache_trace_evidence.json",
-        "lmcache_compat_report.json",
-        "observability_coverage.json",
-        "diagnose-bottleneck/bottleneck_diagnosis.json",
-        "artifact_index.json",
-    ]
+    missing_required = _missing_artifacts(run_dir, REQUIRED_ARTIFACTS, require_nonempty=True)
+    missing_optional = _missing_artifacts(run_dir, OPTIONAL_ARTIFACTS, require_nonempty=True)
     lines = [
         "# Packet A LMCache MP Modal Lab Summary",
         "",
@@ -469,14 +643,29 @@ def _write_summary_and_index(run_dir: Path) -> None:
         "## Required Artifacts",
         "",
     ]
-    lines.extend(f"- [{'x' if (run_dir / rel).exists() else ' '}] `{rel}`" for rel in required)
+    lines.extend(f"- [{'x' if not _missing_artifacts(run_dir, [rel], require_nonempty=True) else ' '}] `{rel}`" for rel in REQUIRED_ARTIFACTS)
+    lines.extend(
+        [
+            "",
+            "## Optional / Conditional Artifacts",
+            "",
+        ]
+    )
+    lines.extend(f"- [{'x' if not _missing_artifacts(run_dir, [rel], require_nonempty=True) else ' '}] `{rel}`" for rel in OPTIONAL_ARTIFACTS)
+    if missing_required:
+        lines.extend(["", "## Missing Required", ""])
+        lines.extend(f"- `{rel}`" for rel in missing_required)
+    if missing_optional:
+        lines.extend(["", "## Missing Optional / Conditional", ""])
+        lines.extend(f"- `{rel}`" for rel in missing_optional)
     lines.extend(
         [
             "",
             "## Notes",
             "",
             "- LMCache and vLLM health failures raise immediately before traffic is sent.",
-            "- Individual capture and InferGuard command failures are logged and do not stop later captures.",
+            "- InferGuard packet, compatibility, and coverage commands are required and fail the run on nonzero exit.",
+            "- Safe LMCache HTTP endpoint captures are recorded in `http/capture_manifest.json`; destructive endpoints are not called.",
             "- L2 is intentionally not configured for Packet A L1-only evidence.",
             "",
         ]
@@ -493,6 +682,15 @@ def _terminate(proc: subprocess.Popen[str] | None) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=30)
+
+
+def _close_handles(handles: list[object]) -> None:
+    while handles:
+        handle = handles.pop()
+        try:
+            handle.close()
+        except Exception:
+            pass
 
 
 @app.function(gpu="H100", timeout=4 * 60 * 60, startup_timeout=30 * 60, volumes={"/out": volume})
@@ -536,16 +734,13 @@ def run_packet_a() -> str:
         _drive_traffic(run_dir)
         _capture_metrics(run_dir, "loaded")
         _capture_safe_http(run_dir)
+        _run_trace_replay(run_dir)
         _run_inferguard_packet(run_dir)
-        _write_summary_and_index(run_dir)
+        _validate_required_artifacts(run_dir)
     finally:
         _terminate(vllm_proc)
         _terminate(lmcache_proc)
-        for handle in handles:
-            try:
-                handle.close()
-            except Exception:
-                pass
+        _close_handles(handles)
         _write_summary_and_index(run_dir)
         try:
             volume.commit()

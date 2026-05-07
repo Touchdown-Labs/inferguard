@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from inferguard.compat import build_compat_report
 from inferguard.disagg.adapters import _parse_lmcache
 from inferguard.disagg.adapters.lmcache import parse_lmcache_prometheus
 from inferguard.disagg.metrics_schema import NORMALIZED_LMCACHE_FIELDS
@@ -145,6 +148,85 @@ lmcache_mp_l1_read_failure_total 1
     assert metrics.lmcache_event_bus_subscriber_exceptions_total == 1
 
 
+def test_lmcache_l2_label_split_counters_gauges_and_throughput_aggregate() -> None:
+    metrics = parse_lmcache_prometheus(
+        """
+lmcache_mp_l2_store_tasks_total{l2_name="fs"} 4
+lmcache_mp_l2_store_tasks_total{l2_name="s3"} 6
+lmcache_mp_l2_store_completed_total{l2_name="fs"} 2
+lmcache_mp_l2_store_completed_total{l2_name="s3"} 3
+lmcache_mp_l2_prefetch_load_tasks_total{l2_name="fs"} 1
+lmcache_mp_l2_prefetch_load_tasks_total{l2_name="s3"} 2
+lmcache_mp_l2_prefetch_loaded_keys_total{l2_name="fs"} 5
+lmcache_mp_l2_prefetch_loaded_keys_total{l2_name="s3"} 7
+lmcache_mp_l2_store_throughput_gbs_sum{l2_name="fs"} 1
+lmcache_mp_l2_store_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp_l2_store_throughput_gbs_sum{l2_name="s3"} 3
+lmcache_mp_l2_store_throughput_gbs_count{l2_name="s3"} 2
+lmcache_mp_l2_load_throughput_gbs_sum{l2_name="fs"} 0.2
+lmcache_mp_l2_load_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp_l2_load_throughput_gbs_sum{l2_name="s3"} 0.4
+lmcache_mp_l2_load_throughput_gbs_count{l2_name="s3"} 2
+lmcache_mp_num_inflight_l2_stores{l2_name="fs",adapter_index="0"} 2
+lmcache_mp_num_inflight_l2_stores{l2_name="s3",adapter_index="1"} 3
+lmcache_mp_num_inflight_l2_loads{l2_name="fs",adapter_index="0"} 1
+lmcache_mp_num_inflight_l2_loads{l2_name="s3",adapter_index="1"} 4
+lmcache_mp_inflight_load_memory_usage_bytes{l2_name="fs",adapter_index="0"} 1024
+lmcache_mp_inflight_load_memory_usage_bytes{l2_name="s3",adapter_index="1"} 2048
+lmcache_mp_active_prefetch_jobs 2
+"""
+    )
+
+    assert metrics.lmcache_l2_store_tasks == 10
+    assert metrics.lmcache_l2_store_completed == 5
+    assert metrics.lmcache_l2_prefetch_load_tasks == 3
+    assert metrics.lmcache_l2_prefetch_loaded_keys == 12
+    assert metrics.lmcache_l2_store_throughput_gbs == 1
+    assert metrics.lmcache_l2_load_throughput_gbs == pytest.approx(0.15)
+    assert metrics.lmcache_num_inflight_l2_stores == 5
+    assert metrics.lmcache_num_inflight_l2_loads == 5
+    assert metrics.lmcache_inflight_load_memory_usage_bytes == 3072
+    assert metrics.lmcache_active_prefetch_jobs == 2
+
+
+def test_lmcache_l2_status_rows_summaries_and_diagnostics_are_fixture_backed() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_l1_read_keys_total 10
+lmcache_mp_l2_store_tasks_total{l2_name="fs"} 10
+lmcache_mp_l2_store_completed_total{l2_name="fs"} 1
+lmcache_mp_l2_store_succeeded_keys_total{l2_name="fs"} 1
+lmcache_mp_l2_prefetch_load_tasks_total{l2_name="fs"} 6
+lmcache_mp_l2_prefetch_load_keys_total{l2_name="fs"} 12
+lmcache_mp_l2_prefetch_loaded_keys_total{l2_name="fs"} 2
+lmcache_mp_l2_load_completed_total{l2_name="fs"} 1
+lmcache_mp_l2_store_throughput_gbs_sum{l2_name="fs"} 0.05
+lmcache_mp_l2_store_throughput_gbs_count{l2_name="fs"} 1
+lmcache_mp_l2_load_throughput_gbs_sum{l2_name="fs"} 0.04
+lmcache_mp_l2_load_throughput_gbs_count{l2_name="fs"} 1
+lmcache_mp_num_inflight_l2_stores{l2_name="fs",adapter_index="0"} 4
+lmcache_mp_num_inflight_l2_loads{l2_name="fs",adapter_index="0"} 3
+lmcache_mp_inflight_load_memory_usage_bytes{l2_name="fs",adapter_index="0"} 8192
+lmcache_mp_active_prefetch_jobs 2
+""",
+        expect_mode="mp",
+        l2_configured=True,
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_mp", "l2_counters")]["status"] == "populated"
+    assert families[("lmcache_mp", "l2_throughput")]["status"] == "populated"
+    assert families[("lmcache_mp", "l2_inflight_gauges")]["status"] == "populated"
+    assert report["lmcache_l2_summary"]["store_backlog"] is True
+    assert report["lmcache_l2_summary"]["load_backlog"] is True
+    assert report["lmcache_l2_summary"]["store_throughput_gbs"] == 0.05
+    codes = {item["code"] for item in report["diagnostic_findings"]}
+    assert "lmcache_mp_l2_store_backlog" in codes
+    assert "lmcache_mp_l2_load_backlog" in codes
+    assert "lmcache_mp_l2_throughput_low" in codes
+
+
 def test_lmcache_real_modal_mp_slice_parses_storage_and_l0_fields() -> None:
     metrics = parse_lmcache_prometheus((FIXTURES / "mp_modal_real_slice.prom").read_text(encoding="utf-8"))
 
@@ -277,6 +359,37 @@ lmcache:chunk_statistics_chunks 8
     assert metrics.lmcache_storage_events_not_found_count == 7
     assert metrics.lmcache_chunk_statistics_count == 8
     assert metrics.raw_metrics_extra["lmcache_blend_future_source_only_total"] == 99
+
+
+def test_lmcache_cacheblend_summary_aggregates_metrics_for_diagnostics() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+lmcache_blend_lookup_requests_total{model_name="a"} 10
+lmcache_blend_lookup_requests_total{model_name="b"} 30
+lmcache_blend_lookup_fingerprint_hits_total{model_name="a"} 5
+lmcache_blend_lookup_fingerprint_hits_total{model_name="b"} 15
+lmcache_blend_lookup_storage_hits_total{model_name="a"} 3
+lmcache_blend_lookup_storage_hits_total{model_name="b"} 9
+lmcache_blend_lookup_stale_chunks_total{model_name="a"} 1
+lmcache_blend_lookup_no_gpu_context_errors_total{model_name="b"} 1
+lmcache_blend_retrieve_failures_total{model_name="a"} 1
+lmcache_blend_store_pre_computed_failures_total{model_name="b"} 2
+lmcache_blend_store_final_failures_total{model_name="b"} 3
+lmcache_blend_fingerprints_registered_total{model_name="a"} 4
+lmcache_blend_fingerprints_registered_total{model_name="b"} 6
+lmcache_blend_chunks_evicted_total{model_name="a"} 2
+""",
+        expect_mode="mp",
+    )
+
+    summary = report["lmcache_cacheblend_summary"]
+    assert summary["observed"] is True
+    assert summary["lookup_requests"] == 40
+    assert summary["lookup_fingerprint_hit_rate"] == 0.5
+    assert summary["lookup_storage_hit_rate"] == 0.3
+    assert summary["failures"] == 6
+    assert summary["fingerprints_registered"] == 10
+    assert any(item["code"] == "lmcache_cacheblend_failures" for item in report["diagnostic_findings"])
 
 
 def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:

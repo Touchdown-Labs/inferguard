@@ -805,9 +805,15 @@ def _lmcache_missing_signal_downgrade(
     finding_priority = [
         "lmcache_mp_l1_failures",
         "lmcache_mp_l2_failures",
+        "lmcache_log_p2p_transfer_failure",
+        "lmcache_log_pd_role_mismatch",
+        "lmcache_log_pd_stall",
         "lmcache_mp_eventbus_loss",
         "lmcache_mp_l1_eviction_pressure",
         "lmcache_mp_low_hit_rate",
+        "lmcache_log_p2p_transfer_speed_hint",
+        "lmcache_log_nixl_proxy_indicator",
+        "lmcache_log_nixl_request_indicator",
         "otel_tracing_enabled_but_no_spans",
         "lmcache_mp_trace_enabled_but_no_trace_artifact",
         "lmcache_mp_eventbus_taildrop_unobservable",
@@ -949,8 +955,27 @@ def _lmcache_log_evidence_downgrade(
     event_counts = log_evidence.get("event_counts") or {}
     config = log_evidence.get("config") or {}
     code = ""
-    if config.get("stale_lmcache_connector_seen"):
+    finding_code = _select_lmcache_finding_code(
+        [item for item in log_evidence.get("findings", []) or [] if isinstance(item, Mapping)],
+        [
+            "lmcache_log_p2p_transfer_failure",
+            "lmcache_log_pd_role_mismatch",
+            "lmcache_log_pd_stall",
+            "lmcache_log_p2p_transfer_speed_hint",
+            "lmcache_log_nixl_proxy_indicator",
+            "lmcache_log_nixl_request_indicator",
+        ],
+    )
+    if finding_code:
+        code = finding_code
+    elif config.get("stale_lmcache_connector_seen"):
         code = "lmcache_log_stale_connector"
+    elif (event_counts.get("pd_role_mismatch") or 0) or (event_counts.get("pd_stall") or 0):
+        code = "lmcache_log_pd_attention_needed"
+    elif (event_counts.get("p2p_transfer_failure") or 0) or (
+        event_counts.get("p2p_transfer_speed") or 0
+    ):
+        code = "lmcache_log_p2p_attention_needed"
     elif (event_counts.get("pd_sender") or 0) or (event_counts.get("pd_receiver") or 0):
         code = "lmcache_log_pd_evidence_present"
     elif (event_counts.get("p2p_peer") or 0) or (event_counts.get("p2p_transfer") or 0):
@@ -972,6 +997,8 @@ def _lmcache_log_evidence_downgrade(
             "lmcache_log.event_counts": event_counts,
             "lmcache_log.config": config,
             "lmcache_log.mode_candidates": log_evidence.get("mode_candidates") or [],
+            "lmcache_log.findings": log_evidence.get("findings") or [],
+            "lmcache_log.numeric_hints": log_evidence.get("numeric_hints") or {},
         },
         claim_status="inferred",
         downgrades=[

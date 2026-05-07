@@ -8,6 +8,12 @@ from typer.testing import CliRunner
 from inferguard.cli import app
 from inferguard.observability_coverage import build_observability_coverage_report
 
+LMCACHE_FIXTURES = Path(__file__).parent / "fixtures" / "lmcache_metrics"
+
+
+def _lmcache_fixture(name: str) -> str:
+    return (LMCACHE_FIXTURES / name).read_text(encoding="utf-8")
+
 
 def test_observability_coverage_marks_vllm_external_and_cpu_offload() -> None:
     report = build_observability_coverage_report(
@@ -302,6 +308,105 @@ lmcache:chunk_statistics_chunks 6
     assert families[("lmcache_embedded", "chunk_stats")]["status"] == "populated"
 
 
+def test_vllm_embedded_dynamic_offload_fixture_is_classified() -> None:
+    report = build_observability_coverage_report(
+        engine_text=_lmcache_fixture("vllm_embedded_dynamic_offload.prom"),
+        expected_engine="vllm",
+        expect_lmcache_mode="embedded",
+        cpu_offload_configured=True,
+    )
+
+    compat = report["lmcache_compat"]
+    families = {(row["surface"], row["family"]): row for row in compat["families"]}
+    architecture = compat["detected_architecture"]
+    signals = architecture["signals"]
+    assert report["detected_engines"] == ["vllm"]
+    assert report["detected_lmcache_mode"] == "embedded"
+    assert architecture["label"] == "vllm_embedded_lmcache"
+    assert architecture["claim_status"] == "measured"
+    assert signals["vllm_embedded_connector_label"] is True
+    assert signals["vllm_lmcache_offload_backend_label"] is True
+    assert "LMCacheConnectorV1Dynamic" in architecture["connector_labels"]
+    assert "lmcache" in architecture["offload_backend_labels"]
+    assert families[("lmcache_embedded", "production_requests")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_tokens")]["status"] == "populated"
+    assert report["surfaces"]["vllm_simple_cpu_offload"]["status"] == "complete"
+
+
+def test_vllm_stale_connector_fixture_emits_user_finding() -> None:
+    report = build_observability_coverage_report(
+        engine_text=_lmcache_fixture("vllm_stale_connector.prom"),
+        expected_engine="vllm",
+        expect_lmcache_mode="embedded",
+    )
+
+    compat = report["lmcache_compat"]
+    codes = {item["code"] for item in compat["diagnostic_findings"]}
+    assert compat["detected_architecture"]["label"] == "vllm_embedded_lmcache"
+    assert compat["detected_architecture"]["signals"]["stale_lmcache_connector_label"] is True
+    assert "lmcache_stale_connector" in codes
+
+
+def test_vllm_lmcache_offload_flag_without_metrics_is_inferred_only() -> None:
+    report = build_observability_coverage_report(
+        engine_text=_lmcache_fixture("vllm_lmcache_offload_flag_only.prom"),
+        expected_engine="vllm",
+    )
+
+    compat = report["lmcache_compat"]
+    architecture = compat["detected_architecture"]
+    codes = {item["code"] for item in compat["diagnostic_findings"]}
+    assert report["detected_lmcache_mode"] == "unknown"
+    assert architecture["label"] == "vllm_embedded_lmcache"
+    assert architecture["claim_status"] == "inferred"
+    assert architecture["signals"]["vllm_lmcache_offload_backend_label"] is True
+    assert architecture["signals"]["lmcache_embedded_metrics"] is False
+    assert "vllm_lmcache_offload_flag_without_metrics" in codes
+
+
+def test_sglang_embedded_lmcache_fixture_is_distinct_from_hicache() -> None:
+    report = build_observability_coverage_report(
+        engine_text=_lmcache_fixture("sglang_lmcache_embedded.prom"),
+        expected_engine="sglang",
+        expect_lmcache_mode="embedded",
+    )
+
+    compat = report["lmcache_compat"]
+    architecture = compat["detected_architecture"]
+    signals = architecture["signals"]
+    codes = {item["code"] for item in compat["diagnostic_findings"]}
+    assert report["detected_engines"] == ["sglang"]
+    assert report["detected_lmcache_mode"] == "embedded"
+    assert architecture["label"] == "sglang_embedded_lmcache"
+    assert architecture["claim_status"] == "measured"
+    assert signals["sglang_enable_lmcache_label"] is True
+    assert signals["sglang_lmcache_connector_label"] is True
+    assert signals["sglang_lmcradix_cache_label"] is True
+    assert signals["sglang_hicache_metrics"] is True
+    assert "LMCacheLayerwiseConnector" in architecture["connector_labels"]
+    assert "LMCRadixCache" in architecture["cache_labels"]
+    assert "sglang_lmcache_with_hicache_metrics" in codes
+    assert "sglang_hicache_not_lmcache" not in codes
+
+
+def test_sglang_hicache_only_fixture_does_not_claim_lmcache() -> None:
+    report = build_observability_coverage_report(
+        engine_text=_lmcache_fixture("sglang_hicache_only.prom"),
+        expected_engine="sglang",
+    )
+
+    compat = report["lmcache_compat"]
+    architecture = compat["detected_architecture"]
+    codes = {item["code"] for item in compat["diagnostic_findings"]}
+    assert report["detected_engines"] == ["sglang"]
+    assert report["detected_lmcache_mode"] == "unknown"
+    assert architecture["label"] == "unknown"
+    assert architecture["signals"]["sglang_hicache_metrics"] is True
+    assert architecture["signals"]["sglang_lmcache_connector_label"] is False
+    assert architecture["signals"]["sglang_enable_lmcache_label"] is False
+    assert "sglang_hicache_not_lmcache" in codes
+
+
 def test_lmcache_compat_promotes_trace_and_otel_missing_evidence() -> None:
     report = build_observability_coverage_report(
         lmcache_text="""
@@ -321,3 +426,40 @@ lmcache_mp_l1_read_keys_total 5
     codes = {item["code"] for item in report["lmcache_compat"]["diagnostic_findings"]}
     assert "lmcache_mp_trace_enabled_but_no_trace_artifact" in codes
     assert "otel_tracing_enabled_but_no_spans" in codes
+
+
+def test_lmcache_compat_promotes_parser_only_p2p_pd_log_findings() -> None:
+    report = build_observability_coverage_report(
+        lmcache_log_evidence={
+            "line_count": 3,
+            "event_counts": {
+                "p2p_transfer_failure": 1,
+                "pd_role_mismatch": 1,
+                "nixl_request": 1,
+            },
+            "findings": [
+                {
+                    "code": "lmcache_log_p2p_transfer_failure",
+                    "category": "p2p_transfer_failure",
+                    "severity": "warning",
+                    "message": "P2P transfer failed.",
+                    "event_count": 1,
+                    "evidence_status": "parser_only",
+                },
+                {
+                    "code": "lmcache_log_pd_role_mismatch",
+                    "category": "pd_role_mismatch",
+                    "severity": "warning",
+                    "message": "PD role mismatch.",
+                    "event_count": 1,
+                    "evidence_status": "parser_only",
+                },
+            ],
+        },
+    )
+
+    findings = report["lmcache_compat"]["diagnostic_findings"]
+    by_code = {item["code"]: item for item in findings}
+    assert by_code["lmcache_log_p2p_transfer_failure"]["evidence_status"] == "parser_only"
+    assert by_code["lmcache_log_pd_role_mismatch"]["evidence_status"] == "parser_only"
+    assert report["surfaces"]["lmcache_logs"]["status"] == "complete"

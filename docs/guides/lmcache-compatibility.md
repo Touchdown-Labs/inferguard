@@ -140,6 +140,8 @@ For vLLM embedded mode, the current source-backed connector strings are:
 - `LMCacheConnectorV1`;
 - `LMCacheConnectorV1Dynamic` with
   `kv_connector_module_path="lmcache.integration.vllm.lmcache_connector_v1"`;
+- `--kv-offloading-backend lmcache` / `kv_offloading_backend="lmcache"` as
+  launch/config evidence for the vLLM LMCache offload path;
 - legacy `LMCacheConnector`, which InferGuard should treat as stale/pinned
   evidence unless the operator documents an old stack.
 
@@ -153,6 +155,10 @@ For SGLang embedded mode, current mainline source evidence points to:
 
 No current-mainline SGLang MP connector contract has been proven yet. InferGuard
 must not mark SGLang MP as supported until source and a live fixture prove it.
+SGLang HiCache-only metrics are not LMCache proof; InferGuard keeps them as
+SGLang cache/storage context unless `--enable-lmcache`,
+`LMCacheLayerwiseConnector`, `LMCRadixCache`, or `lmcache:*` evidence is also
+present.
 
 ### Standalone MP `lmcache_mp_*`
 
@@ -247,7 +253,11 @@ Current InferGuard support is not 100% LMCache compatible. The highest-priority 
    zero-hit-after-warmup, hash-seed risk, missing lookup counters, L1 pressure,
    L2 stalls, EventBus drop risk, and trace/OTel evidence gaps.
 4. Expand structured log parsing for MP store/retrieve lifecycle proof.
-5. Add explicit embedded mode detection for vLLM and SGLang connector strings.
+5. Validate embedded vLLM and SGLang connector classification against live
+   fixtures. Fixture-backed parser support exists for vLLM
+   `LMCacheConnectorV1Dynamic`/`kv_offloading_backend=lmcache`, stale
+   `LMCacheConnector`, SGLang `--enable-lmcache`/`LMCacheLayerwiseConnector`/
+   `LMCRadixCache`, and HiCache-only separation.
 6. Add P2P mode detection and P2P metric normalization.
 7. Add controller and internal API collection.
 8. Add live compatibility fixtures for embedded, P2P, PD, OTel, and trace
