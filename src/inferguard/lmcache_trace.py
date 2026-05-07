@@ -95,9 +95,13 @@ def _unpack_record(payload: bytes) -> Any:
     try:
         import msgpack  # type: ignore[import-not-found]
 
-        return msgpack.unpackb(payload, raw=False)
+        try:
+            return msgpack.unpackb(payload, raw=False)
+        except Exception:
+            pass
     except ImportError:
-        return json.loads(payload.decode("utf-8"))
+        pass
+    return json.loads(payload.decode("utf-8"))
 
 
 def _safe_mapping(value: Any) -> dict[str, Any]:

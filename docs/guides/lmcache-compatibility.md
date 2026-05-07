@@ -42,6 +42,27 @@ Use it when you have one or both of:
 - Optional LMCache HTTP, `.lct`, and OTel evidence JSON files produced by
   `collect-lmcache` or equivalent local parsing.
 
+For MP runs, prefer packet collection first:
+
+```bash
+inferguard collect-lmcache \
+  --output-dir modal-out/lmcache-packet \
+  --engine-metrics-file vllm.prom \
+  --lmcache-metrics-file lmcache.prom \
+  --lmcache-http-base-url http://localhost:7000 \
+  --lmcache-http-thread-name eviction \
+  --lmcache-log-file lmcache.log \
+  --lmcache-trace-file lmcache-trace.lct \
+  --lmcache-otel-file lmcache-otel.json \
+  --expect-mode mp \
+  --mp-trace-recording-enabled \
+  --mp-tracing-enabled
+```
+
+`collect-lmcache` fetches safe read-only MP HTTP routes from the base URL and
+records destructive routes such as cache clearing and metrics reset as skipped
+evidence rather than invoking them.
+
 Example:
 
 ```bash
@@ -200,9 +221,9 @@ Current InferGuard support is not 100% LMCache compatible. The highest-priority 
 1. Add a clean full MP golden fixture with LMCache MP metrics, HTTP evidence,
    logs, and optional `.lct` / OTel evidence.
 2. Add an MP L2 live fixture.
-3. Add detector rules for MP mode mismatch, missing MP metrics,
+3. Calibrate detector rules for MP mode mismatch, missing MP metrics,
    zero-hit-after-warmup, hash-seed risk, missing lookup counters, L1 pressure,
-   L2 stalls, and EventBus drop risk.
+   L2 stalls, EventBus drop risk, and trace/OTel evidence gaps.
 4. Expand structured log parsing for MP store/retrieve lifecycle proof.
 5. Add explicit embedded mode detection for vLLM and SGLang connector strings.
 6. Add P2P mode detection and P2P metric normalization.

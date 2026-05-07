@@ -28,23 +28,19 @@ class LmcacheOtelEvidence:
 
 
 def parse_lmcache_otel_jsonl(path: Path) -> dict[str, Any]:
-    """Parse JSONL OTel span exports for LMCache MP span evidence."""
+    """Parse JSONL or OTLP JSON span exports for LMCache MP span evidence."""
 
     evidence = LmcacheOtelEvidence(present=True)
     attribute_keys: set[str] = set()
     durations: dict[str, list[float]] = {}
     try:
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
+        text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
         evidence.parse_errors.append(f"{type(exc).__name__}: {exc}")
         return evidence.as_dict()
-    for idx, line in enumerate(lines, start=1):
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError as exc:
-            evidence.parse_errors.append(f"line {idx}: {exc.msg}")
+    for idx, row in enumerate(_iter_span_rows(text, evidence.parse_errors), start=1):
+        if not isinstance(row, dict):
+            evidence.parse_errors.append(f"span {idx}: expected object")
             continue
         evidence.span_count += 1
         name = _span_name(row)
@@ -65,6 +61,55 @@ def parse_lmcache_otel_jsonl(path: Path) -> dict[str, Any]:
     return evidence.as_dict()
 
 
+def _iter_span_rows(text: str, parse_errors: list[str]) -> list[Any]:
+    stripped = text.strip()
+    if not stripped:
+        return []
+    if stripped.startswith(("{", "[")):
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            parse_errors.append(f"json: {exc.msg}")
+        else:
+            rows = _spans_from_otlp_json(payload)
+            if rows:
+                return rows
+            if isinstance(payload, list):
+                return payload
+            if isinstance(payload, dict):
+                return [payload]
+    rows: list[Any] = []
+    for idx, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            parse_errors.append(f"line {idx}: {exc.msg}")
+            continue
+        rows.extend(_spans_from_otlp_json(row) or [row])
+    return rows
+
+
+def _spans_from_otlp_json(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not isinstance(payload, dict):
+        return rows
+    for resource_span in payload.get("resourceSpans") or payload.get("resource_spans") or []:
+        if not isinstance(resource_span, dict):
+            continue
+        for scope_span in resource_span.get("scopeSpans") or resource_span.get("scope_spans") or []:
+            if not isinstance(scope_span, dict):
+                continue
+            for span in scope_span.get("spans") or []:
+                if isinstance(span, dict):
+                    rows.append(span)
+    for span in payload.get("spans") or []:
+        if isinstance(span, dict):
+            rows.append(span)
+    return rows
+
+
 def _span_name(row: dict[str, Any]) -> str:
     for key in ("name", "span_name", "operationName"):
         if row.get(key):
@@ -78,9 +123,26 @@ def _attributes(row: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for item in attrs:
             if isinstance(item, dict) and item.get("key"):
-                out[str(item["key"])] = item.get("value")
+                out[str(item["key"])] = _otel_value(item.get("value"))
         return out
-    return attrs if isinstance(attrs, dict) else {}
+    return {str(key): _otel_value(value) for key, value in attrs.items()} if isinstance(attrs, dict) else {}
+
+
+def _otel_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        for key in (
+            "stringValue",
+            "intValue",
+            "doubleValue",
+            "boolValue",
+            "string_value",
+            "int_value",
+            "double_value",
+            "bool_value",
+        ):
+            if key in value:
+                return value[key]
+    return value
 
 
 def _duration_seconds(row: dict[str, Any]) -> float | None:

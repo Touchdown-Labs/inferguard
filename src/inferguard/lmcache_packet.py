@@ -8,6 +8,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urljoin
 from typing import Any
 
 from inferguard.compat import build_compat_report, write_compat_report
@@ -29,10 +30,22 @@ class LmcachePacketOptions:
     lmcache_metrics_url: str | None = None
     engine_metrics_file: Path | None = None
     lmcache_metrics_file: Path | None = None
+    lmcache_http_base_url: str | None = None
+    lmcache_http_thread_name: str | None = None
     lmcache_health_url: str | None = None
     lmcache_health_file: Path | None = None
     lmcache_status_url: str | None = None
     lmcache_status_file: Path | None = None
+    lmcache_conf_url: str | None = None
+    lmcache_conf_file: Path | None = None
+    lmcache_threads_url: str | None = None
+    lmcache_threads_file: Path | None = None
+    lmcache_periodic_threads_url: str | None = None
+    lmcache_periodic_threads_file: Path | None = None
+    lmcache_periodic_thread_url: str | None = None
+    lmcache_periodic_thread_file: Path | None = None
+    lmcache_periodic_threads_health_url: str | None = None
+    lmcache_periodic_threads_health_file: Path | None = None
     engine_log_file: Path | None = None
     lmcache_log_file: Path | None = None
     lmcache_trace_file: Path | None = None
@@ -76,10 +89,12 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         sources=sources,
         errors=errors,
     )
+    http_base_url = _normalize_base_url(options.lmcache_http_base_url)
+    http_endpoint_errors: dict[str, str] = {}
     health_text = _capture_text(
         destination=output_dir / "lmcache_health.txt",
         source_name="lmcache_health",
-        url=options.lmcache_health_url,
+        url=options.lmcache_health_url or _join_base(http_base_url, "/api/healthcheck"),
         source_file=options.lmcache_health_file,
         timeout_seconds=options.timeout_seconds,
         artifacts=artifacts,
@@ -89,18 +104,125 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
     status_text = _capture_text(
         destination=output_dir / "lmcache_status.txt",
         source_name="lmcache_status",
-        url=options.lmcache_status_url,
+        url=options.lmcache_status_url or _join_base(http_base_url, "/api/status"),
         source_file=options.lmcache_status_file,
         timeout_seconds=options.timeout_seconds,
         artifacts=artifacts,
         sources=sources,
         errors=errors,
     )
+    root_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="root",
+        filename="lmcache_root.txt",
+        url=options.lmcache_http_base_url or _join_base(http_base_url, "/"),
+        source_file=None,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    conf_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="conf",
+        filename="lmcache_conf.txt",
+        url=options.lmcache_conf_url or _join_base(http_base_url, "/conf"),
+        source_file=options.lmcache_conf_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    threads_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="threads",
+        filename="lmcache_threads.txt",
+        url=options.lmcache_threads_url or _join_base(http_base_url, "/threads"),
+        source_file=options.lmcache_threads_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    periodic_threads_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="periodic_threads",
+        filename="lmcache_periodic_threads.txt",
+        url=options.lmcache_periodic_threads_url or _join_base(http_base_url, "/periodic-threads"),
+        source_file=options.lmcache_periodic_threads_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    periodic_thread_path = (
+        f"/periodic-threads/{options.lmcache_http_thread_name}"
+        if options.lmcache_http_thread_name
+        else ""
+    )
+    periodic_thread_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="periodic_thread",
+        filename="lmcache_periodic_thread.txt",
+        url=options.lmcache_periodic_thread_url or _join_base(http_base_url, periodic_thread_path),
+        source_file=options.lmcache_periodic_thread_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    periodic_threads_health_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="periodic_threads_health",
+        filename="lmcache_periodic_threads_health.txt",
+        url=options.lmcache_periodic_threads_health_url
+        or _join_base(http_base_url, "/periodic-threads-health"),
+        source_file=options.lmcache_periodic_threads_health_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
     http_evidence: dict[str, Any] | None = None
-    if health_text or status_text:
+    if any(
+        [
+            root_text,
+            health_text,
+            status_text,
+            conf_text,
+            threads_text,
+            periodic_threads_text,
+            periodic_thread_text,
+            periodic_threads_health_text,
+            http_endpoint_errors,
+        ]
+    ):
         http_evidence = parse_lmcache_http_payloads(
+            root_text=root_text,
             health_text=health_text,
             status_text=status_text,
+            conf_text=conf_text,
+            threads_text=threads_text,
+            periodic_threads_text=periodic_threads_text,
+            periodic_thread_text=periodic_thread_text,
+            periodic_threads_health_text=periodic_threads_health_text,
+            endpoint_errors=http_endpoint_errors,
+            skipped_endpoints=[
+                {
+                    "endpoint": "POST /api/clear-cache",
+                    "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
+                },
+                {
+                    "endpoint": "POST /metrics/reset",
+                    "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
+                },
+            ],
         )
         http_evidence_path = output_dir / "lmcache_http_evidence.json"
         atomic_write_json(http_evidence_path, http_evidence)
@@ -287,6 +409,35 @@ def _capture_url(
     return text
 
 
+def _capture_optional_http_endpoint(
+    *,
+    output_dir: Path,
+    endpoint_name: str,
+    filename: str,
+    url: str | None,
+    source_file: Path | None,
+    timeout_seconds: float,
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+    endpoint_errors: dict[str, str],
+) -> str:
+    before = len(errors)
+    text = _capture_text(
+        destination=output_dir / filename,
+        source_name=f"lmcache_{endpoint_name}",
+        url=url,
+        source_file=source_file,
+        timeout_seconds=timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    if not text and len(errors) > before:
+        endpoint_errors[endpoint_name] = errors[-1]["error"]
+    return text
+
+
 def _copy_file(
     *,
     destination: Path,
@@ -324,3 +475,15 @@ def _record_error(
 
 def _utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _normalize_base_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    return url if url.endswith("/") else f"{url}/"
+
+
+def _join_base(base_url: str | None, path: str) -> str | None:
+    if not base_url or not path:
+        return None
+    return urljoin(base_url, path.lstrip("/"))

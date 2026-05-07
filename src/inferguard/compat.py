@@ -144,6 +144,14 @@ def build_compat_report(
         samples,
         mp_observability=mp_observability_report,
     )
+    diagnostic_findings.extend(
+        _evidence_diagnostic_findings(
+            lmcache_http_evidence=lmcache_http_evidence,
+            lmcache_trace_evidence=lmcache_trace_evidence,
+            lmcache_otel_evidence=lmcache_otel_evidence,
+            mp_observability=mp_observability_report,
+        )
+    )
     upstream_questions = _upstream_questions(families, samples, mp_observability_report)
     failures = _failures(
         families,
@@ -849,6 +857,50 @@ def _evidence_failures(
             }
         )
     return failures
+
+
+def _evidence_diagnostic_findings(
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_trace_evidence: dict[str, Any] | None,
+    lmcache_otel_evidence: dict[str, Any] | None,
+    mp_observability: dict[str, Any],
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for item in (lmcache_http_evidence or {}).get("failure_reasons", []) or []:
+        if isinstance(item, dict):
+            findings.append(
+                {
+                    "code": item.get("code") or "lmcache_http_unhealthy",
+                    "severity": "warning",
+                    "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy.",
+                    "recommendation": "Inspect LMCache MP HTTP health/status and periodic thread evidence.",
+                }
+            )
+    config = mp_observability.get("config") or {}
+    if config.get("trace_recording_enabled") and not (
+        lmcache_trace_evidence and lmcache_trace_evidence.get("claim_status") == "measured"
+    ):
+        findings.append(
+            {
+                "code": "lmcache_mp_trace_enabled_but_no_trace_artifact",
+                "severity": "warning",
+                "message": "LMCache MP trace recording is configured, but no parseable .lct evidence was present.",
+                "recommendation": "Capture the trace output file from --trace-level storage and include it in collect-lmcache.",
+            }
+        )
+    if config.get("tracing_enabled") and not (
+        lmcache_otel_evidence and lmcache_otel_evidence.get("claim_status") == "measured"
+    ):
+        findings.append(
+            {
+                "code": "otel_tracing_enabled_but_no_spans",
+                "severity": "warning",
+                "message": "LMCache MP OTel tracing is configured, but no LMCache span evidence was present.",
+                "recommendation": "Verify the OTLP endpoint and export mp.store, mp.retrieve, and mp.lookup_prefetch spans.",
+            }
+        )
+    return findings
 
 
 __all__ = [

@@ -1724,6 +1724,20 @@ def collect_lmcache_cmd(
         Path | None,
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache Prometheus scrape."),
     ] = None,
+    lmcache_http_base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--lmcache-http-base-url",
+            help="Optional LMCache MP HTTP base URL; fetches safe read-only endpoints.",
+        ),
+    ] = None,
+    lmcache_http_thread_name: Annotated[
+        str | None,
+        typer.Option(
+            "--lmcache-http-thread-name",
+            help="Optional periodic thread name to fetch from /periodic-threads/{thread_name}.",
+        ),
+    ] = None,
     lmcache_health_url: Annotated[
         str | None,
         typer.Option("--lmcache-health-url", help="Optional LMCache MP HTTP healthcheck URL."),
@@ -1739,6 +1753,61 @@ def collect_lmcache_cmd(
     lmcache_status_file: Annotated[
         Path | None,
         typer.Option("--lmcache-status-file", help="Optional saved LMCache MP status response."),
+    ] = None,
+    lmcache_conf_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-conf-url", help="Optional LMCache MP /conf URL."),
+    ] = None,
+    lmcache_conf_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-conf-file", help="Optional saved LMCache MP /conf response."),
+    ] = None,
+    lmcache_threads_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-threads-url", help="Optional LMCache MP /threads URL."),
+    ] = None,
+    lmcache_threads_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-threads-file", help="Optional saved LMCache MP /threads response."),
+    ] = None,
+    lmcache_periodic_threads_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-periodic-threads-url", help="Optional LMCache MP /periodic-threads URL."),
+    ] = None,
+    lmcache_periodic_threads_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--lmcache-periodic-threads-file",
+            help="Optional saved LMCache MP /periodic-threads response.",
+        ),
+    ] = None,
+    lmcache_periodic_thread_url: Annotated[
+        str | None,
+        typer.Option(
+            "--lmcache-periodic-thread-url",
+            help="Optional LMCache MP /periodic-threads/{thread_name} URL.",
+        ),
+    ] = None,
+    lmcache_periodic_thread_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--lmcache-periodic-thread-file",
+            help="Optional saved LMCache MP /periodic-threads/{thread_name} response.",
+        ),
+    ] = None,
+    lmcache_periodic_threads_health_url: Annotated[
+        str | None,
+        typer.Option(
+            "--lmcache-periodic-threads-health-url",
+            help="Optional LMCache MP /periodic-threads-health URL.",
+        ),
+    ] = None,
+    lmcache_periodic_threads_health_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--lmcache-periodic-threads-health-file",
+            help="Optional saved LMCache MP /periodic-threads-health response.",
+        ),
     ] = None,
     engine_log_file: Annotated[
         Path | None,
@@ -1848,6 +1917,17 @@ def collect_lmcache_cmd(
             lmcache_health_file,
             lmcache_status_url,
             lmcache_status_file,
+            lmcache_http_base_url,
+            lmcache_conf_url,
+            lmcache_conf_file,
+            lmcache_threads_url,
+            lmcache_threads_file,
+            lmcache_periodic_threads_url,
+            lmcache_periodic_threads_file,
+            lmcache_periodic_thread_url,
+            lmcache_periodic_thread_file,
+            lmcache_periodic_threads_health_url,
+            lmcache_periodic_threads_health_file,
             engine_log_file,
             lmcache_log_file,
             lmcache_trace_file,
@@ -1862,10 +1942,22 @@ def collect_lmcache_cmd(
             lmcache_metrics_url=lmcache_metrics_url,
             engine_metrics_file=engine_metrics_file,
             lmcache_metrics_file=lmcache_metrics_file,
+            lmcache_http_base_url=lmcache_http_base_url,
+            lmcache_http_thread_name=lmcache_http_thread_name,
             lmcache_health_url=lmcache_health_url,
             lmcache_health_file=lmcache_health_file,
             lmcache_status_url=lmcache_status_url,
             lmcache_status_file=lmcache_status_file,
+            lmcache_conf_url=lmcache_conf_url,
+            lmcache_conf_file=lmcache_conf_file,
+            lmcache_threads_url=lmcache_threads_url,
+            lmcache_threads_file=lmcache_threads_file,
+            lmcache_periodic_threads_url=lmcache_periodic_threads_url,
+            lmcache_periodic_threads_file=lmcache_periodic_threads_file,
+            lmcache_periodic_thread_url=lmcache_periodic_thread_url,
+            lmcache_periodic_thread_file=lmcache_periodic_thread_file,
+            lmcache_periodic_threads_health_url=lmcache_periodic_threads_health_url,
+            lmcache_periodic_threads_health_file=lmcache_periodic_threads_health_file,
             engine_log_file=engine_log_file,
             lmcache_log_file=lmcache_log_file,
             lmcache_trace_file=lmcache_trace_file,

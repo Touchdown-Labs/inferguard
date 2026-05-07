@@ -51,3 +51,41 @@ def test_lmcache_otel_records_bad_json_without_crashing(tmp_path: Path) -> None:
 
     assert evidence["claim_status"] == "measured"
     assert evidence["parse_errors"]
+
+
+def test_lmcache_otel_parses_otlp_json_export(tmp_path: Path) -> None:
+    spans = tmp_path / "otlp.json"
+    spans.write_text(
+        json.dumps(
+            {
+                "resourceSpans": [
+                    {
+                        "scopeSpans": [
+                            {
+                                "spans": [
+                                    {
+                                        "name": "mp.retrieve",
+                                        "startTimeUnixNano": "1000",
+                                        "endTimeUnixNano": "2001000",
+                                        "attributes": [
+                                            {"key": "device", "value": {"stringValue": "cuda:0"}},
+                                            {"key": "retrieved_count", "value": {"intValue": "8"}},
+                                        ],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    evidence = parse_lmcache_otel_jsonl(spans)
+
+    assert evidence["claim_status"] == "measured"
+    assert evidence["span_count"] == 1
+    assert evidence["span_counts"]["mp.retrieve"] == 1
+    assert evidence["latency_seconds"]["mp.retrieve"]["max"] == 0.002
+    assert "retrieved_count" in evidence["attribute_keys"]

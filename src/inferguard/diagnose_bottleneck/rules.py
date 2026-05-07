@@ -803,6 +803,8 @@ def _lmcache_missing_signal_downgrade(
         "lmcache_mp_eventbus_loss",
         "lmcache_mp_l1_eviction_pressure",
         "lmcache_mp_low_hit_rate",
+        "otel_tracing_enabled_but_no_spans",
+        "lmcache_mp_trace_enabled_but_no_trace_artifact",
         "lmcache_mp_eventbus_taildrop_unobservable",
         "lmcache_mp_empty_cache_salt",
     ]

@@ -178,3 +178,24 @@ lmcache_mp_l2_prefetch_failure_total 1
     assert "lmcache_mp_l2_failures" in codes
     question_codes = {item["code"] for item in compat["upstream_questions"]}
     assert "lmcache_mp_empty_cache_salt" in question_codes
+
+
+def test_lmcache_compat_promotes_trace_and_otel_missing_evidence() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_l1_read_keys_total 5
+""",
+        expect_lmcache_mode="mp",
+        lmcache_trace_evidence={"present": True, "claim_status": "not_proven"},
+        lmcache_otel_evidence={"present": True, "claim_status": "not_proven"},
+        mp_observability={
+            "trace_recording_enabled": True,
+            "tracing_enabled": True,
+            "event_bus_queue_size": 10000,
+        },
+    )
+
+    codes = {item["code"] for item in report["lmcache_compat"]["diagnostic_findings"]}
+    assert "lmcache_mp_trace_enabled_but_no_trace_artifact" in codes
+    assert "otel_tracing_enabled_but_no_spans" in codes

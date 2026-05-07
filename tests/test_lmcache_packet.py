@@ -16,6 +16,11 @@ def test_collect_lmcache_packet_writes_partial_first_artifacts(tmp_path: Path) -
     lmcache_log = tmp_path / "lmcache.log"
     lmcache_health = tmp_path / "health.json"
     lmcache_status = tmp_path / "status.json"
+    lmcache_conf = tmp_path / "conf.json"
+    lmcache_threads = tmp_path / "threads.json"
+    lmcache_periodic_threads = tmp_path / "periodic_threads.json"
+    lmcache_periodic_thread = tmp_path / "periodic_thread.json"
+    lmcache_periodic_threads_health = tmp_path / "periodic_threads_health.json"
     lmcache_trace = tmp_path / "trace.lct"
     lmcache_otel = tmp_path / "otel.jsonl"
     lmcache_metrics.write_text(
@@ -38,6 +43,11 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     lmcache_log.write_text("Prefetch request completed (L1+L2): 4/10 prefix hits\n", encoding="utf-8")
     lmcache_health.write_text('{"is_healthy": true, "status": "ok"}', encoding="utf-8")
     lmcache_status.write_text('{"engine_type": "mp", "chunk_size": 256}', encoding="utf-8")
+    lmcache_conf.write_text('{"prometheus_port": 9090}', encoding="utf-8")
+    lmcache_threads.write_text('{"threads": [{"name": "EventBusDrain", "alive": true}]}', encoding="utf-8")
+    lmcache_periodic_threads.write_text('{"periodic_threads": ["eviction"]}', encoding="utf-8")
+    lmcache_periodic_thread.write_text('{"name": "eviction", "healthy": true}', encoding="utf-8")
+    lmcache_periodic_threads_health.write_text('{"healthy": true}', encoding="utf-8")
     _write_lct(
         lmcache_trace,
         [
@@ -55,6 +65,11 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
             lmcache_metrics_file=lmcache_metrics,
             lmcache_health_file=lmcache_health,
             lmcache_status_file=lmcache_status,
+            lmcache_conf_file=lmcache_conf,
+            lmcache_threads_file=lmcache_threads,
+            lmcache_periodic_threads_file=lmcache_periodic_threads,
+            lmcache_periodic_thread_file=lmcache_periodic_thread,
+            lmcache_periodic_threads_health_file=lmcache_periodic_threads_health,
             lmcache_log_file=lmcache_log,
             lmcache_trace_file=lmcache_trace,
             lmcache_otel_file=lmcache_otel,
@@ -70,10 +85,18 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     assert (output_dir / "lmcache_metrics.prom").exists()
     assert (output_dir / "lmcache.log").exists()
     assert (output_dir / "lmcache_http_evidence.json").exists()
+    assert (output_dir / "lmcache_conf.txt").exists()
+    assert (output_dir / "lmcache_threads.txt").exists()
+    assert (output_dir / "lmcache_periodic_threads.txt").exists()
+    assert (output_dir / "lmcache_periodic_thread.txt").exists()
+    assert (output_dir / "lmcache_periodic_threads_health.txt").exists()
     assert (output_dir / "lmcache_log_evidence.json").exists()
     assert (output_dir / "lmcache_trace_evidence.json").exists()
     assert (output_dir / "lmcache_otel_evidence.json").exists()
     assert manifest["http_evidence"]["booleans"]["is_healthy"] is True
+    assert manifest["http_evidence"]["booleans"]["has_conf"] is True
+    assert manifest["http_evidence"]["booleans"]["has_threads"] is True
+    assert manifest["http_evidence"]["skipped_endpoints"][0]["endpoint"] == "POST /api/clear-cache"
     assert manifest["log_evidence"]["event_counts"]["prefetch_complete"] == 1
     assert manifest["trace_evidence"]["claim_status"] == "measured"
     assert manifest["otel_evidence"]["claim_status"] == "measured"

@@ -44,3 +44,39 @@ def test_lmcache_trace_reports_malformed_file(tmp_path: Path) -> None:
 
     assert evidence["claim_status"] == "not_proven"
     assert "truncated_record" in evidence["parse_error"]
+
+
+def test_lmcache_trace_parses_real_msgpack_records(tmp_path: Path) -> None:
+    import msgpack
+
+    trace = tmp_path / "real_msgpack.lct"
+    chunks = []
+    for record in [
+        {
+            "magic": "LMCT",
+            "format_version": 1,
+            "level": "storage",
+            "trace_schema_version": 1,
+            "sm_config_digest": "abc",
+        },
+        {
+            "qualname": "StorageManager.read_prefetched_results.__enter__",
+            "t_mono": 1.0,
+            "args": {"request_id": "req-a"},
+        },
+        {
+            "qualname": "StorageManager.finish_read_prefetched",
+            "t_mono": 1.2,
+            "args": {"request_id": "req-a"},
+        },
+    ]:
+        payload = msgpack.packb(record, use_bin_type=True)
+        chunks.append(struct.pack(">I", len(payload)) + payload)
+    trace.write_bytes(b"".join(chunks))
+
+    evidence = parse_lmcache_trace_file(trace)
+
+    assert evidence["claim_status"] == "measured"
+    assert evidence["header"]["magic"] == "LMCT"
+    assert evidence["storage_calls"]["__enter__"] == 1
+    assert evidence["storage_calls"]["finish_read_prefetched"] == 1

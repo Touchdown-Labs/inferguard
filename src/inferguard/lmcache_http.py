@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 SCHEMA_VERSION = "inferguard-lmcache-http-evidence/v1"
 
@@ -14,6 +14,7 @@ class LmcacheHttpEvidence:
     schema_version: str = SCHEMA_VERSION
     endpoints: dict[str, dict[str, Any]] = field(default_factory=dict)
     booleans: dict[str, bool] = field(default_factory=dict)
+    skipped_endpoints: list[dict[str, str]] = field(default_factory=list)
     failure_reasons: list[dict[str, str]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -25,31 +26,52 @@ def parse_lmcache_http_payloads(
     health_text: str = "",
     status_text: str = "",
     metrics_text: str = "",
+    root_text: str = "",
+    conf_text: str = "",
     threads_text: str = "",
     periodic_threads_text: str = "",
+    periodic_thread_text: str = "",
     periodic_threads_health_text: str = "",
+    extra_payloads: Mapping[str, str] | None = None,
+    endpoint_errors: Mapping[str, str] | None = None,
+    skipped_endpoints: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Parse best-effort LMCache HTTP API responses into bounded evidence."""
 
     evidence = LmcacheHttpEvidence()
     payloads = {
+        "root": root_text,
         "health": health_text,
         "status": status_text,
         "metrics": metrics_text,
+        "conf": conf_text,
         "threads": threads_text,
         "periodic_threads": periodic_threads_text,
+        "periodic_thread": periodic_thread_text,
         "periodic_threads_health": periodic_threads_health_text,
     }
+    if extra_payloads:
+        payloads.update({str(name): text for name, text in extra_payloads.items()})
     for name, text in payloads.items():
         if not text:
             continue
         evidence.endpoints[name] = _endpoint_row(name, text)
+    for name, error in (endpoint_errors or {}).items():
+        evidence.endpoints[str(name)] = {
+            "present": False,
+            "status": "unavailable",
+            "error": str(error),
+        }
+    evidence.skipped_endpoints = list(skipped_endpoints or [])
     evidence.booleans = {
+        "has_root": "root" in evidence.endpoints,
         "has_health": "health" in evidence.endpoints,
         "has_status": "status" in evidence.endpoints,
         "has_metrics": "metrics" in evidence.endpoints,
+        "has_conf": "conf" in evidence.endpoints,
         "has_threads": "threads" in evidence.endpoints,
         "has_periodic_threads": "periodic_threads" in evidence.endpoints,
+        "has_periodic_thread": "periodic_thread" in evidence.endpoints,
         "has_periodic_threads_health": "periodic_threads_health" in evidence.endpoints,
         "is_healthy": _is_overall_healthy(evidence.endpoints),
     }
@@ -100,6 +122,12 @@ def _extract_fields(name: str, payload: Any) -> dict[str, Any]:
         "active_prefetch_jobs",
         "registered_gpu_ids",
         "storage_manager",
+        "event_bus",
+        "periodic_threads",
+        "threads",
+        "quota",
+        "version",
+        "commit_id",
         "error",
         "failure_reason",
     ):
