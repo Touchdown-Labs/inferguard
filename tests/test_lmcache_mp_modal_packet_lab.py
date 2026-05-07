@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import types
 from pathlib import Path
 
+_LMCACHE_SOURCE_ENV_KEYS = (
+    "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE",
+    "INFERGUARD_PACKET_A_LMCACHE_GIT_REF",
+    "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO",
+    "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC",
+)
 
-def _load_lab_module():
+
+def _load_lab_module(env: dict[str, str] | None = None):
     module_name = "_lmcache_mp_modal_packet_lab_test"
-    if module_name in sys.modules:
-        return sys.modules[module_name]
+    sys.modules.pop(module_name, None)
 
     class _FakeImage:
         def __init__(self):
@@ -67,13 +74,26 @@ def _load_lab_module():
     fake_modal = types.SimpleNamespace(Image=_FakeImage, Volume=_FakeVolume, App=_FakeApp)
     sys.modules["modal"] = fake_modal
 
+    saved_env = {key: os.environ.get(key) for key in _LMCACHE_SOURCE_ENV_KEYS}
+    for key in _LMCACHE_SOURCE_ENV_KEYS:
+        os.environ.pop(key, None)
+    if env:
+        os.environ.update(env)
+
     path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_mp_modal_packet_lab.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     assert spec.loader is not None
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
     return module
 
 
@@ -87,9 +107,18 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     assert lab.MODAL_INFERGUARD_PACKAGE_DIR == "src/inferguard"
     assert lab.INFERGUARD_LOCAL_INSTALL_COMMAND == "python -m pip install -e /opt/inferguard"
 
+    assert lab.LMCACHE_INSTALL_PLAN.source_kind == "pypi"
+    assert lab.LMCACHE_INSTALL_PLAN.source_ref == "lmcache"
+    assert lab.UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES == (
+        "lmcache_mp_lookup_requested_tokens_total",
+        "lmcache_mp_lookup_hit_tokens_total",
+        "lmcache_mp_l1_memory_usage_bytes",
+    )
+
     calls = lab.image.calls
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "inferguard" not in pip_install_args
+    assert "lmcache" in pip_install_args
     assert not any("git+https://github.com/Touchdown-Labs/inferguard" in arg for arg in pip_install_args)
 
     add_local_files = [kwargs for name, _args, kwargs in calls if name == "add_local_file"]
@@ -110,13 +139,15 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
             "copy": True,
         },
     ]
-    add_local_dir = next(kwargs for name, _args, kwargs in calls if name == "add_local_dir")
-    assert add_local_dir == {
-        "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
-        "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
-        "copy": True,
-    }
-    assert add_local_dir["local_path"] != str(lab.REPO_ROOT)
+    add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
+    assert add_local_dirs == [
+        {
+            "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
+            "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
+            "copy": True,
+        }
+    ]
+    assert add_local_dirs[0]["local_path"] != str(lab.REPO_ROOT)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
     assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
 
@@ -124,6 +155,56 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     assert call_names.index("add_local_file") > call_names.index("pip_install")
     assert call_names.index("add_local_dir") > call_names.index("add_local_file")
     assert call_names.index("run_commands") > call_names.index("add_local_dir")
+
+
+def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> None:
+    lab = _load_lab_module({"INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE": str(tmp_path)})
+
+    assert lab.LMCACHE_INSTALL_PLAN.source_kind == "local"
+    assert lab.LMCACHE_INSTALL_PLAN.local_source == tmp_path
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    assert "lmcache" not in pip_install_args
+
+    add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
+    assert add_local_dirs[0] == {
+        "local_path": str(tmp_path),
+        "remote_path": lab.MODAL_LMCACHE_SOURCE,
+        "copy": True,
+    }
+    assert add_local_dirs[1]["remote_path"] == (
+        f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}"
+    )
+    for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
+        assert dep in pip_install_args
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+    assert run_commands_args == (
+        "python -m pip install -e /opt/lmcache --no-build-isolation",
+        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
+    )
+
+
+def test_modal_image_can_install_lmcache_from_git_ref() -> None:
+    lab = _load_lab_module(
+        {
+            "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO": "https://github.com/LMCache/LMCache.git",
+            "INFERGUARD_PACKET_A_LMCACHE_GIT_REF": "b1-metrics-ref",
+        }
+    )
+
+    assert lab.LMCACHE_INSTALL_PLAN.source_kind == "git"
+    assert lab.LMCACHE_INSTALL_PLAN.source_ref == "b1-metrics-ref"
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    assert "lmcache" not in pip_install_args
+    assert "git+https://github.com/LMCache/LMCache.git@b1-metrics-ref" not in pip_install_args
+    for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
+        assert dep in pip_install_args
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+    assert run_commands_args == (
+        "python -m pip install git+https://github.com/LMCache/LMCache.git@b1-metrics-ref --no-build-isolation",
+        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
+    )
 
 
 def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) -> None:

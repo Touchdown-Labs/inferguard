@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -58,60 +60,162 @@ MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
-volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
-
-image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .apt_install("curl", "git")
-    .pip_install(
-        "vllm",
-        "lmcache",
-        "hf-transfer",
-        "huggingface-hub",
-        "nvidia-cuda-runtime-cu12",
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "pyproject.toml"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "README.md"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "LICENSE"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
-        copy=True,
-    )
-    .add_local_dir(
-        local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
-        copy=True,
-    )
-    .run_commands(INFERGUARD_LOCAL_INSTALL_COMMAND)
-    .env(
-        {
-            "HF_HUB_ENABLE_HF_TRANSFER": "1",
-            "HF_HOME": "/out/hf-cache",
-            "VLLM_CACHE_ROOT": "/out/vllm-cache",
-            "PYTHONHASHSEED": "0",
-            "LMCACHE_USE_EXPERIMENTAL": "True",
-            "LMCACHE_LOCAL_CPU": "True",
-            "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
-            "LMCACHE_CHUNK_SIZE": "256",
-            "VLLM_USE_FLASHINFER_SAMPLER": "0",
-            "VLLM_USE_DEEP_GEMM": "0",
-            "VLLM_DEEP_GEMM_WARMUP": "skip",
-            "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
-            "LD_LIBRARY_PATH": (
-                "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
-            ),
-        }
-    )
+MODAL_LMCACHE_SOURCE = "/opt/lmcache"
+LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
+LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
+LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
+LMCACHE_PIP_SPEC_ENV = "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC"
+DEFAULT_LMCACHE_PIP_SPEC = "lmcache"
+DEFAULT_LMCACHE_GIT_REPO = "https://github.com/LMCache/LMCache.git"
+UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
+    "lmcache_mp_lookup_requested_tokens_total",
+    "lmcache_mp_lookup_hit_tokens_total",
+    "lmcache_mp_l1_memory_usage_bytes",
 )
 
+
+@dataclass(frozen=True)
+class LmcacheInstallPlan:
+    source_kind: str
+    pip_packages: tuple[str, ...]
+    run_commands: tuple[str, ...] = ()
+    local_source: Path | None = None
+    remote_source: str | None = None
+    source_ref: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "source_kind": self.source_kind,
+            "pip_packages": list(self.pip_packages),
+            "run_commands": list(self.run_commands),
+            "local_source": str(self.local_source) if self.local_source else None,
+            "remote_source": self.remote_source,
+            "source_ref": self.source_ref,
+            "required_mp_prometheus_families": list(UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES),
+        }
+
+
+BASE_MODAL_PIP_PACKAGES = (
+    "vllm",
+    "hf-transfer",
+    "huggingface-hub",
+    "nvidia-cuda-runtime-cu12",
+)
+LMCACHE_SOURCE_BUILD_DEPS = (
+    "ninja",
+    "packaging>=24.2",
+    "setuptools_scm>=8",
+    "wheel",
+)
+
+
+def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> LmcacheInstallPlan:
+    env = env or os.environ
+    local_source = env.get(LMCACHE_LOCAL_SOURCE_ENV, "").strip()
+    git_ref = env.get(LMCACHE_GIT_REF_ENV, "").strip()
+    git_repo = (
+        env.get(LMCACHE_GIT_REPO_ENV, DEFAULT_LMCACHE_GIT_REPO).strip()
+        or DEFAULT_LMCACHE_GIT_REPO
+    )
+    pip_spec = (
+        env.get(LMCACHE_PIP_SPEC_ENV, DEFAULT_LMCACHE_PIP_SPEC).strip()
+        or DEFAULT_LMCACHE_PIP_SPEC
+    )
+
+    if local_source:
+        return LmcacheInstallPlan(
+            source_kind="local",
+            pip_packages=(*BASE_MODAL_PIP_PACKAGES, *LMCACHE_SOURCE_BUILD_DEPS),
+            run_commands=(
+                f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation",
+            ),
+            local_source=Path(local_source).expanduser(),
+            source_ref=local_source,
+        )
+
+    if git_ref:
+        git_spec = f"git+{git_repo}@{git_ref}"
+        return LmcacheInstallPlan(
+            source_kind="git",
+            pip_packages=(*BASE_MODAL_PIP_PACKAGES, *LMCACHE_SOURCE_BUILD_DEPS),
+            run_commands=(
+                f"python -m pip install {shlex.quote(git_spec)} --no-build-isolation",
+            ),
+            remote_source=git_repo,
+            source_ref=git_ref,
+        )
+
+    return LmcacheInstallPlan(
+        source_kind="pypi",
+        pip_packages=(*BASE_MODAL_PIP_PACKAGES, pip_spec),
+        remote_source=pip_spec,
+        source_ref=pip_spec,
+    )
+
+
+LMCACHE_INSTALL_PLAN = _select_lmcache_install_plan()
+
+
+def _build_modal_image() -> modal.Image:
+    built_image = (
+        modal.Image.debian_slim(python_version="3.11")
+        .apt_install("curl", "git")
+        .pip_install(*LMCACHE_INSTALL_PLAN.pip_packages)
+    )
+    if LMCACHE_INSTALL_PLAN.local_source is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(LMCACHE_INSTALL_PLAN.local_source),
+            remote_path=MODAL_LMCACHE_SOURCE,
+            copy=True,
+        )
+    built_image = (
+        built_image.add_local_file(
+            local_path=str(REPO_ROOT / "pyproject.toml"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "README.md"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "LICENSE"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
+            copy=True,
+        )
+        .add_local_dir(
+            local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
+            copy=True,
+        )
+        .run_commands(*LMCACHE_INSTALL_PLAN.run_commands, INFERGUARD_LOCAL_INSTALL_COMMAND)
+        .env(
+            {
+                "HF_HUB_ENABLE_HF_TRANSFER": "1",
+                "HF_HOME": "/out/hf-cache",
+                "VLLM_CACHE_ROOT": "/out/vllm-cache",
+                "PYTHONHASHSEED": "0",
+                "LMCACHE_USE_EXPERIMENTAL": "True",
+                "LMCACHE_LOCAL_CPU": "True",
+                "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
+                "LMCACHE_CHUNK_SIZE": "256",
+                "VLLM_USE_FLASHINFER_SAMPLER": "0",
+                "VLLM_USE_DEEP_GEMM": "0",
+                "VLLM_DEEP_GEMM_WARMUP": "skip",
+                "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
+                "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND": LMCACHE_INSTALL_PLAN.source_kind,
+                "LD_LIBRARY_PATH": (
+                    "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+                ),
+            }
+        )
+    )
+    return built_image
+
+
+volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
+image = _build_modal_image()
 app = modal.App(APP_NAME, image=image)
 
 
@@ -283,6 +387,10 @@ def _write_env_snapshot(run_dir: Path) -> None:
         safe_env[key] = "<redacted>" if any(marker in key.upper() for marker in blocked) else value
     (run_dir / "env.redacted.json").write_text(
         json.dumps(safe_env, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "lmcache_install_plan.json").write_text(
+        json.dumps(LMCACHE_INSTALL_PLAN.as_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -907,6 +1015,10 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
         f"- L2 configured: `{spec.l2_configured}`",
         f"- OTel enabled: `{spec.enable_otel}`",
         f"- Eviction policy: `{spec.eviction_policy}`",
+        f"- LMCache install source: `{LMCACHE_INSTALL_PLAN.source_kind}` "
+        f"(`{LMCACHE_INSTALL_PLAN.source_ref}`)",
+        "- Required upstream MP metrics: "
+        + ", ".join(f"`{name}`" for name in UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES),
         f"- Output directory: `{run_dir}`",
         "",
         "## Required Artifacts",
