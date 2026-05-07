@@ -11,9 +11,28 @@ present, which evidence is missing, and what that implies.
 
 ## Current State
 
-Latest pushed InferGuard commit:
+Scoring source manifest:
 
-- `edccffd feat: add LMCache evidence coverage`
+- InferGuard tracker commit used for this score: `7ba414c`.
+- Latest InferGuard implementation commit included in the score:
+  `edccffd feat: add LMCache evidence coverage`.
+- LMCache repo used for source verification: `/Users/chen/Projects/LMCache`.
+- LMCache upstream ref used for source verification: `upstream/dev` at
+  `5ff3fe35`.
+- LMCache local branch state when scored: `dev...upstream/dev [behind 7]`.
+- Official public baseline: `https://docs.lmcache.ai/mp/observability.html`.
+- Local doc/source baseline:
+  - `docs/source/mp/observability.rst`
+  - `docs/source/mp/http_api.rst`
+  - `docs/source/mp/configuration.rst`
+  - `docs/source/mp/tracing_and_debugging.rst`
+  - `docs/source/mp/architecture.rst`
+  - `lmcache/v1/mp_observability/`
+  - `tests/v1/mp_observability/`
+  - `examples/observability/grafana/provisioning/dashboards/lmcache.json`
+- RepoPrompt context: LMCache window `10`, context
+  `44277818-F58D-4891-A5F3-97AC341DB0B2`. The selection has been reset to the
+  explicit MP observability source set listed above.
 
 ## Progress Scoreboard
 
@@ -24,18 +43,48 @@ fixtures counts as partial progress, not complete support. A surface only gets
 full credit when InferGuard has code, tests, real artifacts, and user-facing
 diagnosis or reporting.
 
-| Workstream | Weight | Done | Status | What is complete | What is still needed |
+Scoring rules:
+
+- Public LMCache docs define the customer-facing baseline.
+- LMCache source defines emerging/hidden requirements, but source-only metrics
+  do not earn full support credit until InferGuard has fixture coverage.
+- Parser and compatibility-report support earns partial credit.
+- Real artifacts and golden tests are required for full credit.
+- Diagnosis credit requires user-facing findings, not just metric presence.
+
+| Workstream | Weight | Done | Status | Source basis | What is complete | What is still needed |
+| --- | ---: | ---: | --- | --- | --- | --- |
+| LMCache MP Prometheus coverage | 20 | 14 | partial | Official MP Observability doc plus `lmcache/v1/mp_observability/subscribers/metrics/` | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families | Add live L2 fixture, live nonzero lookup-token fixture, sampled throughput/lifecycle fixture, and source-discovered L1/L2 failure counters |
+| Embedded / in-process LMCache metrics | 12 | 7 | partial | InferGuard aliases plus LMCache single-process `lmcache.` namespace guidance | Parses `lmcache:*` and `lmcache_*`; added production request/token/health/remote/P2P/chunk aliases; preserves unknown metrics | Add live embedded fixture and stale connector tests |
+| HTTP API evidence | 8 | 5 | partial | `docs/source/mp/http_api.rst` and public HTTP API docs | Parses saved LMCache MP health/status evidence; included in packet, compat, and coverage reports | Add live fixtures for `/api/healthcheck`, `/api/status`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, and `/periodic-threads-health` |
+| Trace recording `.lct` evidence | 8 | 4 | partial | MP Observability and Tracing/Debugging docs; `lmcache/v1/mp_observability/trace/` | Captures and summarizes `.lct`-style length-prefixed records; handles malformed traces | Validate against real LMCache `.lct` msgpack trace from `--trace-level storage` and add replay-summary checks |
+| OTel span evidence | 8 | 4 | partial | MP Observability tracing section and Grafana dashboard span names | Parses JSONL spans for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`; included in reports | Add real OTel export fixture and tracing-enabled/no-spans detector |
+| Log evidence | 8 | 3 | partial | MP logging docs and existing InferGuard log parser | Existing conservative LMCache log parsing exists | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
+| Diagnosis rules | 16 | 2 | early | InferGuard `diagnose-bottleneck` behavior and Touchdown playbook needs | Compatibility/coverage can report missing families and evidence gaps | Add LMCache-specific detectors with thresholds, evidence, and recommendations |
+| Live golden fixtures | 10 | 3 | partial | Existing Modal real-shaped slice plus synthetic tests | Modal real-shaped MP metric slice exists; synthetic tests cover new evidence parsers | Capture clean full MP packet, embedded packet, L2 packet, OTel packet, and `.lct` packet |
+| vLLM / SGLang bridge | 6 | 4 | partial | InferGuard vLLM/SGLang parsers and LMCache connector docs/source | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
+| Docs / release readiness | 4 | 2 | partial | InferGuard docs and CLI reference | Coverage plan exists and is linked in docs nav | Update existing LMCache docs to reflect new HTTP/trace/OTel support and refresh CLI reference |
+
+### Detailed Ledger: LMCache MP Prometheus Coverage
+
+The **14 / 20** MP Prometheus score is based on the official MP Observability
+metric list plus source-discovered metrics in
+`lmcache/v1/mp_observability/subscribers/metrics/`.
+
+| Sub-area | Weight | Done | Source | InferGuard evidence | Missing for full credit |
 | --- | ---: | ---: | --- | --- | --- |
-| LMCache MP Prometheus coverage | 20 | 14 | partial | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families | Add live L2 fixture, live nonzero lookup-token fixture, and sampled throughput/lifecycle fixture |
-| Embedded / in-process LMCache metrics | 12 | 7 | partial | Parses `lmcache:*` and `lmcache_*`; added production request/token/health/remote/P2P/chunk aliases; preserves unknown metrics | Add live embedded fixture and stale connector tests |
-| HTTP health/status evidence | 8 | 5 | partial | Parses saved LMCache MP health/status evidence; included in packet, compat, and coverage reports | Add live HTTP fixtures for healthy, unhealthy, unreachable, and richer `/api/status` payloads |
-| Trace recording `.lct` evidence | 8 | 4 | partial | Captures and summarizes `.lct`-style length-prefixed records; handles malformed traces | Validate against real LMCache `.lct` msgpack trace from `--trace-level storage` |
-| OTel span evidence | 8 | 4 | partial | Parses JSONL spans for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`; included in reports | Add real OTel export fixture and tracing-enabled/no-spans detector |
-| Log evidence | 8 | 3 | partial | Existing conservative LMCache log parsing exists | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
-| Diagnosis rules | 16 | 2 | early | Compatibility/coverage can report missing families and evidence gaps | Add LMCache-specific `diagnose-bottleneck` detectors with thresholds and recommendations |
-| Live golden fixtures | 10 | 3 | partial | Modal real-shaped MP metric slice exists; synthetic tests cover new evidence parsers | Capture clean full MP packet, embedded packet, L2 packet, OTel packet, `.lct` packet |
-| vLLM / SGLang bridge | 6 | 4 | partial | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
-| Docs / release readiness | 4 | 2 | partial | Coverage plan exists and is linked in docs nav | Update existing LMCache docs to reflect new HTTP/trace/OTel support and refresh CLI reference |
+| StorageManager counters: `sm_read_*`, `sm_write_*` | 2 | 2 | Official docs | Parsed, normalized, reported, and tested | None |
+| L1 counters and memory: `l1_read_keys`, `l1_write_keys`, `l1_evicted_keys`, `l1_memory_usage_bytes` | 2 | 2 | Official docs | Parsed, normalized, reported, and tested | None |
+| Lookup hit-rate: `lookup_requested_tokens`, `lookup_hit_tokens`, `model_name`, `cache_salt` | 2 | 1.5 | Official docs | Parser/report/tests exist | Live nonzero lookup-token fixture |
+| L2 counters and `l2_name` labels | 2 | 1.5 | Official docs | Parser/report/tests exist | Live L2-configured fixture |
+| L1/L0 lifecycle and real-reuse histograms | 2 | 1.5 | Official docs | Parser/report/tests exist | Live sampled fixture proving nonzero histograms |
+| L0-L1 and L1-L2 throughput histograms | 2 | 1.5 | Official docs | Parser/report/tests exist | Live sampled throughput fixture |
+| Engine counter: `num_chunks_loaded` | 1 | 1 | Official docs | Parser/report/tests exist | None |
+| Observable gauges: `active_prefetch_jobs`, in-flight L2, in-flight load bytes | 1 | 1 | Official docs | Parser/report/tests exist | None |
+| Resource and label handling: `service.instance.id`, `cache_salt`, `model_name`, L2 labels | 1 | 1 | Official docs | Compatibility report tracks these | None |
+| EventBus self-metrics and L1/L2 failure counters | 1 | 0.5 | LMCache source | EventBus self-metrics parsed; failure counters not yet parsed | Add `l1_allocation_failure`, `l1_read_failure`, and `l2_prefetch_failure` aliases/tests |
+| Real MP fixture coverage | 2 | 0.5 | Modal real-shaped slice | Real-shaped MP scrape exists | Clean full fixture with metrics, HTTP, logs, optional trace/OTel |
+| Diagnostic mapping | 2 | 0.5 | InferGuard report behavior | Missing-family reporting exists | LMCache-specific detector pack |
 
 Percent by category:
 
@@ -51,6 +100,19 @@ The next meaningful milestone is **60 / 100**. To reach it, finish:
 2. Golden fixture tests from that packet.
 3. First detector pack for missing lookup counters, zero hit rate, cache salt,
    EventBus observability, and tracing artifacts.
+
+### RepoPrompt Index Procedure
+
+When refreshing this score, do not use a stale broad RepoPrompt selection. Build
+an explicit LMCache MP observability selection with:
+
+```bash
+rp-cli -w 10 -e 'call manage_selection {"op":"set","paths":["docs/source/mp/observability.rst","docs/source/mp/http_api.rst","docs/source/mp/configuration.rst","docs/source/mp/tracing_and_debugging.rst","docs/source/mp/architecture.rst","lmcache/v1/mp_observability","tests/v1/mp_observability","examples/observability/grafana/provisioning/dashboards/lmcache.json"],"mode":"full","view":"files","strict":true}'
+rp-cli -w 10 -e 'context --tree --files'
+```
+
+Then copy the selected source list and LMCache `upstream/dev` commit into the
+source manifest above before changing score values.
 
 What shipped before `edccffd`:
 
@@ -128,6 +190,9 @@ Goal: prove InferGuard can inspect one real LMCache MP run end to end.
   - [ ] LMCache MP `/metrics`.
   - [ ] LMCache `/api/healthcheck`.
   - [ ] LMCache `/api/status`.
+  - [ ] LMCache `/threads`.
+  - [ ] LMCache `/periodic-threads`.
+  - [ ] LMCache `/periodic-threads-health`.
   - [ ] vLLM logs.
   - [ ] LMCache logs.
   - [ ] `.lct` trace when `--trace-level storage` is enabled.
