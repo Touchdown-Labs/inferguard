@@ -114,6 +114,62 @@ rp-cli -w 10 -e 'context --tree --files'
 Then copy the selected source list and LMCache `upstream/dev` commit into the
 source manifest above before changing score values.
 
+### Canonical LMCache MP HTTP Endpoints To Support
+
+These are the real MP HTTP endpoints confirmed from
+`lmcache/v1/multiprocess/http_apis/` plus inherited compatible routes from
+`lmcache/v1/internal_api_server/common/`. The shared `/run_script` route exists
+in the common package but is explicitly excluded from MP by
+`_MP_INCOMPATIBLE_MODULES`, so InferGuard should not require it for MP coverage.
+
+| Method | Path | Source | InferGuard support target |
+| --- | --- | --- | --- |
+| GET | `/` | `root_api.py` | Liveness evidence |
+| GET | `/api/healthcheck` | `healthcheck_api.py` | Health evidence and unhealthy reason |
+| GET | `/api/status` | `status_api.py` | Engine/storage status evidence |
+| POST | `/api/clear-cache` | `cache_api.py` | Record availability only; do not call automatically |
+| GET | `/conf` | `conf_api.py` | Config evidence |
+| GET | `/version` | `version_api.py` | Version evidence |
+| GET | `/lmc_version` | `version_api.py` | LMCache package version evidence |
+| GET | `/commit_id` | `version_api.py` | Build commit evidence |
+| GET | `/env` | inherited `env_api.py` | Optional debug evidence; redact before customer use |
+| GET | `/loglevel` | inherited `loglevel_api.py` | Record availability only; mutates when query includes `level` |
+| GET | `/metrics` | inherited `metrics_api.py` | Prometheus scrape |
+| POST | `/metrics/reset` | inherited `metrics_api.py` | Record availability only; do not call automatically |
+| GET | `/threads` | inherited `thread_api.py` | Thread dump evidence |
+| GET | `/periodic-threads` | inherited `periodic_thread_api.py` | Periodic thread status evidence |
+| GET | `/periodic-threads/{thread_name}` | inherited `periodic_thread_api.py` | Per-thread debug evidence |
+| GET | `/periodic-threads-health` | inherited `periodic_thread_api.py` | Periodic thread health evidence |
+| PUT | `/api/quota/{cache_salt}` | `quota_api.py` | Record availability only; do not call automatically |
+| GET | `/api/quota/{cache_salt}` | `quota_api.py` | Per-salt quota evidence |
+| DELETE | `/api/quota/{cache_salt}` | `quota_api.py` | Record availability only; do not call automatically |
+| GET | `/api/quota` | `quota_api.py` | Quota inventory evidence |
+
+### Canonical LMCache MP Metrics To Support
+
+Metric names below use the OpenTelemetry source name. In Prometheus, dots become
+underscores and counters usually gain a `_total` suffix. InferGuard should
+accept both exact scraped names and the OTel-to-Prometheus form.
+
+| Family | Metrics | Source | InferGuard support target |
+| --- | --- | --- | --- |
+| StorageManager counters | `lmcache_mp.sm_read_requests`, `lmcache_mp.sm_read_succeed_keys`, `lmcache_mp.sm_read_failed_keys`, `lmcache_mp.sm_write_requests`, `lmcache_mp.sm_write_succeed_keys`, `lmcache_mp.sm_write_failed_keys` | Official docs and `sm.py` | Parse, report, diagnose read/write failures |
+| L1 counters | `lmcache_mp.l1_read_keys`, `lmcache_mp.l1_write_keys`, `lmcache_mp.l1_evicted_keys` | Official docs and `l1.py` | Parse, report, diagnose eviction pressure |
+| L1 memory gauge | `lmcache_mp.l1_memory_usage_bytes` | Official docs and L1 gauge registration | Parse, report, diagnose no-plateau/leak and capacity pressure |
+| L1 failure counters | `lmcache_mp.l1_allocation_failure`, `lmcache_mp.l1_read_failure` | Source `l1_failures.py` | Add aliases/tests; diagnose OOM and read-lock/read-reserve failures |
+| L1 lifecycle histograms | `lmcache_mp.l1_chunk_lifetime_seconds`, `lmcache_mp.l1_chunk_idle_before_evict_seconds`, `lmcache_mp.l1_chunk_reuse_gap_seconds`, `lmcache_mp.l1_chunk_evict_reuse_gap_seconds` | Official docs and `l1_lifecycle.py` | Parse sampled histograms; do not require nonzero in every run |
+| Real reuse histograms | `lmcache_mp.real_reuse_gap_seconds`, `lmcache_mp.real_reuse_gap_chunks` | Official docs and `sm_lifecycle.py` | Parse by `cache_salt`; diagnose reuse interval and storage volume |
+| L2 counters | `lmcache_mp.l2_store_tasks`, `lmcache_mp.l2_store_keys`, `lmcache_mp.l2_store_completed`, `lmcache_mp.l2_store_succeeded_keys`, `lmcache_mp.l2_store_failed_keys`, `lmcache_mp.l2_load_completed`, `lmcache_mp.l2_prefetch_lookups`, `lmcache_mp.l2_prefetch_lookup_keys`, `lmcache_mp.l2_prefetch_hit_keys`, `lmcache_mp.l2_prefetch_load_tasks`, `lmcache_mp.l2_prefetch_load_keys`, `lmcache_mp.l2_prefetch_loaded_keys`, `lmcache_mp.l2_prefetch_failed_keys` | Official docs and `l2.py` | Parse/report only as required when L2 is configured |
+| L2 failure counter | `lmcache_mp.l2_prefetch_failure` | Source `l2_failures.py` | Add aliases/tests; diagnose L2 prefetch load failures |
+| Lookup hit-rate counters | `lmcache_mp.lookup_requested_tokens`, `lmcache_mp.lookup_hit_tokens` | Official docs and `lookup.py` | Parse by `model_name` and `cache_salt`; compute hit rate |
+| L0 lifecycle histograms | `lmcache_mp.l0_block_lifetime_seconds`, `lmcache_mp.l0_block_idle_before_evict_seconds`, `lmcache_mp.l0_block_reuse_gap_seconds` | Official docs and `l0_lifecycle.py` | Parse sampled GPU-block lifecycle metrics |
+| L0-L1 throughput histograms | `lmcache_mp.l0_l1_store_throughput_gbs`, `lmcache_mp.l0_l1_load_throughput_gbs` | Official docs and `l0_l1_throughput.py` | Parse sampled GPU↔CPU copy throughput |
+| L1-L2 throughput histograms | `lmcache_mp.l2_store_throughput_gbs`, `lmcache_mp.l2_load_throughput_gbs` | Official docs and `l2_throughput.py` | Parse by `l2_name`; diagnose slow backend path |
+| Engine counter | `lmcache_mp.num_chunks_loaded` | Official docs and `engine.py` | Parse by worker/model/salt |
+| Observable gauges | `lmcache_mp.active_prefetch_jobs`, `lmcache_mp.num_inflight_l2_stores`, `lmcache_mp.num_inflight_l2_loads`, `lmcache_mp.inflight_load_memory_usage_bytes` | Official docs and gauge registration | Parse point-in-time pressure and in-flight L2 state |
+| EventBus self-metrics | `lmcache_mp.event_bus.queue_depth`, `lmcache_mp.event_bus.drain_lag_seconds`, `lmcache_mp.event_bus.dropped_events_total`, `lmcache_mp.event_bus.subscriber_exceptions` | Source `event_bus.py` | Parse/report; diagnose tail-drop and subscriber failures |
+| CacheBlend counters | `lmcache_blend.lookup_requests`, `lmcache_blend.lookup_fingerprint_hits`, `lmcache_blend.lookup_storage_hits`, `lmcache_blend.lookup_stale_chunks`, `lmcache_blend.lookup_no_gpu_context_errors`, `lmcache_blend.retrieve_requests`, `lmcache_blend.retrieve_chunks`, `lmcache_blend.retrieve_failures`, `lmcache_blend.store_pre_computed_requests`, `lmcache_blend.store_pre_computed_chunks`, `lmcache_blend.store_pre_computed_failures`, `lmcache_blend.store_final_requests`, `lmcache_blend.store_final_chunks`, `lmcache_blend.store_final_failures`, `lmcache_blend.fingerprints_registered`, `lmcache_blend.chunks_evicted` | Source `cb_server.py` | Support when Blend server / CacheBlend is enabled; do not require for normal MP |
+
 What shipped before `edccffd`:
 
 - LMCache MP Prometheus compatibility reporting for `lmcache_mp_*`.
