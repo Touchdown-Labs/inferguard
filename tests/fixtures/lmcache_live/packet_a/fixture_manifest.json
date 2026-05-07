@@ -1,0 +1,18 @@
+{
+  "acceptance_status": "accepted",
+  "artifact_path": "/packet-a/20260507T230057Z",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-cH4YAMKOZxmsVOf58YzHPo",
+  "notes": [
+    "Live Modal H100 Packet A run using standalone lmcache server plus vLLM LMCacheMPConnector.",
+    "Required MP Prometheus families populated: lookup requested tokens, lookup hit tokens, and L1 memory usage.",
+    "L2 and OTel are intentionally not enabled in Packet A."
+  ],
+  "packet_id": "a",
+  "raw_hashes_removed": true,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "row_id": "B1",
+  "score_points": 10,
+  "source": "live_modal_h100",
+  "timestamp_utc": "2026-05-07T23:00:57Z"
+}

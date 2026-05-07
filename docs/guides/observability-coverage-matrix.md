@@ -22,23 +22,23 @@ Status meanings:
 
 The active upstream tracker is
 `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
-It supersedes docs 188/189/190. Current LMCache coverage remains **58 / 100**.
+It supersedes docs 188/189/190. Current LMCache coverage is **68 / 100**.
 This matrix records structural parser, packet, report, and diagnosis surfaces
-that exist now. Live validation is still pending for the Modal Packet A gate, so
-these rows must not be read as 100% LMCache compatibility.
+that exist now. Packet A is live-validated; Packet B-F/H1-H3 are still pending,
+so these rows must not be read as 100% LMCache compatibility.
 
-Run Packet A from the full repo checkout:
+Run Packet B from the full repo checkout:
 
 ```bash
 cd /Users/chen/Projects/inferguard
 python scripts/lmcache_mp_packet_commands.py
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
+INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
+modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
 ```
 
-The previous pinned-package blocker is addressed by local-source Modal
-packaging, so Packet A targets the current InferGuard repo contents. B1 still
-does not score until live Packet A artifacts are replayed, imported as compact
-fixtures, and pinned by tests; the matrix stays at **58 / 100** until then.
+B1 Packet A is accepted and pinned under
+`tests/fixtures/lmcache_live/packet_a/`; the matrix is now **68 / 100**.
+Packet B lifecycle is the next score-moving gate.
 
 Source refresh for the Worker Docs/CLI checklist on 2026-05-07 used:
 
@@ -90,7 +90,7 @@ reach 100/100. The states intentionally use the stricter SDLC taxonomy.
 
 | Lane | Current state | Required evidence | Missing proof | Exact next command |
 | --- | --- | --- | --- | --- |
-| MP architecture | fixture_backed | `LMCacheMPConnector` launch/config, standalone `lmcache server`, ZMQ config, vLLM `/metrics`, LMCache HTTP and `/metrics` | Live Packet A with config/log proof from the local-source Modal runner. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+| MP architecture | live_validated | `LMCacheMPConnector` launch/config, standalone `lmcache server`, ZMQ config, vLLM `/metrics`, LMCache HTTP and `/metrics` | Keep Packet A fixture green; no current blocker. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
 | MP HTTP safe endpoints | parser_only / fixture_backed mixed | `/`, `/api/healthcheck`, `/api/status`, `/conf`, `/version`, `/lmc_version`, `/commit_id`, `/api/quota`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, `/periodic-threads-health` | Live endpoint packet; `/env` and `/loglevel` opt-in redaction/safety policy. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
 | MP destructive endpoint guard | destructive_skipped | `POST /api/clear-cache`, `POST /metrics/reset`, quota mutation routes recorded but not called | Packet manifest row proving skipped status. | `printf '%s\n' 'POST /api/clear-cache destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
 | MP Prometheus metric families | fixture_backed / parser_only mixed | StorageManager, L1, L1 failures, L1 lifecycle, real reuse, L2, L2 failures, lookup hit rate, L0 lifecycle, L0-L1 throughput, L1-L2 throughput, engine counter, observable gauges, EventBus, CacheBlend | Live nonzero lookup, L2, sampled lifecycle/throughput, EventBus clean/failure, CacheBlend packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-mode mp` |

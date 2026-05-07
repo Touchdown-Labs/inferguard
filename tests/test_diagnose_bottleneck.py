@@ -171,6 +171,31 @@ def test_lmcache_compat_missing_signal_becomes_specific_diagnosis(tmp_path: Path
     assert diagnosis["rule_fired"] == "lmcache_mp_lookup_counters_missing"
 
 
+def test_lmcache_compat_surfaces_even_without_request_profile(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_packet_without_request_profile"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    shutil.rmtree(root / "request_profile")
+    _write_lmcache_compat_report(
+        root,
+        diagnostic_findings=[
+            {
+                "code": "lmcache_mp_empty_cache_salt",
+                "severity": "info",
+                "message": "LMCache MP lookup metrics contain an empty cache_salt label.",
+            }
+        ],
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["verdict"] == "not_enough_evidence"
+    assert diagnosis["claim_status"] == "inferred"
+    assert diagnosis["rule_fired"] == "lmcache_mp_empty_cache_salt"
+    assert diagnosis["metric_values"]["lmcache_compat.detected_architecture"]["label"] == (
+        "vllm_mp_lmcache"
+    )
+
+
 def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: Path) -> None:
     root = tmp_path / "lmcache_mp_l2_failure"
     shutil.copytree(FIXTURES / "not_enough_evidence", root)

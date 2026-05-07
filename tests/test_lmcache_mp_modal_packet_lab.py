@@ -29,6 +29,12 @@ def _load_lab_module(env: dict[str, str] | None = None):
             image.calls.append(("debian_slim", (), kwargs))
             return image
 
+        @classmethod
+        def from_registry(cls, *args, **kwargs):
+            image = cls()
+            image.calls.append(("from_registry", args, kwargs))
+            return image
+
         def apt_install(self, *args):
             self.calls.append(("apt_install", args, {}))
             return self
@@ -114,6 +120,11 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
         "lmcache_mp_lookup_hit_tokens_total",
         "lmcache_mp_l1_memory_usage_bytes",
     )
+    assert lab.LMCACHE_METRICS_URL == "http://127.0.0.1:8080/metrics"
+    assert lab.LMCACHE_METRICS_URLS == (
+        "http://127.0.0.1:8080/metrics",
+        "http://127.0.0.1:9090/metrics",
+    )
 
     calls = lab.image.calls
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
@@ -163,8 +174,23 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
     assert lab.LMCACHE_INSTALL_PLAN.source_kind == "local"
     assert lab.LMCACHE_INSTALL_PLAN.local_source == tmp_path
     calls = lab.image.calls
+    assert calls[0] == (
+        "from_registry",
+        (lab.CUDA_DEVEL_IMAGE,),
+        {"add_python": "3.11"},
+    )
+    apt_install_args = next(args for name, args, _kwargs in calls if name == "apt_install")
+    assert "build-essential" in apt_install_args
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "lmcache" not in pip_install_args
+    build_env = next(
+        args[0]
+        for name, args, _kwargs in calls
+        if name == "env" and args[0].get("CUDA_HOME") == "/usr/local/cuda"
+    )
+    assert build_env["TORCH_CUDA_ARCH_LIST"] == "9.0"
+    assert build_env["CC"] == "gcc"
+    assert build_env["CXX"] == "g++"
 
     add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
     assert add_local_dirs[0] == {
@@ -177,6 +203,9 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
     )
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
         assert dep in pip_install_args
+    runtime_env = calls[-1][1][0]
+    assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND"] == "local"
+    assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF"] == str(tmp_path)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
     assert run_commands_args == (
         "python -m pip install -e /opt/lmcache --no-build-isolation",
@@ -195,6 +224,11 @@ def test_modal_image_can_install_lmcache_from_git_ref() -> None:
     assert lab.LMCACHE_INSTALL_PLAN.source_kind == "git"
     assert lab.LMCACHE_INSTALL_PLAN.source_ref == "b1-metrics-ref"
     calls = lab.image.calls
+    assert calls[0] == (
+        "from_registry",
+        (lab.CUDA_DEVEL_IMAGE,),
+        {"add_python": "3.11"},
+    )
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "lmcache" not in pip_install_args
     assert "git+https://github.com/LMCache/LMCache.git@b1-metrics-ref" not in pip_install_args
@@ -362,8 +396,20 @@ def test_packet_a_summary_marks_missing_required_artifacts(tmp_path: Path) -> No
     summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
     index = json.loads((tmp_path / "artifact_index.json").read_text(encoding="utf-8"))
     assert "## Missing Required" in summary
+    assert "- LMCache install source: `pypi` (`lmcache`)" in summary
     assert "`vllm.log`" in summary
     assert any(item["path"] == "env.txt" for item in index)
+
+
+def test_packet_a_summary_uses_runtime_lmcache_install_source(tmp_path: Path, monkeypatch) -> None:
+    lab = _load_lab_module()
+    monkeypatch.setenv("INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND", "local")
+    monkeypatch.setenv("INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF", "/Users/chen/Projects/LMCache")
+
+    lab._write_summary_and_index(tmp_path)
+
+    summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
+    assert "- LMCache install source: `local` (`/Users/chen/Projects/LMCache`)" in summary
 
 
 def test_packet_command_script_lists_exact_modal_functions() -> None:

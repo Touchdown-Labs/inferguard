@@ -1,0 +1,93 @@
+{
+  "booleans": {
+    "has_config_hints": true,
+    "has_health_startup": true,
+    "has_nixl_proxy": false,
+    "has_nixl_request": false,
+    "has_p2p_peer": false,
+    "has_p2p_transfer": false,
+    "has_p2p_transfer_failure": false,
+    "has_p2p_transfer_speed": false,
+    "has_pd_receiver": false,
+    "has_pd_role_mismatch": false,
+    "has_pd_sender": false,
+    "has_pd_stall": false,
+    "has_prefetch_complete": true,
+    "has_retrieve": false,
+    "has_stale_lmcache_connector": false,
+    "has_store": true
+  },
+  "config": {
+    "connectors": [
+      "LMCacheMPConnector"
+    ],
+    "enable_async_loading": null,
+    "enable_p2p": null,
+    "enable_pd": null,
+    "pythonhashseed_seen": false,
+    "pythonhashseed_values": [],
+    "stale_lmcache_connector_seen": false
+  },
+  "event_counts": {
+    "health_startup": 12,
+    "nixl_proxy": 0,
+    "nixl_request": 0,
+    "p2p_peer": 0,
+    "p2p_transfer": 0,
+    "p2p_transfer_failure": 0,
+    "p2p_transfer_speed": 0,
+    "pd_receiver": 0,
+    "pd_role_mismatch": 0,
+    "pd_sender": 0,
+    "pd_stall": 0,
+    "prefetch_complete": 9,
+    "retrieve": 0,
+    "store": 7
+  },
+  "findings": [],
+  "line_count": 304,
+  "mode_candidates": [
+    "mp"
+  ],
+  "numeric_hints": {
+    "p2p_transfer_speed": []
+  },
+  "schema_version": "inferguard-lmcache-logs/v1",
+  "snippets": {
+    "health_startup": [
+      "(APIServer pid=71) INFO 05-07 23:02:56 [api_server.py:602] Starting vLLM server on http://0.0.0.0:8000",
+      "(EngineCore pid=84) \u001b[32;20m[2026-05-07 23:02:59,103] LMCache INFO:\u001b[0m Started PeriodicThread: lmcache-heartbeat (level=critical, interval=10.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v1.periodic_thread...",
+      "(EngineCore pid=84) \u001b[32;20m[2026-05-07 23:02:59,490] LMCache INFO:\u001b[0m Started PeriodicThread: lmcache-heartbeat (level=critical, interval=10.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v1.periodic_thread...",
+      "\u001b[32;20m[2026-05-07 23:01:06,264] LMCache INFO:\u001b[0m Starting LMCache HTTP server on http://0.0.0.0:8080 \u001b[3m(http_server.py:154:lmcache.v1.multiprocess.http_server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:01:06,307] LMCache INFO:\u001b[0m Starting LMCache HTTP server... (CUDA available: True) \u001b[3m(http_server.py:59:lmcache.v1.multiprocess.http_server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:01:06,994] LMCache INFO:\u001b[0m LookupHashLoggingSubscriber started: output_dir=/out/packet-a/20260507T230057Z/lookup_hashes, rotation_interval=21600s, rotation_max_size=104857600, max_files=10, ex..."
+    ],
+    "nixl_proxy": [],
+    "nixl_request": [],
+    "p2p_peer": [],
+    "p2p_transfer": [],
+    "p2p_transfer_failure": [],
+    "p2p_transfer_speed": [],
+    "pd_receiver": [],
+    "pd_role_mismatch": [],
+    "pd_sender": [],
+    "pd_stall": [],
+    "prefetch_complete": [
+      "\u001b[32;20m[2026-05-07 23:03:01,475] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.0 ms (external_request_id=cmpl-819e3fe396a65099-0-93fd3b8f, prefetch_request_id=-1) \u001b[3m(storag...",
+      "\u001b[32;20m[2026-05-07 23:03:03,122] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 0.9 ms (external_request_id=cmpl-bd74e35930e5f0b2-0-b4671939, prefetch_request_id=-1) \u001b[3m(storag...",
+      "\u001b[32;20m[2026-05-07 23:03:04,765] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.0 ms (external_request_id=cmpl-90f763da919eacc5-0-a43c1dfe, prefetch_request_id=-1) \u001b[3m(storag...",
+      "\u001b[32;20m[2026-05-07 23:03:06,407] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.1 ms (external_request_id=cmpl-b559cfe47c9173c5-0-af48b90a, prefetch_request_id=-1) \u001b[3m(storag...",
+      "\u001b[32;20m[2026-05-07 23:03:08,049] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.0 ms (external_request_id=cmpl-83b4a6c44f9ec20e-0-8527a5cb, prefetch_request_id=-1) \u001b[3m(storag...",
+      "\u001b[32;20m[2026-05-07 23:03:09,693] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.0 ms (external_request_id=cmpl-b485c8775caf0f0f-0-b77fc5c6, prefetch_request_id=-1) \u001b[3m(storag..."
+    ],
+    "retrieve": [],
+    "store": [
+      "\u001b[32;20m[2026-05-07 23:01:09,187] LMCache INFO:\u001b[0m Starting StoreController... \u001b[3m(store_controller.py:271:lmcache.v1.distributed.storage_controllers.store_controller)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:02:59,514] LMCache INFO:\u001b[0m Stored 2048 tokens in 0.020 seconds \u001b[3m(server.py:422:lmcache.v1.multiprocess.server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:03:00,428] LMCache INFO:\u001b[0m Stored 256 tokens in 0.001 seconds \u001b[3m(server.py:422:lmcache.v1.multiprocess.server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:03:02,076] LMCache INFO:\u001b[0m Stored 256 tokens in 0.001 seconds \u001b[3m(server.py:422:lmcache.v1.multiprocess.server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:03:03,720] LMCache INFO:\u001b[0m Stored 256 tokens in 0.001 seconds \u001b[3m(server.py:422:lmcache.v1.multiprocess.server)\u001b[0m",
+      "\u001b[32;20m[2026-05-07 23:03:05,363] LMCache INFO:\u001b[0m Stored 256 tokens in 0.001 seconds \u001b[3m(server.py:422:lmcache.v1.multiprocess.server)\u001b[0m"
+    ]
+  }
+}

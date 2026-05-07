@@ -173,8 +173,8 @@ def apply_rules(bundle: EvidenceBundle) -> BottleneckDiagnosis:
     thresholds = _thresholds(bundle.rule_config)
     for checker in (
         is_model_launch_bound,
-        _missing_required_inputs,
         _lmcache_missing_signal_downgrade,
+        _missing_required_inputs,
         _all_metric_groups_not_proven,
         _sglang_chunked_prefill_bug_downgrade,
         _sglang_speculative_kv_bug_downgrade,

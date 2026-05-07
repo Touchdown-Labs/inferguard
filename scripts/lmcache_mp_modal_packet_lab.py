@@ -47,7 +47,10 @@ VLLM_HEALTH_URL = f"{VLLM_BASE_URL}/health"
 VLLM_METRICS_URL = f"{VLLM_BASE_URL}/metrics"
 LMCACHE_HTTP_BASE_URL = f"http://127.0.0.1:{LMCACHE_HTTP_PORT}"
 LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/api/healthcheck"
-LMCACHE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
+LMCACHE_HTTP_METRICS_URL = f"{LMCACHE_HTTP_BASE_URL}/metrics"
+LMCACHE_STANDALONE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
+LMCACHE_METRICS_URLS = (LMCACHE_HTTP_METRICS_URL, LMCACHE_STANDALONE_METRICS_URL)
+LMCACHE_METRICS_URL = LMCACHE_HTTP_METRICS_URL
 LMCACHE_TRACE_FILE = "lmcache_trace.lct"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
 TRACE_REPLAY_DIR = "trace-replay"
@@ -67,6 +70,7 @@ LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
 LMCACHE_PIP_SPEC_ENV = "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC"
 DEFAULT_LMCACHE_PIP_SPEC = "lmcache"
 DEFAULT_LMCACHE_GIT_REPO = "https://github.com/LMCache/LMCache.git"
+CUDA_DEVEL_IMAGE = "nvidia/cuda:13.0.2-devel-ubuntu22.04"
 UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
     "lmcache_mp_lookup_requested_tokens_total",
     "lmcache_mp_lookup_hit_tokens_total",
@@ -104,9 +108,21 @@ BASE_MODAL_PIP_PACKAGES = (
 LMCACHE_SOURCE_BUILD_DEPS = (
     "ninja",
     "packaging>=24.2",
+    "setuptools>=77.0.3,<81.0.0",
     "setuptools_scm>=8",
     "wheel",
 )
+CUDA_SOURCE_BUILD_ENV = {
+    "CC": "gcc",
+    "CXX": "g++",
+    "CUDA_HOME": "/usr/local/cuda",
+    "TORCH_CUDA_ARCH_LIST": "9.0",
+    "ENABLE_CXX11_ABI": "1",
+    "LD_LIBRARY_PATH": (
+        "/usr/local/cuda/lib64:"
+        "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+    ),
+}
 
 
 def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> LmcacheInstallPlan:
@@ -157,11 +173,17 @@ LMCACHE_INSTALL_PLAN = _select_lmcache_install_plan()
 
 
 def _build_modal_image() -> modal.Image:
-    built_image = (
-        modal.Image.debian_slim(python_version="3.11")
-        .apt_install("curl", "git")
-        .pip_install(*LMCACHE_INSTALL_PLAN.pip_packages)
-    )
+    if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}:
+        built_image = modal.Image.from_registry(CUDA_DEVEL_IMAGE, add_python="3.11").apt_install(
+            "build-essential", "curl", "git"
+        )
+    else:
+        built_image = modal.Image.debian_slim(python_version="3.11").apt_install("curl", "git")
+
+    built_image = built_image.pip_install(*LMCACHE_INSTALL_PLAN.pip_packages)
+    if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}:
+        built_image = built_image.env(CUDA_SOURCE_BUILD_ENV)
+
     if LMCACHE_INSTALL_PLAN.local_source is not None:
         built_image = built_image.add_local_dir(
             local_path=str(LMCACHE_INSTALL_PLAN.local_source),
@@ -205,8 +227,11 @@ def _build_modal_image() -> modal.Image:
                 "VLLM_DEEP_GEMM_WARMUP": "skip",
                 "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
                 "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND": LMCACHE_INSTALL_PLAN.source_kind,
+                "INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF": LMCACHE_INSTALL_PLAN.source_ref or "",
                 "LD_LIBRARY_PATH": (
-                    "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+                    CUDA_SOURCE_BUILD_ENV["LD_LIBRARY_PATH"]
+                    if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}
+                    else "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
                 ),
             }
         )
@@ -292,6 +317,16 @@ def _append(path: Path, text: str) -> None:
             handle.write("\n")
 
 
+def _runtime_lmcache_install_source() -> tuple[str, str]:
+    source_kind = os.environ.get(
+        "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND", LMCACHE_INSTALL_PLAN.source_kind
+    )
+    source_ref = os.environ.get(
+        "INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF", LMCACHE_INSTALL_PLAN.source_ref or ""
+    )
+    return source_kind, source_ref or source_kind
+
+
 def _run(
     cmd: list[str],
     log_path: Path,
@@ -370,6 +405,29 @@ def _wait_for_http(
             return
         time.sleep(10)
     raise RuntimeError(f"{label} did not become healthy at {url}")
+
+
+def _wait_for_any_http(
+    urls: tuple[str, ...],
+    log_path: Path,
+    *,
+    label: str,
+    max_wait_seconds: int,
+    proc: subprocess.Popen[str] | None,
+) -> str:
+    deadline = time.monotonic() + max_wait_seconds
+    attempt = 0
+    while time.monotonic() < deadline:
+        if proc is not None and proc.poll() is not None:
+            raise RuntimeError(f"{label} exited before health passed with code {proc.returncode}")
+        attempt += 1
+        for url in urls:
+            result = _run_best_effort(["curl", "-fsS", url], log_path, timeout=30)
+            if result == 0:
+                _append(log_path, f"{label} health passed at {url} after {attempt} attempts\n")
+                return url
+        time.sleep(10)
+    raise RuntimeError(f"{label} did not become healthy at any of {', '.join(urls)}")
 
 
 def _quote_cmd(cmd: list[str]) -> str:
@@ -1005,6 +1063,7 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
     optional_artifacts = _optional_artifacts(spec)
     missing_required = _missing_artifacts(run_dir, required_artifacts, require_nonempty=True)
     missing_optional = _missing_artifacts(run_dir, optional_artifacts, require_nonempty=True)
+    source_kind, source_ref = _runtime_lmcache_install_source()
     lines = [
         f"# Packet {spec.packet_id.upper()} LMCache MP Modal Lab Summary",
         "",
@@ -1015,8 +1074,7 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
         f"- L2 configured: `{spec.l2_configured}`",
         f"- OTel enabled: `{spec.enable_otel}`",
         f"- Eviction policy: `{spec.eviction_policy}`",
-        f"- LMCache install source: `{LMCACHE_INSTALL_PLAN.source_kind}` "
-        f"(`{LMCACHE_INSTALL_PLAN.source_ref}`)",
+        f"- LMCache install source: `{source_kind}` (`{source_ref}`)",
         "- Required upstream MP metrics: "
         + ", ".join(f"`{name}`" for name in UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES),
         f"- Output directory: `{run_dir}`",
@@ -1102,8 +1160,8 @@ def _run_packet(spec: PacketSpec) -> str:
             max_wait_seconds=180,
             proc=lmcache_proc,
         )
-        _wait_for_http(
-            LMCACHE_METRICS_URL,
+        _wait_for_any_http(
+            LMCACHE_METRICS_URLS,
             run_dir / "health.log",
             label="LMCache Prometheus",
             max_wait_seconds=180,

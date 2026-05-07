@@ -85,25 +85,26 @@ inferguard observability-coverage \
   --json
 ```
 
-Coverage accounting remains **58 / 100** until a live packet proves the missing
-signals. The active score source is
+Coverage accounting is **68 / 100** after the accepted live Packet A fixture.
+The active score source is
 `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`,
 which supersedes the earlier docs 188/189/190 trackers.
 
-Run Packet A from the full InferGuard repo checkout, not from the old
+Run Packet B from the full InferGuard repo checkout, not from the old
 Touchdown-Labs OSS mirror:
 
 ```bash
 cd /Users/chen/Projects/inferguard
 python scripts/lmcache_mp_packet_commands.py
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
+INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
+modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
 ```
 
-B1 status as of 2026-05-07: the previous pinned-package blocker is
-addressed by local-source Modal packaging, so the runner now targets the current
-InferGuard repo contents. B1 still remains unscored until a live Packet A run is
-collected, replayed through the report commands, imported as compact fixtures,
-and pinned by passing tests.
+B1 status as of 2026-05-07: accepted. Live Packet A landed from Modal run
+`https://modal.com/apps/ocwc22/main/ap-cH4YAMKOZxmsVOf58YzHPo`, volume
+`lmcache-mp-lab:/packet-a/20260507T230057Z`, and is pinned by
+`tests/fixtures/lmcache_live/packet_a/`. Packet B lifecycle is the next
+score-moving gate.
 
 ### Local B1 missing-family diagnostic smoke
 
@@ -144,7 +145,8 @@ HTTP/log/lookup-hash evidence is shown as
 `live_alternate_not_scoreable`; it explains the failure mode but does not replace
 `lmcache_mp_lookup_requested_tokens_total`,
 `lmcache_mp_lookup_hit_tokens_total`, or `lmcache_mp_l1_memory_usage_bytes`.
-Do not move the 58/100 score from this fixture.
+Do not move the 68/100 score from this rejected fixture; it remains a diagnostic
+regression for older LMCache installs.
 
 Use these exact next commands when updating endpoint, signal, or rule status:
 
@@ -156,7 +158,8 @@ Use these exact next commands when updating endpoint, signal, or rule status:
 | Trace, OTel, replay, lookup-hash evidence | partial | Real `.lct`, collector OTel export, replay output, and live lookup-hash JSONL. | `inferguard collect-lmcache --output-dir "$PACKET_DIR" --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
 | Log, P2P, and PD evidence | partial | Live MP logs plus two-engine P2P and prefiller/decoder packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
 | Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
-| Packet A score gate | partial | Local-source Modal packaging is in place; B1 still needs clean live vLLM + standalone LMCache MP artifacts imported as compact fixtures. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+| Packet A score gate | live_validated | Accepted live vLLM + standalone LMCache MP fixture imported and pinned. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
+| Packet B lifecycle gate | next | Live sampled lifecycle/L0-L1 proof with compact fixture. | `cd /Users/chen/Projects/inferguard && INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
 
 Current source-backed caveats:
 
@@ -187,22 +190,23 @@ Source-backed checklist links:
 
 Use this exact status language in CLI output reviews and release notes:
 
-- Current LMCache observability status is **58 / 100, partial**.
+- Current LMCache observability status is **68 / 100, partial**.
 - MP parser/report support is **fixture_backed for core families** and
   **parser_only for live-only throughput, gauges, and replay proofs**.
 - Embedded production metrics are **fixture_backed for core aliases** and
   **parser_only for live backend, P2P, local CPU, memory-management, and
   profiling packets**.
-- No lane is `live_validated` until a real packet is collected and replayed
-  through `collect-lmcache`, `lmcache-compat`, `observability-coverage`, and
-  `diagnose-bottleneck`.
+- Packet A is `live_validated`; no other lane is `live_validated` until a real
+  packet is collected and replayed through `collect-lmcache`, `lmcache-compat`,
+  `observability-coverage`, and `diagnose-bottleneck`.
 
 Full docs/CLI closeout command set:
 
 ```bash
 cd /Users/chen/Projects/inferguard
 python scripts/lmcache_mp_packet_commands.py
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
+INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
+modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
 
 inferguard collect-lmcache \
   --output-dir "$PACKET_DIR/lmcache-packet" \

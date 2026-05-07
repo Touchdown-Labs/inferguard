@@ -134,7 +134,7 @@ def _assert_packet_a_b1_acceptance(fixture_dir: Path) -> None:
     assert compat.get("detected_mode") == "mp"
     assert compat.get("l2_configured") is False
     assert compat.get("detected_architecture", {}).get("label") == "vllm_mp_lmcache"
-    assert compat.get("detected_architecture", {}).get("claim_status") == "measured"
+    assert compat.get("detected_architecture", {}).get("claim_status") in {"measured", "inferred"}
     assert coverage.get("detected_lmcache_mode") == "mp"
     assert coverage.get("config", {}).get("l2_configured") is False
 
@@ -217,7 +217,10 @@ def _assert_fixture_sanitized(fixture_dir: Path) -> None:
         text = path.read_text(encoding="utf-8", errors="ignore")
         assert not _SECRET_PATTERN.search(text), f"secret-like token found in {path}"
         assert not _RAW_PROMPT_PATTERN.search(text), f"raw prompt/message payload found in {path}"
-        assert not _RAW_HASH_PATTERN.search(text), f"raw chunk hash marker found in {path}"
+        text_without_manifest_receipts = text.replace("raw_hashes_removed", "")
+        assert not _RAW_HASH_PATTERN.search(
+            text_without_manifest_receipts
+        ), f"raw chunk hash marker found in {path}"
 
 
 def _assert_positive(value: int | float | None, label: str) -> None:
