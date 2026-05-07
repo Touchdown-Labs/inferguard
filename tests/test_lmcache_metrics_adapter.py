@@ -94,6 +94,7 @@ lmcache_mp_l2_prefetch_load_tasks_total 6
 lmcache_mp_l2_prefetch_load_keys_total 12
 lmcache_mp_l2_prefetch_loaded_keys_total 10
 lmcache_mp_l2_prefetch_failed_keys_total 2
+lmcache_mp_l2_prefetch_failure_total 1
 lmcache_mp_l2_load_completed_total{l2_name="fs"} 5
 lmcache_mp_l2_store_throughput_gbs_sum{l2_name="fs"} 8
 lmcache_mp_l2_store_throughput_gbs_count{l2_name="fs"} 2
@@ -109,6 +110,8 @@ lmcache_mp_event_bus_queue_depth 7
 lmcache_mp_event_bus_drain_lag_seconds 0.25
 lmcache_mp_event_bus_dropped_events_total 3
 lmcache_mp_event_bus_subscriber_exceptions_total 1
+lmcache_mp_l1_allocation_failure_total 2
+lmcache_mp_l1_read_failure_total 1
 """
     )
 
@@ -126,7 +129,10 @@ lmcache_mp_event_bus_subscriber_exceptions_total 1
     assert metrics.lmcache_l2_prefetch_load_tasks == 6
     assert metrics.lmcache_l2_prefetch_load_keys == 12
     assert metrics.lmcache_l2_prefetch_failed_keys == 2
+    assert metrics.lmcache_l2_prefetch_failure == 1
     assert metrics.lmcache_l2_load_completed == 5
+    assert metrics.lmcache_l1_allocation_failure == 2
+    assert metrics.lmcache_l1_read_failure == 1
     assert metrics.lmcache_l2_store_throughput_gbs == 4
     assert metrics.lmcache_l2_load_throughput_gbs == 3
     assert metrics.lmcache_l0_l1_store_throughput_gbs == 5

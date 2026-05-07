@@ -50,6 +50,7 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_mp", "lookup_tokens", ("lmcache_mp_lookup_*_tokens_total",)),
     MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys_total",)),
     MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes",)),
+    MetricFamilySpec("lmcache_mp", "l1_failures", ("lmcache_mp_l1_*_failure*",), required_when="optional"),
     MetricFamilySpec(
         "lmcache_mp", "l1_lifecycle", ("lmcache_mp_l1_chunk_*_seconds*",), required_when="sampled"
     ),
@@ -58,6 +59,7 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     ),
     MetricFamilySpec("lmcache_mp", "real_reuse", ("lmcache_mp_real_reuse_gap_*",), required_when="sampled"),
     MetricFamilySpec("lmcache_mp", "l2_counters", ("lmcache_mp_l2_*",), required_when="l2_configured"),
+    MetricFamilySpec("lmcache_mp", "l2_failures", ("lmcache_mp_l2_*_failure*",), required_when="optional"),
     MetricFamilySpec(
         "lmcache_mp", "l0_l1_throughput", ("lmcache_mp_l0_l1_*_throughput_gbs*",), required_when="sampled"
     ),
@@ -111,6 +113,11 @@ def build_compat_report(
         for name in observed_names
     )
     detected_mode = _detected_mode(observed_lmcache_mp, observed_lmcache_embedded)
+    architecture = _architecture_detection(
+        samples,
+        observed_lmcache_mp=observed_lmcache_mp,
+        observed_lmcache_embedded=observed_lmcache_embedded,
+    )
     mp_observability_report = _mp_observability_report(
         samples,
         observed_lmcache_mp=observed_lmcache_mp,
@@ -133,6 +140,10 @@ def build_compat_report(
             lmcache_otel_evidence=lmcache_otel_evidence,
         )
     )
+    diagnostic_findings = _diagnostic_findings(
+        samples,
+        mp_observability=mp_observability_report,
+    )
     upstream_questions = _upstream_questions(families, samples, mp_observability_report)
     failures = _failures(
         families,
@@ -154,8 +165,10 @@ def build_compat_report(
         "lmcache_source": lmcache_source,
         "expect_mode": expect_mode,
         "detected_mode": detected_mode,
+        "detected_architecture": architecture,
         "l2_configured": l2_configured,
         "failure_reasons": failures,
+        "diagnostic_findings": diagnostic_findings,
         "upstream_questions": upstream_questions,
         "observed": {
             "lmcache_mp": observed_lmcache_mp,
@@ -361,6 +374,71 @@ def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -
     return "unknown"
 
 
+def _architecture_detection(
+    samples: list[LabeledSample],
+    *,
+    observed_lmcache_mp: bool,
+    observed_lmcache_embedded: bool,
+) -> dict[str, Any]:
+    names = {sample.name for sample in samples}
+    has_vllm = any(name.startswith("vllm:") for name in names)
+    has_sglang = any(name.startswith("sglang:") for name in names)
+    connector_labels = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"connector", "kv_connector"} and value
+        }
+    )
+    has_mp_connector = "LMCacheMPConnector" in connector_labels
+    has_vllm_embedded_connector = any(
+        connector in {"LMCacheConnectorV1", "LMCacheConnectorV1Dynamic"}
+        for connector in connector_labels
+    )
+    has_stale_lmcache_connector = "LMCacheConnector" in connector_labels
+    has_sglang_lmcache_connector = any(
+        connector in {"LMCacheLayerwiseConnector", "LMCacheConnector"}
+        for connector in connector_labels
+    )
+    label = "unknown"
+    confidence = "not_proven"
+    if has_vllm and (observed_lmcache_mp or has_mp_connector):
+        label = "vllm_mp_lmcache"
+        confidence = "measured" if observed_lmcache_mp and has_mp_connector else "inferred"
+    elif has_vllm and (observed_lmcache_embedded or has_vllm_embedded_connector):
+        label = "vllm_embedded_lmcache"
+        confidence = "measured" if observed_lmcache_embedded else "inferred"
+    elif has_sglang and observed_lmcache_mp:
+        label = "sglang_mp_lmcache_candidate"
+        confidence = "inferred"
+    elif has_sglang and (observed_lmcache_embedded or has_sglang_lmcache_connector):
+        label = "sglang_embedded_lmcache"
+        confidence = "measured" if observed_lmcache_embedded else "inferred"
+    elif observed_lmcache_mp:
+        label = "lmcache_mp_server"
+        confidence = "measured"
+    elif observed_lmcache_embedded:
+        label = "lmcache_embedded_unknown_engine"
+        confidence = "measured"
+    signals = {
+        "vllm_metrics": has_vllm,
+        "sglang_metrics": has_sglang,
+        "lmcache_mp_metrics": observed_lmcache_mp,
+        "lmcache_embedded_metrics": observed_lmcache_embedded,
+        "lmcache_mp_connector_label": has_mp_connector,
+        "vllm_embedded_connector_label": has_vllm_embedded_connector,
+        "sglang_lmcache_connector_label": has_sglang_lmcache_connector,
+        "stale_lmcache_connector_label": has_stale_lmcache_connector,
+    }
+    return {
+        "label": label,
+        "claim_status": confidence,
+        "connector_labels": connector_labels,
+        "signals": signals,
+    }
+
+
 def _is_applicable(
     spec: MetricFamilySpec,
     *,
@@ -460,6 +538,20 @@ def _upstream_questions(
                 "owner_question": "This MP scrape has counters but sparse sampled lifecycle/throughput histograms; should this lab raise --metrics-sample-rate for validation runs?",
             }
         )
+    empty_salt = any(
+        sample.name.startswith("lmcache_mp_lookup_")
+        and "cache_salt" in sample.labels
+        and sample.labels.get("cache_salt", "") == ""
+        and sample.value != 0.0
+        for sample in samples
+    )
+    if empty_salt:
+        questions.append(
+            {
+                "code": "lmcache_mp_empty_cache_salt",
+                "owner_question": "Should the vLLM LMCacheMPConnector propagate cache_salt for this workload, or is an empty cache_salt expected for single-tenant runs?",
+            }
+        )
     external_queries = _sum_matching(samples, "vllm:external_prefix_cache_queries_total")
     external_hits = _sum_matching(samples, "vllm:external_prefix_cache_hits_total")
     external_transfer_tokens = _sum_matching(
@@ -478,6 +570,124 @@ def _upstream_questions(
             }
         )
     return questions
+
+
+def _diagnostic_findings(
+    samples: list[LabeledSample],
+    *,
+    mp_observability: dict[str, Any],
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    requested = _sum_matching(samples, "lmcache_mp_lookup_requested_tokens_total")
+    hit = _sum_matching(samples, "lmcache_mp_lookup_hit_tokens_total")
+    if requested > 0:
+        hit_rate = hit / requested
+        if hit_rate < 0.3:
+            findings.append(
+                {
+                    "code": "lmcache_mp_low_hit_rate",
+                    "severity": "warning",
+                    "message": "LMCache MP token hit rate is below 30% for the scrape window.",
+                    "metrics": {
+                        "lmcache_mp_lookup_requested_tokens_total": requested,
+                        "lmcache_mp_lookup_hit_tokens_total": hit,
+                        "hit_rate": hit_rate,
+                    },
+                    "recommendation": "Check cache_salt propagation, prompt prefix structure, replay traffic, and chunk size before tuning storage tiers.",
+                }
+            )
+    empty_salt = any(
+        sample.name.startswith("lmcache_mp_lookup_")
+        and "cache_salt" in sample.labels
+        and sample.labels.get("cache_salt", "") == ""
+        and sample.value != 0.0
+        for sample in samples
+    )
+    if empty_salt:
+        findings.append(
+            {
+                "code": "lmcache_mp_empty_cache_salt",
+                "severity": "info",
+                "message": "LMCache MP lookup metrics contain a populated empty cache_salt label.",
+                "metrics": {"cache_salt": ""},
+                "recommendation": "Confirm whether this is intentional single-tenant behavior or a connector propagation gap.",
+            }
+        )
+    if mp_observability.get("event_bus_taildrop_risk"):
+        findings.append(
+            {
+                "code": "lmcache_mp_eventbus_taildrop_unobservable",
+                "severity": "warning",
+                "message": "LMCache MP metrics are present but EventBus self-metrics are absent, so tail-drop risk is not directly observable.",
+                "metrics": {
+                    "event_bus_queue_size": mp_observability.get("config", {}).get("event_bus_queue_size"),
+                    "event_bus_metric_names": mp_observability.get("event_bus_metric_names", []),
+                },
+                "recommendation": "Ask LMCache to expose stable EventBus queue depth, dropped event, drain lag, and subscriber exception counters.",
+            }
+        )
+    dropped = _sum_matching(samples, "lmcache_mp_event_bus_dropped_events_total")
+    subscriber_errors = _sum_matching(samples, "lmcache_mp_event_bus_subscriber_exceptions_total")
+    if dropped > 0 or subscriber_errors > 0:
+        findings.append(
+            {
+                "code": "lmcache_mp_eventbus_loss",
+                "severity": "critical" if dropped > 0 else "warning",
+                "message": "LMCache MP EventBus reports dropped events or subscriber exceptions.",
+                "metrics": {
+                    "lmcache_mp_event_bus_dropped_events_total": dropped,
+                    "lmcache_mp_event_bus_subscriber_exceptions_total": subscriber_errors,
+                },
+                "recommendation": "Increase EventBus capacity, inspect subscriber errors, and treat sampled lifecycle metrics as incomplete for this window.",
+            }
+        )
+    l1_evicted = _sum_matching(samples, "lmcache_mp_l1_evicted_keys_total")
+    l1_written = _sum_matching(samples, "lmcache_mp_l1_write_keys_total")
+    if l1_evicted > 0 and (l1_written <= 0 or l1_evicted / max(l1_written, 1.0) > 0.2):
+        findings.append(
+            {
+                "code": "lmcache_mp_l1_eviction_pressure",
+                "severity": "warning",
+                "message": "LMCache MP L1 is evicting a meaningful share of written keys.",
+                "metrics": {
+                    "lmcache_mp_l1_evicted_keys_total": l1_evicted,
+                    "lmcache_mp_l1_write_keys_total": l1_written,
+                    "evicted_to_written_ratio": l1_evicted / max(l1_written, 1.0),
+                },
+                "recommendation": "Check L1 sizing, eviction watermarks, and whether L2 is fast enough to absorb spill traffic.",
+            }
+        )
+    l1_alloc_failures = _sum_matching(samples, "lmcache_mp_l1_allocation_failure_total")
+    l1_read_failures = _sum_matching(samples, "lmcache_mp_l1_read_failure_total")
+    if l1_alloc_failures > 0 or l1_read_failures > 0:
+        findings.append(
+            {
+                "code": "lmcache_mp_l1_failures",
+                "severity": "critical",
+                "message": "LMCache MP reports L1 allocation or read failures.",
+                "metrics": {
+                    "lmcache_mp_l1_allocation_failure_total": l1_alloc_failures,
+                    "lmcache_mp_l1_read_failure_total": l1_read_failures,
+                },
+                "recommendation": "Inspect L1 memory capacity, object locks, and read/write conflict logs before interpreting hit-rate economics.",
+            }
+        )
+    l2_failed = (
+        _sum_matching(samples, "lmcache_mp_l2_store_failed_keys_total")
+        + _sum_matching(samples, "lmcache_mp_l2_prefetch_failed_keys_total")
+        + _sum_matching(samples, "lmcache_mp_l2_prefetch_failure_total")
+    )
+    if l2_failed > 0:
+        findings.append(
+            {
+                "code": "lmcache_mp_l2_failures",
+                "severity": "critical",
+                "message": "LMCache MP reports failed L2 store or prefetch work.",
+                "metrics": {"l2_failed_operations_or_keys": l2_failed},
+                "recommendation": "Check the configured L2 adapter, backend throughput, credentials, and per-adapter in-flight gauges.",
+            }
+        )
+    return findings
 
 
 def _mp_observability_report(

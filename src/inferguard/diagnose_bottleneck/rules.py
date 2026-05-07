@@ -792,6 +792,59 @@ def _lmcache_missing_signal_downgrade(
     report = bundle.lmcache_compat_report
     if not report or report.get("detected_mode") not in {"mp", "mixed"}:
         return None
+    findings = [
+        item
+        for item in report.get("diagnostic_findings") or []
+        if isinstance(item, Mapping)
+    ]
+    finding_priority = [
+        "lmcache_mp_l1_failures",
+        "lmcache_mp_l2_failures",
+        "lmcache_mp_eventbus_loss",
+        "lmcache_mp_l1_eviction_pressure",
+        "lmcache_mp_low_hit_rate",
+        "lmcache_mp_eventbus_taildrop_unobservable",
+        "lmcache_mp_empty_cache_salt",
+    ]
+    finding_codes = {str(item.get("code")) for item in findings}
+    selected_finding_code = next(
+        (code for code in finding_priority if code in finding_codes),
+        "",
+    )
+    if selected_finding_code:
+        selected_finding = next(
+            item for item in findings if str(item.get("code")) == selected_finding_code
+        )
+        selected_claim_status = (
+            "measured"
+            if selected_finding.get("severity") in {"critical", "warning"}
+            else "inferred"
+        )
+        downgrades = []
+        if selected_claim_status != "measured":
+            downgrades.append(
+                Downgrade(
+                    "lmcache_mp_diagnostics",
+                    "measured",
+                    "inferred",
+                    selected_finding_code,
+                )
+            )
+        return _not_enough_result(
+            bundle,
+            rule_fired=selected_finding_code,
+            reasoning=str(
+                selected_finding.get("message")
+                or "LMCache MP telemetry contains an actionable cache observability finding."
+            ),
+            metric_values={
+                "lmcache_compat.detected_mode": report.get("detected_mode"),
+                "lmcache_compat.detected_architecture": report.get("detected_architecture") or {},
+                "lmcache_compat.diagnostic_findings": findings,
+            },
+            claim_status=selected_claim_status,
+            downgrades=downgrades,
+        )
     questions = [
         item
         for item in report.get("upstream_questions") or []
@@ -804,6 +857,7 @@ def _lmcache_missing_signal_downgrade(
         "lmcache_mp_lookup_counters_missing",
         "vllm_external_prefix_no_hits",
         "lmcache_eventbus_self_metrics_missing",
+        "lmcache_mp_empty_cache_salt",
     ]
     selected = next((code for code in priority if code in codes), sorted(codes)[0])
     return _not_enough_result(

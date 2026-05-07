@@ -151,6 +151,40 @@ def test_lmcache_compat_missing_signal_becomes_specific_diagnosis(tmp_path: Path
     assert diagnosis["rule_fired"] == "lmcache_mp_lookup_counters_missing"
 
 
+def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_mp_l2_failure"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    compat = {
+        "schema_version": "inferguard-observability-compat/v1",
+        "detected_mode": "mp",
+        "detected_architecture": {"label": "vllm_mp_lmcache", "claim_status": "measured"},
+        "diagnostic_findings": [
+            {
+                "code": "lmcache_mp_low_hit_rate",
+                "severity": "warning",
+                "message": "LMCache MP token hit rate is below 30%.",
+                "metrics": {"hit_rate": 0.1},
+            },
+            {
+                "code": "lmcache_mp_l2_failures",
+                "severity": "critical",
+                "message": "LMCache MP reports failed L2 store or prefetch work.",
+                "metrics": {"l2_failed_operations_or_keys": 1},
+            },
+        ],
+    }
+    (root / "metrics" / "lmcache_compat_report.json").write_text(
+        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["verdict"] == "not_enough_evidence"
+    assert diagnosis["claim_status"] == "measured"
+    assert diagnosis["rule_fired"] == "lmcache_mp_l2_failures"
+    assert diagnosis["metric_values"]["lmcache_compat.detected_architecture"]["label"] == "vllm_mp_lmcache"
+
+
 def test_schema_version_locked() -> None:
     diagnosis = _diagnosis("prefill_bound")
 

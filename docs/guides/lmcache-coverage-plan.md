@@ -53,7 +53,7 @@ Scoring source manifest:
 
 ## Progress Scoreboard
 
-Current LMCache coverage: **48 / 100 points complete**.
+Current LMCache coverage: **53 / 100 points complete**.
 
 This score is intentionally conservative. Parser support without real live
 fixtures counts as partial progress, not complete support. A surface only gets
@@ -71,20 +71,20 @@ Scoring rules:
 
 | Workstream | Weight | Done | Status | Source basis | What is complete | What is still needed |
 | --- | ---: | ---: | --- | --- | --- | --- |
-| LMCache MP Prometheus coverage | 20 | 14 | partial | Official MP Observability doc plus `lmcache/v1/mp_observability/subscribers/metrics/` | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families | Add live L2 fixture, live nonzero lookup-token fixture, sampled throughput/lifecycle fixture, and source-discovered L1/L2 failure counters |
+| LMCache MP Prometheus coverage | 20 | 15 | partial | Official MP Observability doc plus `lmcache/v1/mp_observability/subscribers/metrics/` | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families, and source-discovered L1/L2 failure counters | Add live L2 fixture, live nonzero lookup-token fixture, and sampled throughput/lifecycle fixture |
 | Embedded / in-process LMCache metrics | 12 | 7 | partial | InferGuard aliases plus LMCache single-process `lmcache.` namespace guidance | Parses `lmcache:*` and `lmcache_*`; added production request/token/health/remote/P2P/chunk aliases; preserves unknown metrics | Add live embedded fixture and stale connector tests |
 | HTTP API evidence | 8 | 5 | partial | `docs/source/mp/http_api.rst` and public HTTP API docs | Parses saved LMCache MP health/status evidence; included in packet, compat, and coverage reports | Add live fixtures for `/api/healthcheck`, `/api/status`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, and `/periodic-threads-health` |
 | Trace recording `.lct` evidence | 8 | 4 | partial | MP Observability and Tracing/Debugging docs; `lmcache/v1/mp_observability/trace/` | Captures and summarizes `.lct`-style length-prefixed records; handles malformed traces | Validate against real LMCache `.lct` msgpack trace from `--trace-level storage` and add replay-summary checks |
 | OTel span evidence | 8 | 4 | partial | MP Observability tracing section and Grafana dashboard span names | Parses JSONL spans for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`; included in reports | Add real OTel export fixture and tracing-enabled/no-spans detector |
 | Log evidence | 8 | 3 | partial | MP logging docs and existing InferGuard log parser | Existing conservative LMCache log parsing exists | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
-| Diagnosis rules | 16 | 2 | early | InferGuard `diagnose-bottleneck` behavior and Touchdown playbook needs | Compatibility/coverage can report missing families and evidence gaps | Add LMCache-specific detectors with thresholds, evidence, and recommendations |
+| Diagnosis rules | 16 | 5 | early | InferGuard `diagnose-bottleneck` behavior and Touchdown playbook needs | Compatibility/coverage reports LMCache-specific findings for low MP hit rate, empty `cache_salt`, EventBus observability/loss, L1 eviction/failure pressure, and L2 failures; `diagnose-bottleneck` can surface them | Add live thresholds from real runs, trace/OTel no-span detector, log-backed zero-hit-after-restart detector, and stronger remediation text |
 | Live golden fixtures | 10 | 3 | partial | Existing Modal real-shaped slice plus synthetic tests | Modal real-shaped MP metric slice exists; synthetic tests cover new evidence parsers | Capture clean full MP packet, embedded packet, L2 packet, OTel packet, and `.lct` packet |
-| vLLM / SGLang bridge | 6 | 4 | partial | InferGuard vLLM/SGLang parsers and LMCache connector docs/source | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
+| vLLM / SGLang bridge | 6 | 5 | partial | InferGuard vLLM/SGLang parsers and LMCache connector docs/source | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists; compatibility reports now emit architecture labels for `vllm_mp_lmcache`, `vllm_embedded_lmcache`, `sglang_embedded_lmcache`, and `sglang_mp_lmcache_candidate` | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
 | Docs / release readiness | 4 | 2 | partial | InferGuard docs and CLI reference | Coverage plan exists and is linked in docs nav | Update existing LMCache docs to reflect new HTTP/trace/OTel support and refresh CLI reference |
 
 ### Detailed Ledger: LMCache MP Prometheus Coverage
 
-The **14 / 20** MP Prometheus score is based on the official MP Observability
+The **15 / 20** MP Prometheus score is based on the official MP Observability
 metric list plus source-discovered metrics in
 `lmcache/v1/mp_observability/subscribers/metrics/`.
 
@@ -99,16 +99,16 @@ metric list plus source-discovered metrics in
 | Engine counter: `num_chunks_loaded` | 1 | 1 | Official docs | Parser/report/tests exist | None |
 | Observable gauges: `active_prefetch_jobs`, in-flight L2, in-flight load bytes | 1 | 1 | Official docs | Parser/report/tests exist | None |
 | Resource and label handling: `service.instance.id`, `cache_salt`, `model_name`, L2 labels | 1 | 1 | Official docs | Compatibility report tracks these | None |
-| EventBus self-metrics and L1/L2 failure counters | 1 | 0.5 | LMCache source | EventBus self-metrics parsed; failure counters not yet parsed | Add `l1_allocation_failure`, `l1_read_failure`, and `l2_prefetch_failure` aliases/tests |
+| EventBus self-metrics and L1/L2 failure counters | 1 | 1 | LMCache source | EventBus self-metrics and `l1_allocation_failure`, `l1_read_failure`, `l2_prefetch_failure` aliases parse and have targeted tests | None |
 | Real MP fixture coverage | 2 | 0.5 | Modal real-shaped slice | Real-shaped MP scrape exists | Clean full fixture with metrics, HTTP, logs, optional trace/OTel |
-| Diagnostic mapping | 2 | 0.5 | InferGuard report behavior | Missing-family reporting exists | LMCache-specific detector pack |
+| Diagnostic mapping | 2 | 1.5 | InferGuard report behavior | Missing-family reporting plus first LMCache-specific detector pack exists | Tune thresholds and recommendations against live packets |
 
 Percent by category:
 
-- **Collection/parsing:** about **65%** complete.
-- **Compatibility/coverage reporting:** about **70%** complete.
+- **Collection/parsing:** about **70%** complete.
+- **Compatibility/coverage reporting:** about **75%** complete.
 - **Real live validation:** about **30%** complete.
-- **Actionable diagnostics:** about **15%** complete.
+- **Actionable diagnostics:** about **30%** complete.
 - **Public docs/release readiness:** about **45%** complete.
 
 The next meaningful milestone is **60 / 100**. To reach it, finish:
@@ -433,6 +433,10 @@ What shipped before `edccffd`:
 - `observability-coverage` reports across LMCache, vLLM, and SGLang.
 - MP coverage reporting for StorageManager, lookup tokens, L1, L2, lifecycle,
   throughput, gauges, and EventBus families.
+- Architecture detection for `vllm_mp_lmcache`, `vllm_embedded_lmcache`,
+  `sglang_embedded_lmcache`, and `sglang_mp_lmcache_candidate`.
+- First LMCache MP diagnostic findings for low hit rate, empty `cache_salt`,
+  EventBus loss/unobservability, L1 eviction/failure pressure, and L2 failures.
 
 What `edccffd` added:
 
@@ -466,6 +470,31 @@ uv run pytest \
 ```
 
 Result: `44 passed`.
+
+What the latest implementation added:
+
+- Normalized LMCache MP source-discovered failure counters:
+  `lmcache_mp_l1_allocation_failure_total`,
+  `lmcache_mp_l1_read_failure_total`, and
+  `lmcache_mp_l2_prefetch_failure_total`.
+- `detected_architecture` in compatibility reports, separating the LMCache
+  server mode from the engine integration path.
+- `diagnostic_findings` in compatibility reports, with evidence and recommended
+  operator action.
+- `diagnose-bottleneck` promotion of those findings into a specific rule-fired
+  result when a job directory contains `metrics/lmcache_compat_report.json`.
+
+Latest focused verification:
+
+```bash
+uv run pytest \
+  tests/test_lmcache_metrics_adapter.py \
+  tests/test_observability_coverage.py \
+  tests/test_lmcache_packet.py \
+  tests/test_diagnose_bottleneck.py
+```
+
+Result: `17 passed, 18 skipped`.
 
 ## Definition Of 100 Percent
 

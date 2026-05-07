@@ -83,6 +83,8 @@ class LmcacheMetrics:
     lmcache_l1_write_keys: int | None = None
     lmcache_l1_evicted_keys: int | None = None
     lmcache_l1_memory_usage_bytes: int | None = None
+    lmcache_l1_allocation_failure: int | None = None
+    lmcache_l1_read_failure: int | None = None
     lmcache_l1_chunk_lifetime_seconds: float | None = None
     lmcache_l1_chunk_idle_before_evict_seconds: float | None = None
     lmcache_l1_chunk_reuse_gap_seconds: float | None = None
@@ -104,6 +106,7 @@ class LmcacheMetrics:
     lmcache_l2_prefetch_load_keys: int | None = None
     lmcache_l2_prefetch_loaded_keys: int | None = None
     lmcache_l2_prefetch_failed_keys: int | None = None
+    lmcache_l2_prefetch_failure: int | None = None
     lmcache_l2_load_completed: int | None = None
     lmcache_l2_store_throughput_gbs: float | None = None
     lmcache_l2_load_throughput_gbs: float | None = None
@@ -403,6 +406,14 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_l1_memory_usage_bytes": (
         {"name": "lmcache_mp_l1_memory_usage_bytes", "type": "int"},
     ),
+    "lmcache_l1_allocation_failure": (
+        {"name": "lmcache_mp_l1_allocation_failure_total", "type": "int"},
+        {"name": "lmcache_mp_l1_allocation_failure", "type": "int"},
+    ),
+    "lmcache_l1_read_failure": (
+        {"name": "lmcache_mp_l1_read_failure_total", "type": "int"},
+        {"name": "lmcache_mp_l1_read_failure", "type": "int"},
+    ),
     "lmcache_l1_chunk_lifetime_seconds": (
         {"name": "lmcache_mp_l1_chunk_lifetime_seconds", "type": "hist_avg"},
     ),
@@ -465,6 +476,10 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     ),
     "lmcache_l2_prefetch_failed_keys": (
         {"name": "lmcache_mp_l2_prefetch_failed_keys_total", "type": "int"},
+    ),
+    "lmcache_l2_prefetch_failure": (
+        {"name": "lmcache_mp_l2_prefetch_failure_total", "type": "int"},
+        {"name": "lmcache_mp_l2_prefetch_failure", "type": "int"},
     ),
     "lmcache_l2_load_completed": (
         {"name": "lmcache_mp_l2_load_completed_total", "type": "int"},

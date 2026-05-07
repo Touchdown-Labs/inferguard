@@ -156,6 +156,8 @@ class DisaggSnapshot:
     lmcache_l1_write_keys: int | None = None
     lmcache_l1_evicted_keys: int | None = None
     lmcache_l1_memory_usage_bytes: int | None = None
+    lmcache_l1_allocation_failure: int | None = None
+    lmcache_l1_read_failure: int | None = None
     lmcache_l1_chunk_lifetime_seconds: float | None = None
     lmcache_l1_chunk_idle_before_evict_seconds: float | None = None
     lmcache_l1_chunk_reuse_gap_seconds: float | None = None
@@ -177,6 +179,7 @@ class DisaggSnapshot:
     lmcache_l2_prefetch_load_keys: int | None = None
     lmcache_l2_prefetch_loaded_keys: int | None = None
     lmcache_l2_prefetch_failed_keys: int | None = None
+    lmcache_l2_prefetch_failure: int | None = None
     lmcache_l2_load_completed: int | None = None
     lmcache_l2_store_throughput_gbs: float | None = None
     lmcache_l2_load_throughput_gbs: float | None = None
@@ -306,6 +309,8 @@ class DisaggSnapshot:
             "lmcache_l1_write_keys": self.lmcache_l1_write_keys,
             "lmcache_l1_evicted_keys": self.lmcache_l1_evicted_keys,
             "lmcache_l1_memory_usage_bytes": self.lmcache_l1_memory_usage_bytes,
+            "lmcache_l1_allocation_failure": self.lmcache_l1_allocation_failure,
+            "lmcache_l1_read_failure": self.lmcache_l1_read_failure,
             "lmcache_l1_chunk_lifetime_seconds": self.lmcache_l1_chunk_lifetime_seconds,
             "lmcache_l1_chunk_idle_before_evict_seconds": self.lmcache_l1_chunk_idle_before_evict_seconds,
             "lmcache_l1_chunk_reuse_gap_seconds": self.lmcache_l1_chunk_reuse_gap_seconds,
@@ -327,6 +332,7 @@ class DisaggSnapshot:
             "lmcache_l2_prefetch_load_keys": self.lmcache_l2_prefetch_load_keys,
             "lmcache_l2_prefetch_loaded_keys": self.lmcache_l2_prefetch_loaded_keys,
             "lmcache_l2_prefetch_failed_keys": self.lmcache_l2_prefetch_failed_keys,
+            "lmcache_l2_prefetch_failure": self.lmcache_l2_prefetch_failure,
             "lmcache_l2_load_completed": self.lmcache_l2_load_completed,
             "lmcache_l2_store_throughput_gbs": self.lmcache_l2_store_throughput_gbs,
             "lmcache_l2_load_throughput_gbs": self.lmcache_l2_load_throughput_gbs,

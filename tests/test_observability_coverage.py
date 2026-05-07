@@ -66,6 +66,7 @@ lmcache_mp_lookup_hit_tokens_total 50
 
     assert report["detected_engines"] == ["sglang"]
     assert report["detected_lmcache_mode"] == "mp"
+    assert report["lmcache_compat"]["detected_architecture"]["label"] == "sglang_mp_lmcache_candidate"
     assert report["surfaces"]["sglang"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["lmcache_mp"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["vllm"]["status"] == "not_applicable"
@@ -144,3 +145,36 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["surfaces"]["lmcache_http"]["status"] == "complete"
+
+
+def test_lmcache_compat_reports_vllm_mp_architecture_and_findings() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+vllm:cache_config_info{kv_connector="LMCacheMPConnector",kv_role="kv_both"} 1
+vllm:external_prefix_cache_queries_total 100
+vllm:external_prefix_cache_hits_total 0
+""",
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_sm_write_requests_total 10
+lmcache_mp_l1_write_keys_total 10
+lmcache_mp_l1_evicted_keys_total 4
+lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt=""} 1000
+lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt=""} 100
+lmcache_mp_l2_prefetch_failure_total 1
+""",
+        expected_engine="vllm",
+        expect_lmcache_mode="mp",
+        external_cache_configured=True,
+    )
+
+    compat = report["lmcache_compat"]
+    assert compat["detected_architecture"]["label"] == "vllm_mp_lmcache"
+    assert compat["detected_architecture"]["claim_status"] == "measured"
+    codes = {item["code"] for item in compat["diagnostic_findings"]}
+    assert "lmcache_mp_low_hit_rate" in codes
+    assert "lmcache_mp_empty_cache_salt" in codes
+    assert "lmcache_mp_l1_eviction_pressure" in codes
+    assert "lmcache_mp_l2_failures" in codes
+    question_codes = {item["code"] for item in compat["upstream_questions"]}
+    assert "lmcache_mp_empty_cache_salt" in question_codes
