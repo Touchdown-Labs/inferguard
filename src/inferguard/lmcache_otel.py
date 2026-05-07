@@ -8,7 +8,18 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "inferguard-lmcache-otel-evidence/v1"
-LMCache_SPANS = {"mp.store", "mp.retrieve", "mp.lookup_prefetch"}
+MPCACHE_SPANS = {"mp.store", "mp.retrieve", "mp.lookup_prefetch"}
+CACHEBLEND_SPANS = {
+    "cb.request",
+    "cb.lookup",
+    "cb.store_pre_computed",
+    "cb.retrieve",
+    "cb.store_final",
+}
+CACHEBLEND_POINT_SPANS = {"cb.fingerprints.registered", "cb.chunks.evicted"}
+REQUEST_SPANS = {"request"}
+LMCache_SPANS = MPCACHE_SPANS | CACHEBLEND_SPANS | CACHEBLEND_POINT_SPANS | REQUEST_SPANS
+REQUEST_ATTRIBUTE_KEYS = {"hit_tokens", "requested_tokens", "hit_rate"}
 
 
 @dataclass
@@ -18,9 +29,15 @@ class LmcacheOtelEvidence:
     claim_status: str = "not_proven"
     span_count: int = 0
     lmcache_span_count: int = 0
+    mp_span_count: int = 0
+    cacheblend_span_count: int = 0
+    cacheblend_point_span_count: int = 0
+    request_span_count: int = 0
     span_counts: dict[str, int] = field(default_factory=dict)
+    span_groups: dict[str, dict[str, Any]] = field(default_factory=dict)
     latency_seconds: dict[str, dict[str, float]] = field(default_factory=dict)
     attribute_keys: list[str] = field(default_factory=list)
+    request_attributes: dict[str, dict[str, float]] = field(default_factory=dict)
     parse_errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -33,6 +50,7 @@ def parse_lmcache_otel_jsonl(path: Path) -> dict[str, Any]:
     evidence = LmcacheOtelEvidence(present=True)
     attribute_keys: set[str] = set()
     durations: dict[str, list[float]] = {}
+    request_attributes: dict[str, list[float]] = {}
     try:
         text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
@@ -50,15 +68,66 @@ def parse_lmcache_otel_jsonl(path: Path) -> dict[str, Any]:
         evidence.span_counts[name] = evidence.span_counts.get(name, 0) + 1
         attrs = _attributes(row)
         attribute_keys.update(attrs)
+        group = _span_group(name)
+        if group == "mp":
+            evidence.mp_span_count += 1
+        elif group == "cacheblend":
+            evidence.cacheblend_span_count += 1
+        elif group == "cacheblend_point":
+            evidence.cacheblend_point_span_count += 1
+        elif group == "request":
+            evidence.request_span_count += 1
+            _add_request_attribute_values(attrs, request_attributes)
         duration = _duration_seconds(row)
         if duration is not None:
             durations.setdefault(name, []).append(duration)
     evidence.attribute_keys = sorted(attribute_keys)
+    evidence.request_attributes = {
+        name: _duration_summary(values) for name, values in sorted(request_attributes.items())
+    }
+    evidence.span_groups = _span_groups(evidence.span_counts)
     evidence.latency_seconds = {
         name: _duration_summary(values) for name, values in sorted(durations.items())
     }
     evidence.claim_status = "measured" if evidence.lmcache_span_count else "not_proven"
     return evidence.as_dict()
+
+
+def _span_group(name: str) -> str:
+    if name in MPCACHE_SPANS:
+        return "mp"
+    if name in CACHEBLEND_SPANS:
+        return "cacheblend"
+    if name in CACHEBLEND_POINT_SPANS:
+        return "cacheblend_point"
+    if name in REQUEST_SPANS:
+        return "request"
+    return "other"
+
+
+def _span_groups(span_counts: dict[str, int]) -> dict[str, dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {
+        "mp": {"count": 0, "span_counts": {}},
+        "cacheblend": {"count": 0, "span_counts": {}},
+        "cacheblend_point": {"count": 0, "span_counts": {}},
+        "request": {"count": 0, "span_counts": {}},
+    }
+    for name, count in sorted(span_counts.items()):
+        group = _span_group(name)
+        if group == "other":
+            continue
+        groups[group]["count"] += count
+        groups[group]["span_counts"][name] = count
+    return groups
+
+
+def _add_request_attribute_values(
+    attrs: dict[str, Any], request_attributes: dict[str, list[float]]
+) -> None:
+    for key in REQUEST_ATTRIBUTE_KEYS:
+        value = _number(attrs.get(key))
+        if value is not None:
+            request_attributes.setdefault(key, []).append(value)
 
 
 def _iter_span_rows(text: str, parse_errors: list[str]) -> list[Any]:
@@ -179,4 +248,12 @@ def _duration_summary(values: list[float]) -> dict[str, float]:
     }
 
 
-__all__ = ["LMCache_SPANS", "SCHEMA_VERSION", "parse_lmcache_otel_jsonl"]
+__all__ = [
+    "CACHEBLEND_POINT_SPANS",
+    "CACHEBLEND_SPANS",
+    "LMCache_SPANS",
+    "MPCACHE_SPANS",
+    "REQUEST_SPANS",
+    "SCHEMA_VERSION",
+    "parse_lmcache_otel_jsonl",
+]

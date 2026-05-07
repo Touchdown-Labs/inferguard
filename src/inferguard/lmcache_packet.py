@@ -5,15 +5,17 @@ from __future__ import annotations
 import shutil
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from importlib import import_module
 from pathlib import Path
-from urllib.parse import urljoin
 from typing import Any
+from urllib.parse import urljoin
 
 from inferguard.compat import build_compat_report, write_compat_report
-from inferguard.lmcache_http import parse_lmcache_http_payloads
 from inferguard.io import atomic_write_json, atomic_write_text
+from inferguard.lmcache_http import parse_lmcache_http_payloads
 from inferguard.lmcache_logs import parse_lmcache_logs
 from inferguard.lmcache_otel import parse_lmcache_otel_jsonl
 from inferguard.lmcache_trace import parse_lmcache_trace_file
@@ -46,10 +48,20 @@ class LmcachePacketOptions:
     lmcache_periodic_thread_file: Path | None = None
     lmcache_periodic_threads_health_url: str | None = None
     lmcache_periodic_threads_health_file: Path | None = None
+    lmcache_version_url: str | None = None
+    lmcache_version_file: Path | None = None
+    lmcache_lmc_version_url: str | None = None
+    lmcache_lmc_version_file: Path | None = None
+    lmcache_commit_id_url: str | None = None
+    lmcache_commit_id_file: Path | None = None
+    lmcache_quota_url: str | None = None
+    lmcache_quota_file: Path | None = None
     engine_log_file: Path | None = None
     lmcache_log_file: Path | None = None
     lmcache_trace_file: Path | None = None
     lmcache_otel_file: Path | None = None
+    lmcache_trace_replay_output: Path | None = None
+    lmcache_lookup_hash_path: Path | None = None
     expect_mode: str = "auto"
     l2_configured: bool = False
     timeout_seconds: float = 10.0
@@ -189,6 +201,55 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         errors=errors,
         endpoint_errors=http_endpoint_errors,
     )
+    version_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="version",
+        filename="lmcache_version.txt",
+        url=options.lmcache_version_url or _join_base(http_base_url, "/version"),
+        source_file=options.lmcache_version_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    lmc_version_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="lmc_version",
+        filename="lmcache_lmc_version.txt",
+        url=options.lmcache_lmc_version_url or _join_base(http_base_url, "/lmc_version"),
+        source_file=options.lmcache_lmc_version_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    commit_id_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="commit_id",
+        filename="lmcache_commit_id.txt",
+        url=options.lmcache_commit_id_url or _join_base(http_base_url, "/commit_id"),
+        source_file=options.lmcache_commit_id_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    quota_text = _capture_optional_http_endpoint(
+        output_dir=output_dir,
+        endpoint_name="quota",
+        filename="lmcache_quota.txt",
+        url=options.lmcache_quota_url or _join_base(http_base_url, "/api/quota"),
+        source_file=options.lmcache_quota_file,
+        timeout_seconds=options.timeout_seconds,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+        endpoint_errors=http_endpoint_errors,
+    )
+    skipped_endpoints = _skipped_lmcache_endpoints()
     http_evidence: dict[str, Any] | None = None
     if any(
         [
@@ -200,7 +261,12 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
             periodic_threads_text,
             periodic_thread_text,
             periodic_threads_health_text,
+            version_text,
+            lmc_version_text,
+            commit_id_text,
+            quota_text,
             http_endpoint_errors,
+            skipped_endpoints,
         ]
     ):
         http_evidence = parse_lmcache_http_payloads(
@@ -212,17 +278,14 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
             periodic_threads_text=periodic_threads_text,
             periodic_thread_text=periodic_thread_text,
             periodic_threads_health_text=periodic_threads_health_text,
+            extra_payloads={
+                "version": version_text,
+                "lmc_version": lmc_version_text,
+                "commit_id": commit_id_text,
+                "quota": quota_text,
+            },
             endpoint_errors=http_endpoint_errors,
-            skipped_endpoints=[
-                {
-                    "endpoint": "POST /api/clear-cache",
-                    "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
-                },
-                {
-                    "endpoint": "POST /metrics/reset",
-                    "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
-                },
-            ],
+            skipped_endpoints=skipped_endpoints,
         )
         http_evidence_path = output_dir / "lmcache_http_evidence.json"
         atomic_write_json(http_evidence_path, http_evidence)
@@ -279,6 +342,39 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         otel_evidence_path = output_dir / "lmcache_otel_evidence.json"
         atomic_write_json(otel_evidence_path, otel_evidence)
         artifacts["lmcache_otel_evidence"] = str(otel_evidence_path)
+    trace_replay_evidence = _copy_and_parse_optional_evidence(
+        output_dir=output_dir,
+        source_name="lmcache_trace_replay",
+        source_path=options.lmcache_trace_replay_output,
+        artifact_name="lmcache_trace_replay_artifact",
+        evidence_name="lmcache_trace_replay_evidence",
+        evidence_filename="lmcache_trace_replay_evidence.json",
+        parser_candidates=(
+            ("inferguard.lmcache_trace", "parse_lmcache_trace_replay_file"),
+            ("inferguard.lmcache_trace", "parse_lmcache_trace_replay_dir"),
+            ("inferguard.lmcache_trace_replay", "parse_lmcache_trace_replay_outputs"),
+            ("inferguard.lmcache_trace_replay", "parse_lmcache_trace_replay_evidence"),
+        ),
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    lookup_hash_evidence = _copy_and_parse_optional_evidence(
+        output_dir=output_dir,
+        source_name="lmcache_lookup_hash",
+        source_path=options.lmcache_lookup_hash_path,
+        artifact_name="lmcache_lookup_hash_artifact",
+        evidence_name="lmcache_lookup_hash_evidence",
+        evidence_filename="lmcache_lookup_hash_evidence.json",
+        parser_candidates=(
+            ("inferguard.lmcache_lookup_hash", "parse_lmcache_lookup_hash_jsonl"),
+            ("inferguard.lmcache_lookup_hash", "parse_lmcache_lookup_hashes"),
+            ("inferguard.lmcache_lookup_hash", "parse_lmcache_lookup_hash_evidence"),
+        ),
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
 
     report = build_compat_report(
         engine_text=engine_text,
@@ -289,8 +385,11 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         l2_configured=options.l2_configured,
         mp_observability=options.mp_observability,
         lmcache_http_evidence=http_evidence,
+        lmcache_log_evidence=log_evidence,
         lmcache_trace_evidence=trace_evidence,
         lmcache_otel_evidence=otel_evidence,
+        lmcache_trace_replay_evidence=trace_replay_evidence,
+        lmcache_lookup_hash_evidence=lookup_hash_evidence,
     )
     compat_path = output_dir / "lmcache_compat_report.json"
     write_compat_report(report, compat_path)
@@ -306,6 +405,7 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         "sources": sources,
         "artifacts": artifacts,
         "scrape_errors": errors,
+        "skipped_endpoints": skipped_endpoints,
         "compat_summary": {
             "failure_reasons": report.get("failure_reasons", []),
             "upstream_questions": report.get("upstream_questions", []),
@@ -315,6 +415,8 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         "log_evidence": log_evidence,
         "trace_evidence": trace_evidence,
         "otel_evidence": otel_evidence,
+        "trace_replay_evidence": trace_replay_evidence,
+        "lookup_hash_evidence": lookup_hash_evidence,
     }
     manifest_path = output_dir / "packet_manifest.json"
     atomic_write_json(manifest_path, manifest)
@@ -459,6 +561,153 @@ def _copy_file(
     artifacts[source_name] = str(destination)
     sources[source_name] = str(source_file)
     return text
+
+
+def _copy_path(
+    *,
+    destination: Path,
+    source_name: str,
+    source_path: Path | None,
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+) -> Path | None:
+    if source_path is None:
+        return None
+    try:
+        if source_path.is_dir():
+            if destination.exists():
+                shutil.rmtree(destination)
+            shutil.copytree(source_path, destination)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_path, destination)
+    except OSError as exc:
+        _record_error(errors, source_name, str(source_path), exc)
+        return None
+    artifacts[source_name] = str(destination)
+    sources[source_name] = str(source_path)
+    return destination
+
+
+def _copy_and_parse_optional_evidence(
+    *,
+    output_dir: Path,
+    source_name: str,
+    source_path: Path | None,
+    artifact_name: str,
+    evidence_name: str,
+    evidence_filename: str,
+    parser_candidates: tuple[tuple[str, str], ...],
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    if source_path is None:
+        return None
+    destination = output_dir / source_path.name
+    copied_path = _copy_path(
+        destination=destination,
+        source_name=artifact_name,
+        source_path=source_path,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    if copied_path is None:
+        return None
+    parser = _resolve_optional_parser(parser_candidates, source_path)
+    if parser is None:
+        evidence = {
+            "schema_version": f"inferguard-{source_name}-evidence/v0",
+            "present": True,
+            "claim_status": "parser_unavailable",
+            "source": str(source_path),
+            "artifact": str(copied_path),
+            "parser_status": "not_available",
+        }
+    else:
+        try:
+            evidence = parser(source_path)
+        except Exception as exc:  # noqa: BLE001 - optional lane parser should not break packets
+            _record_error(errors, evidence_name, str(source_path), exc)
+            evidence = {
+                "schema_version": f"inferguard-{source_name}-evidence/v0",
+                "present": True,
+                "claim_status": "parse_failed",
+                "source": str(source_path),
+                "artifact": str(copied_path),
+                "parser_status": "failed",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+    evidence_path = output_dir / evidence_filename
+    atomic_write_json(evidence_path, evidence)
+    artifacts[evidence_name] = str(evidence_path)
+    return evidence
+
+
+def _resolve_optional_parser(
+    candidates: tuple[tuple[str, str], ...], source_path: Path
+) -> Callable[[Path], dict[str, Any]] | None:
+    for module_name, function_name in candidates:
+        try:
+            module = import_module(module_name)
+        except ImportError:
+            continue
+        parser = getattr(module, function_name, None)
+        if callable(parser):
+            if function_name.endswith("_dir") and not source_path.is_dir():
+                continue
+            if function_name.endswith("_file") and source_path.is_dir():
+                continue
+            if function_name == "parse_lmcache_lookup_hash_jsonl" and source_path.is_dir():
+                return lambda path: _parse_lookup_hash_dir_with_parser(parser, path)
+            return parser
+    return None
+
+
+def _parse_lookup_hash_dir_with_parser(
+    parser: Callable[[Path], dict[str, Any]], directory: Path
+) -> dict[str, Any]:
+    files = sorted(Path(directory).glob("lookup_hashes_*.jsonl"))
+    children = [parser(path) for path in files]
+    row_count = sum(int(child.get("row_count") or 0) for child in children)
+    malformed_rows = sum(int(child.get("malformed_rows") or 0) for child in children)
+    return {
+        "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1",
+        "present": bool(files),
+        "claim_status": "measured" if row_count else "not_proven",
+        "source_type": "directory",
+        "file_count": len(files),
+        "row_count": row_count,
+        "malformed_rows": malformed_rows,
+        "files": children,
+    }
+
+
+def _skipped_lmcache_endpoints() -> list[dict[str, str]]:
+    return [
+        {
+            "endpoint": "GET /env",
+            "reason": "sensitive environment disclosure; collect-lmcache does not fetch it by default",
+            "status": "sensitive_skipped",
+        },
+        {
+            "endpoint": "POST /api/clear-cache",
+            "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
+            "status": "destructive_skipped",
+        },
+        {
+            "endpoint": "POST /metrics/reset",
+            "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
+            "status": "destructive_skipped",
+        },
+        {
+            "endpoint": "quota mutation endpoints",
+            "reason": "mutating quota routes are excluded; collect-lmcache only fetches safe GET /api/quota",
+            "status": "destructive_skipped",
+        },
+    ]
 
 
 def _record_error(

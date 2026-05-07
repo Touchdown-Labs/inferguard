@@ -111,22 +111,34 @@ vllm:prefix_cache_hits_total 8
 def test_observability_coverage_includes_lmcache_non_prometheus_evidence() -> None:
     report = build_observability_coverage_report(
         lmcache_http_evidence={"booleans": {"is_healthy": True}, "endpoints": {"health": {}}},
+        lmcache_log_evidence={"line_count": 2, "event_counts": {"store": 1}},
         lmcache_trace_evidence={"present": True, "claim_status": "measured", "record_count": 2},
         lmcache_otel_evidence={"present": True, "claim_status": "measured", "lmcache_span_count": 3},
+        lmcache_trace_replay_evidence={"present": True, "claim_status": "measured", "row_count": 1},
+        lmcache_lookup_hash_evidence={"present": True, "claim_status": "measured", "row_count": 1},
     )
 
     assert report["surfaces"]["lmcache_http"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
     assert report["surfaces"]["lmcache_trace_recording"]["status"] == "complete"
     assert report["surfaces"]["lmcache_otel"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_trace_replay"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
 
 
 def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     http = tmp_path / "http.json"
+    log = tmp_path / "log.json"
     trace = tmp_path / "trace.json"
     otel = tmp_path / "otel.json"
+    trace_replay = tmp_path / "trace_replay.json"
+    lookup_hash = tmp_path / "lookup_hash.json"
     http.write_text('{"booleans": {"is_healthy": true}, "endpoints": {"health": {}}}', encoding="utf-8")
+    log.write_text('{"line_count": 1, "event_counts": {"store": 1}}', encoding="utf-8")
     trace.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
     otel.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
+    trace_replay.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
+    lookup_hash.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
 
     result = CliRunner().invoke(
         app,
@@ -134,10 +146,16 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
             "lmcache-compat",
             "--lmcache-http-evidence-file",
             str(http),
+            "--lmcache-log-evidence-file",
+            str(log),
             "--lmcache-trace-evidence-file",
             str(trace),
             "--lmcache-otel-evidence-file",
             str(otel),
+            "--lmcache-trace-replay-evidence-file",
+            str(trace_replay),
+            "--lmcache-lookup-hash-evidence-file",
+            str(lookup_hash),
             "--json",
         ],
     )
@@ -145,6 +163,38 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["surfaces"]["lmcache_http"]["status"] == "complete"
+    assert payload["surfaces"]["lmcache_logs"]["status"] == "complete"
+    assert payload["surfaces"]["lmcache_trace_replay"]["status"] == "complete"
+    assert payload["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
+
+
+def test_observability_coverage_cli_accepts_new_lmcache_evidence_files(tmp_path: Path) -> None:
+    log = tmp_path / "log.json"
+    trace_replay = tmp_path / "trace_replay.json"
+    lookup_hash = tmp_path / "lookup_hash.json"
+    log.write_text('{"line_count": 1, "event_counts": {"retrieve": 1}}', encoding="utf-8")
+    trace_replay.write_text('{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8")
+    lookup_hash.write_text('{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "observability-coverage",
+            "--lmcache-log-evidence-file",
+            str(log),
+            "--lmcache-trace-replay-evidence-file",
+            str(trace_replay),
+            "--lmcache-lookup-hash-evidence-file",
+            str(lookup_hash),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["surfaces"]["lmcache_logs"]["status"] == "complete"
+    assert payload["surfaces"]["lmcache_trace_replay"]["status"] == "complete"
+    assert payload["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
 
 
 def test_lmcache_compat_reports_vllm_mp_architecture_and_findings() -> None:
@@ -178,6 +228,78 @@ lmcache_mp_l2_prefetch_failure_total 1
     assert "lmcache_mp_l2_failures" in codes
     question_codes = {item["code"] for item in compat["upstream_questions"]}
     assert "lmcache_mp_empty_cache_salt" in question_codes
+
+
+def test_lmcache_cacheblend_surface_and_findings_are_reported() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_blend_lookup_requests_total 10
+lmcache_blend_lookup_fingerprint_hits_total 4
+lmcache_blend_lookup_storage_hits_total 3
+lmcache_blend_lookup_stale_chunks_total 2
+lmcache_blend_lookup_no_gpu_context_errors_total 1
+lmcache_blend_retrieve_requests_total 7
+lmcache_blend_retrieve_chunks_total 14
+lmcache_blend_retrieve_failures_total 1
+lmcache_blend_store_pre_computed_requests_total 6
+lmcache_blend_store_pre_computed_chunks_total 13
+lmcache_blend_store_pre_computed_failures_total 0
+lmcache_blend_store_final_requests_total 5
+lmcache_blend_store_final_chunks_total 12
+lmcache_blend_store_final_failures_total 0
+lmcache_blend_fingerprints_registered_total 8
+lmcache_blend_chunks_evicted_total 2
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    compat = report["lmcache_compat"]
+    families = {(row["surface"], row["family"]): row for row in compat["families"]}
+    assert compat["observed"]["lmcache_cacheblend"] is True
+    assert compat["observed"]["lmcache_embedded"] is False
+    assert compat["detected_architecture"]["label"] == "lmcache_mp_server"
+    assert report["surfaces"]["lmcache_cacheblend"]["status"] == "complete"
+    assert families[("lmcache_cacheblend", "lookup")]["status"] == "populated"
+    assert families[("lmcache_cacheblend", "failure")]["status"] == "populated"
+    assert families[("lmcache_cacheblend", "no_gpu_context")]["status"] == "populated"
+    assert families[("lmcache_cacheblend", "stale")]["status"] == "populated"
+    assert any(item["code"] == "lmcache_cacheblend_failures" for item in compat["diagnostic_findings"])
+    assert not any(gap["surface"] == "lmcache_cacheblend" for gap in report["coverage_gaps"])
+
+
+def test_lmcache_cacheblend_surface_is_optional_when_absent() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    assert report["lmcache_compat"]["observed"]["lmcache_cacheblend"] is False
+    assert report["surfaces"]["lmcache_cacheblend"]["status"] == "not_applicable"
+
+
+def test_lmcache_embedded_source_alias_families_are_reported() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:lmcache_is_healthy 1
+lmcache:get_blocking_failed_count 1
+lmcache:put_failed_count 2
+lmcache:storage_events_ongoing_count 3
+lmcache:storage_events_done_count 4
+lmcache:storage_events_not_found_count 5
+lmcache:chunk_statistics_chunks 6
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    assert report["detected_lmcache_mode"] == "embedded"
+    assert families[("lmcache_embedded", "production_health")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_failures")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_storage_events")]["status"] == "populated"
+    assert families[("lmcache_embedded", "chunk_stats")]["status"] == "populated"
 
 
 def test_lmcache_compat_promotes_trace_and_otel_missing_evidence() -> None:

@@ -86,6 +86,9 @@ def _load_evidence_bundle(
     lmcache_compat_report = _read_json(
         paths["lmcache_compat_report"], parse_errors, required=False
     )
+    lmcache_log_evidence = _read_json(
+        paths["lmcache_log_evidence"], parse_errors, required=False
+    )
     engine_rows = _read_jsonl(paths["engine_metrics_timeline"], parse_errors)
     gpu_rows = _read_jsonl(paths["gpu_metrics_timeline"], parse_errors)
     healthcheck = _read_json(paths["healthcheck"], parse_errors, required=False)
@@ -122,6 +125,7 @@ def _load_evidence_bundle(
         cpu_summary=cpu_summary,
         cpu_summary_path=cpu_path,
         lmcache_compat_report=lmcache_compat_report,
+        lmcache_log_evidence=lmcache_log_evidence,
         missing_required_paths=missing,
         parse_errors=parse_errors,
         rule_config=config,
@@ -139,6 +143,7 @@ def _paths(job_dir: Path, validation_report: Path | None) -> dict[str, Path]:
         "gpu_metrics_timeline": job_dir / "metrics" / "gpu_metrics_timeline.jsonl",
         "metrics_summary": job_dir / "metrics" / "metrics_summary.json",
         "lmcache_compat_report": job_dir / "metrics" / "lmcache_compat_report.json",
+        "lmcache_log_evidence": job_dir / "metrics" / "lmcache_log_evidence.json",
         "healthcheck": job_dir / "launch" / "healthcheck.json",
         "launch_command": job_dir / "launch" / "command.json",
         "operator_profile": job_dir / "operator_profile.json",

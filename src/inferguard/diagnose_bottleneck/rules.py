@@ -80,6 +80,7 @@ class EvidenceBundle:
     cpu_summary: dict[str, Any] = field(default_factory=dict)
     cpu_summary_path: Path | None = None
     lmcache_compat_report: dict[str, Any] = field(default_factory=dict)
+    lmcache_log_evidence: dict[str, Any] = field(default_factory=dict)
     missing_required_paths: list[Path] = field(default_factory=list)
     parse_errors: dict[str, str] = field(default_factory=dict)
     rule_config: dict[str, Any] = field(default_factory=dict)
@@ -790,11 +791,15 @@ def _lmcache_missing_signal_downgrade(
 ) -> RuleResult | None:
     del thresholds
     report = bundle.lmcache_compat_report
-    if not report or report.get("detected_mode") not in {"mp", "mixed"}:
+    report_mode = (report or {}).get("detected_mode")
+    compat_report_active = bool(report) and report_mode in {"mp", "mixed"}
+    if report and not compat_report_active and not bundle.lmcache_log_evidence:
+        return None
+    if not report and not bundle.lmcache_log_evidence:
         return None
     findings = [
         item
-        for item in report.get("diagnostic_findings") or []
+        for item in ((report or {}).get("diagnostic_findings") if compat_report_active else []) or []
         if isinstance(item, Mapping)
     ]
     finding_priority = [
@@ -808,11 +813,7 @@ def _lmcache_missing_signal_downgrade(
         "lmcache_mp_eventbus_taildrop_unobservable",
         "lmcache_mp_empty_cache_salt",
     ]
-    finding_codes = {str(item.get("code")) for item in findings}
-    selected_finding_code = next(
-        (code for code in finding_priority if code in finding_codes),
-        "",
-    )
+    selected_finding_code = _select_lmcache_finding_code(findings, finding_priority)
     if selected_finding_code:
         selected_finding = next(
             item for item in findings if str(item.get("code")) == selected_finding_code
@@ -840,50 +841,148 @@ def _lmcache_missing_signal_downgrade(
                 or "LMCache MP telemetry contains an actionable cache observability finding."
             ),
             metric_values={
-                "lmcache_compat.detected_mode": report.get("detected_mode"),
-                "lmcache_compat.detected_architecture": report.get("detected_architecture") or {},
+                "lmcache_compat.detected_mode": (report or {}).get("detected_mode"),
+                "lmcache_compat.detected_architecture": (
+                    (report or {}).get("detected_architecture") or {}
+                ),
                 "lmcache_compat.diagnostic_findings": findings,
             },
             claim_status=selected_claim_status,
             downgrades=downgrades,
+            evidence_source_key="lmcache_compat_report",
         )
     questions = [
         item
-        for item in report.get("upstream_questions") or []
+        for item in ((report or {}).get("upstream_questions") if compat_report_active else []) or []
         if isinstance(item, Mapping)
     ]
     codes = {str(item.get("code")) for item in questions}
-    if not codes:
+    if codes:
+        priority = [
+            "lmcache_mp_lookup_counters_missing",
+            "vllm_external_prefix_no_hits",
+            "lmcache_eventbus_self_metrics_missing",
+            "lmcache_mp_empty_cache_salt",
+        ]
+        selected = _select_lmcache_code(codes, priority) or sorted(codes)[0]
+        return _not_enough_result(
+            bundle,
+            rule_fired=selected,
+            reasoning=(
+                "LMCache MP telemetry is present, but a required observability surface is "
+                "missing or ambiguous. The run proves MP is wired, not that the cache "
+                "economics are fully diagnosable."
+            ),
+            metric_values={
+                "lmcache_compat.detected_mode": (report or {}).get("detected_mode"),
+                "lmcache_compat.upstream_question_codes": sorted(codes),
+                "lmcache_compat.surfaces": (report or {}).get("surfaces") or {},
+            },
+            claim_status="inferred",
+            downgrades=[
+                Downgrade(
+                    "lmcache_mp_compatibility",
+                    "measured",
+                    "inferred",
+                    selected,
+                )
+            ],
+            evidence_source_key="lmcache_compat_report",
+        )
+    log_result = _lmcache_log_evidence_downgrade(bundle, report or {})
+    if log_result is not None:
+        return log_result
+    return None
+
+
+def _select_lmcache_finding_code(
+    findings: list[Mapping[str, Any]],
+    priority: list[str],
+) -> str:
+    codes = {str(item.get("code")) for item in findings}
+    return _select_lmcache_code(codes, priority)
+
+
+def _select_lmcache_code(codes: set[str], priority: list[str]) -> str:
+    selected = next((code for code in priority if code in codes), "")
+    if selected:
+        return selected
+    user_facing_prefixes = (
+        "lmcache_log",
+        "lmcache_cacheblend",
+        "lmcache_p2p",
+        "lmcache_pd",
+        "lmcache_trace_replay",
+        "lmcache_lookup_hash",
+        "cacheblend",
+        "cb.",
+        "p2p",
+        "pd_",
+        "disaggregated_prefill",
+        "trace_replay",
+        "lookup_hash",
+    )
+    selected = next(
+        (
+            code
+            for code in sorted(codes)
+            if code.startswith(user_facing_prefixes)
+            or "cacheblend" in code
+            or "cache_blend" in code
+            or "p2p" in code
+            or "disaggregated_prefill" in code
+            or "trace_replay" in code
+            or "lookup_hash" in code
+        ),
+        "",
+    )
+    return selected
+
+
+def _lmcache_log_evidence_downgrade(
+    bundle: EvidenceBundle,
+    report: Mapping[str, Any],
+) -> RuleResult | None:
+    log_evidence = bundle.lmcache_log_evidence
+    if not log_evidence:
         return None
-    priority = [
-        "lmcache_mp_lookup_counters_missing",
-        "vllm_external_prefix_no_hits",
-        "lmcache_eventbus_self_metrics_missing",
-        "lmcache_mp_empty_cache_salt",
-    ]
-    selected = next((code for code in priority if code in codes), sorted(codes)[0])
+    event_counts = log_evidence.get("event_counts") or {}
+    config = log_evidence.get("config") or {}
+    code = ""
+    if config.get("stale_lmcache_connector_seen"):
+        code = "lmcache_log_stale_connector"
+    elif (event_counts.get("pd_sender") or 0) or (event_counts.get("pd_receiver") or 0):
+        code = "lmcache_log_pd_evidence_present"
+    elif (event_counts.get("p2p_peer") or 0) or (event_counts.get("p2p_transfer") or 0):
+        code = "lmcache_log_p2p_evidence_present"
+    elif (event_counts.get("store") or 0) or (event_counts.get("retrieve") or 0):
+        code = "lmcache_log_lifecycle_evidence_present"
+    if not code:
+        return None
     return _not_enough_result(
         bundle,
-        rule_fired=selected,
+        rule_fired=code,
         reasoning=(
-            "LMCache MP telemetry is present, but a required observability surface is "
-            "missing or ambiguous. The run proves MP is wired, not that the cache "
-            "economics are fully diagnosable."
+            "LMCache logs contain mode or lifecycle evidence, but log snippets alone "
+            "do not prove cache economics. Pair this packet with Prometheus, HTTP, "
+            "trace, and replay evidence before making a live coverage claim."
         ),
         metric_values={
             "lmcache_compat.detected_mode": report.get("detected_mode"),
-            "lmcache_compat.upstream_question_codes": sorted(codes),
-            "lmcache_compat.surfaces": report.get("surfaces") or {},
+            "lmcache_log.event_counts": event_counts,
+            "lmcache_log.config": config,
+            "lmcache_log.mode_candidates": log_evidence.get("mode_candidates") or [],
         },
         claim_status="inferred",
         downgrades=[
             Downgrade(
-                "lmcache_mp_compatibility",
+                "lmcache_log_evidence",
                 "measured",
                 "inferred",
-                selected,
+                code,
             )
         ],
+        evidence_source_key="lmcache_log_evidence",
     )
 
 
@@ -895,8 +994,11 @@ def _not_enough_result(
     metric_values: dict[str, Any],
     claim_status: ClaimStatus | str = "not_proven",
     downgrades: list[Downgrade] | None = None,
+    evidence_source_key: str | None = None,
 ) -> RuleResult:
-    source_key = "metrics_summary" if bundle.paths.get("metrics_summary") else "job_dir"
+    source_key = evidence_source_key or (
+        "metrics_summary" if bundle.paths.get("metrics_summary") else "job_dir"
+    )
     evidence = [
         Evidence(
             metric="diagnose.required_evidence",

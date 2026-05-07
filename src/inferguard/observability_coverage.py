@@ -173,8 +173,11 @@ def build_observability_coverage_report(
     disaggregated_or_external_cache: bool = False,
     mp_observability: dict[str, Any] | None = None,
     lmcache_http_evidence: dict[str, Any] | None = None,
+    lmcache_log_evidence: dict[str, Any] | None = None,
     lmcache_trace_evidence: dict[str, Any] | None = None,
     lmcache_otel_evidence: dict[str, Any] | None = None,
+    lmcache_trace_replay_evidence: dict[str, Any] | None = None,
+    lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a single coverage report for engine and LMCache telemetry."""
 
@@ -202,8 +205,11 @@ def build_observability_coverage_report(
         l2_configured=l2_configured,
         mp_observability=mp_observability,
         lmcache_http_evidence=lmcache_http_evidence,
+        lmcache_log_evidence=lmcache_log_evidence,
         lmcache_trace_evidence=lmcache_trace_evidence,
         lmcache_otel_evidence=lmcache_otel_evidence,
+        lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
+        lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
     )
     surfaces = _surface_rows(engine_families)
     for surface, row in lmcache_report.get("surfaces", {}).items():
@@ -239,8 +245,11 @@ def build_observability_coverage_report_from_paths(
     engine_metrics_file: Path | None = None,
     lmcache_metrics_file: Path | None = None,
     lmcache_http_evidence_file: Path | None = None,
+    lmcache_log_evidence_file: Path | None = None,
     lmcache_trace_evidence_file: Path | None = None,
     lmcache_otel_evidence_file: Path | None = None,
+    lmcache_trace_replay_evidence_file: Path | None = None,
+    lmcache_lookup_hash_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -253,8 +262,11 @@ def build_observability_coverage_report_from_paths(
         engine_source=str(engine_metrics_file or ""),
         lmcache_source=str(lmcache_metrics_file or ""),
         lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_log_evidence=_read_json_object(lmcache_log_evidence_file),
         lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
+        lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
+        lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
         **kwargs,
     )
 
@@ -265,8 +277,11 @@ def build_observability_coverage_report_from_urls(
     lmcache_metrics_url: str | None = None,
     timeout_seconds: float = 10.0,
     lmcache_http_evidence_file: Path | None = None,
+    lmcache_log_evidence_file: Path | None = None,
     lmcache_trace_evidence_file: Path | None = None,
     lmcache_otel_evidence_file: Path | None = None,
+    lmcache_trace_replay_evidence_file: Path | None = None,
+    lmcache_lookup_hash_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -275,8 +290,11 @@ def build_observability_coverage_report_from_urls(
         engine_source=engine_metrics_url or "",
         lmcache_source=lmcache_metrics_url or "",
         lmcache_http_evidence=_read_json_object(lmcache_http_evidence_file),
+        lmcache_log_evidence=_read_json_object(lmcache_log_evidence_file),
         lmcache_trace_evidence=_read_json_object(lmcache_trace_evidence_file),
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
+        lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
+        lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
         **kwargs,
     )
 

@@ -1505,6 +1505,10 @@ def lmcache_compat_cmd(
         Path | None,
         typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
     ] = None,
+    lmcache_log_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-log-evidence-file", help="Optional LMCache log evidence JSON."),
+    ] = None,
     lmcache_trace_evidence_file: Annotated[
         Path | None,
         typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
@@ -1512,6 +1516,14 @@ def lmcache_compat_cmd(
     lmcache_otel_evidence_file: Annotated[
         Path | None,
         typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
+    ] = None,
+    lmcache_trace_replay_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
+    ] = None,
+    lmcache_lookup_hash_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
     ] = None,
     output: Annotated[
         Path | None,
@@ -1608,8 +1620,11 @@ def lmcache_compat_cmd(
             engine_metrics_file,
             lmcache_metrics_file,
             lmcache_http_evidence_file,
+            lmcache_log_evidence_file,
             lmcache_trace_evidence_file,
             lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -1641,8 +1656,11 @@ def lmcache_compat_cmd(
             l2_configured=l2_configured,
             mp_observability=mp_observability,
             lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_log_evidence_file=lmcache_log_evidence_file,
             lmcache_trace_evidence_file=lmcache_trace_evidence_file,
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
         )
     else:
         report = build_compat_report_from_paths(
@@ -1652,8 +1670,11 @@ def lmcache_compat_cmd(
             l2_configured=l2_configured,
             mp_observability=mp_observability,
             lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_log_evidence_file=lmcache_log_evidence_file,
             lmcache_trace_evidence_file=lmcache_trace_evidence_file,
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
         )
     if output is not None:
         write_compat_report(report, output)
@@ -1809,6 +1830,38 @@ def collect_lmcache_cmd(
             help="Optional saved LMCache MP /periodic-threads-health response.",
         ),
     ] = None,
+    lmcache_version_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-version-url", help="Optional LMCache MP /version URL."),
+    ] = None,
+    lmcache_version_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-version-file", help="Optional saved LMCache MP /version response."),
+    ] = None,
+    lmcache_lmc_version_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-lmc-version-url", help="Optional LMCache MP /lmc_version URL."),
+    ] = None,
+    lmcache_lmc_version_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-lmc-version-file", help="Optional saved LMCache MP /lmc_version response."),
+    ] = None,
+    lmcache_commit_id_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-commit-id-url", help="Optional LMCache MP /commit_id URL."),
+    ] = None,
+    lmcache_commit_id_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-commit-id-file", help="Optional saved LMCache MP /commit_id response."),
+    ] = None,
+    lmcache_quota_url: Annotated[
+        str | None,
+        typer.Option("--lmcache-quota-url", help="Optional LMCache MP GET /api/quota URL."),
+    ] = None,
+    lmcache_quota_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-quota-file", help="Optional saved LMCache MP GET /api/quota response."),
+    ] = None,
     engine_log_file: Annotated[
         Path | None,
         typer.Option("--engine-log-file", help="Optional engine log file to copy into the packet."),
@@ -1824,6 +1877,20 @@ def collect_lmcache_cmd(
     lmcache_otel_file: Annotated[
         Path | None,
         typer.Option("--lmcache-otel-file", help="Optional JSONL export of LMCache OTel spans."),
+    ] = None,
+    lmcache_trace_replay_output: Annotated[
+        Path | None,
+        typer.Option(
+            "--lmcache-trace-replay-output",
+            help="Optional LMCache trace replay output file or directory to copy and parse if supported.",
+        ),
+    ] = None,
+    lmcache_lookup_hash_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--lmcache-lookup-hash-path",
+            help="Optional lookup_hashes_*.jsonl file or lookup-hash directory to copy and parse if supported.",
+        ),
     ] = None,
     expect_mode: Annotated[
         str,
@@ -1928,10 +1995,20 @@ def collect_lmcache_cmd(
             lmcache_periodic_thread_file,
             lmcache_periodic_threads_health_url,
             lmcache_periodic_threads_health_file,
+            lmcache_version_url,
+            lmcache_version_file,
+            lmcache_lmc_version_url,
+            lmcache_lmc_version_file,
+            lmcache_commit_id_url,
+            lmcache_commit_id_file,
+            lmcache_quota_url,
+            lmcache_quota_file,
             engine_log_file,
             lmcache_log_file,
             lmcache_trace_file,
             lmcache_otel_file,
+            lmcache_trace_replay_output,
+            lmcache_lookup_hash_path,
         ]
     ):
         raise typer.BadParameter("pass at least one URL or file input to collect")
@@ -1958,10 +2035,20 @@ def collect_lmcache_cmd(
             lmcache_periodic_thread_file=lmcache_periodic_thread_file,
             lmcache_periodic_threads_health_url=lmcache_periodic_threads_health_url,
             lmcache_periodic_threads_health_file=lmcache_periodic_threads_health_file,
+            lmcache_version_url=lmcache_version_url,
+            lmcache_version_file=lmcache_version_file,
+            lmcache_lmc_version_url=lmcache_lmc_version_url,
+            lmcache_lmc_version_file=lmcache_lmc_version_file,
+            lmcache_commit_id_url=lmcache_commit_id_url,
+            lmcache_commit_id_file=lmcache_commit_id_file,
+            lmcache_quota_url=lmcache_quota_url,
+            lmcache_quota_file=lmcache_quota_file,
             engine_log_file=engine_log_file,
             lmcache_log_file=lmcache_log_file,
             lmcache_trace_file=lmcache_trace_file,
             lmcache_otel_file=lmcache_otel_file,
+            lmcache_trace_replay_output=lmcache_trace_replay_output,
+            lmcache_lookup_hash_path=lmcache_lookup_hash_path,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             timeout_seconds=timeout_seconds,
@@ -2014,6 +2101,10 @@ def observability_coverage_cmd(
         Path | None,
         typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
     ] = None,
+    lmcache_log_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-log-evidence-file", help="Optional LMCache log evidence JSON."),
+    ] = None,
     lmcache_trace_evidence_file: Annotated[
         Path | None,
         typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
@@ -2021,6 +2112,14 @@ def observability_coverage_cmd(
     lmcache_otel_evidence_file: Annotated[
         Path | None,
         typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
+    ] = None,
+    lmcache_trace_replay_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
+    ] = None,
+    lmcache_lookup_hash_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
     ] = None,
     expected_engine: Annotated[
         str,
@@ -2083,8 +2182,11 @@ def observability_coverage_cmd(
             engine_metrics_file,
             lmcache_metrics_file,
             lmcache_http_evidence_file,
+            lmcache_log_evidence_file,
             lmcache_trace_evidence_file,
             lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -2105,8 +2207,11 @@ def observability_coverage_cmd(
             lmcache_metrics_url=lmcache_metrics_url,
             timeout_seconds=timeout_seconds,
             lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_log_evidence_file=lmcache_log_evidence_file,
             lmcache_trace_evidence_file=lmcache_trace_evidence_file,
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
             **kwargs,
         )
     else:
@@ -2114,8 +2219,11 @@ def observability_coverage_cmd(
             engine_metrics_file=engine_metrics_file,
             lmcache_metrics_file=lmcache_metrics_file,
             lmcache_http_evidence_file=lmcache_http_evidence_file,
+            lmcache_log_evidence_file=lmcache_log_evidence_file,
             lmcache_trace_evidence_file=lmcache_trace_evidence_file,
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
+            lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
+            lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
             **kwargs,
         )
     if output is not None:

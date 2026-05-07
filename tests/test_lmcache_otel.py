@@ -89,3 +89,49 @@ def test_lmcache_otel_parses_otlp_json_export(tmp_path: Path) -> None:
     assert evidence["span_counts"]["mp.retrieve"] == 1
     assert evidence["latency_seconds"]["mp.retrieve"]["max"] == 0.002
     assert "retrieved_count" in evidence["attribute_keys"]
+
+
+def test_lmcache_otel_distinguishes_request_mp_and_cacheblend_spans(tmp_path: Path) -> None:
+    spans = tmp_path / "cacheblend.jsonl"
+    spans.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "name": "request",
+                        "duration_ms": 50,
+                        "attributes": {
+                            "requested_tokens": 100,
+                            "hit_tokens": 40,
+                            "hit_rate": 0.4,
+                        },
+                    }
+                ),
+                json.dumps({"name": "mp.store", "duration_ms": 2}),
+                json.dumps({"name": "cb.request", "duration_ms": 12}),
+                json.dumps({"name": "cb.lookup", "duration_ms": 3}),
+                json.dumps({"name": "cb.store_pre_computed", "duration_ms": 4}),
+                json.dumps({"name": "cb.retrieve", "duration_ms": 5}),
+                json.dumps({"name": "cb.store_final", "duration_ms": 6}),
+                json.dumps({"name": "cb.fingerprints.registered", "attributes": {"count": 2}}),
+                json.dumps({"name": "cb.chunks.evicted", "attributes": {"count": 1}}),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    evidence = parse_lmcache_otel_jsonl(spans)
+
+    assert evidence["claim_status"] == "measured"
+    assert evidence["lmcache_span_count"] == 9
+    assert evidence["mp_span_count"] == 1
+    assert evidence["request_span_count"] == 1
+    assert evidence["cacheblend_span_count"] == 5
+    assert evidence["cacheblend_point_span_count"] == 2
+    assert evidence["span_groups"]["mp"]["span_counts"]["mp.store"] == 1
+    assert evidence["span_groups"]["cacheblend"]["span_counts"]["cb.lookup"] == 1
+    assert evidence["span_groups"]["cacheblend_point"]["span_counts"]["cb.chunks.evicted"] == 1
+    assert evidence["span_groups"]["request"]["span_counts"]["request"] == 1
+    assert evidence["request_attributes"]["hit_tokens"]["max"] == 40.0
+    assert evidence["request_attributes"]["requested_tokens"]["max"] == 100.0
+    assert evidence["request_attributes"]["hit_rate"]["max"] == 0.4

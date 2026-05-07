@@ -13,6 +13,11 @@ present, which evidence is missing, and what that implies.
 
 Scoring source manifest:
 
+- Upstream tracker for this plan:
+  `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/188-2026-05-07-lmcache-inferguard-observability-source-of-truth.md`.
+- Source-of-truth score from that tracker: **58 / 100**. Do not raise this
+  score until the tracker records fixture-backed implementation and live
+  validation evidence.
 - InferGuard tracker commit used for this score: `7ba414c`.
 - Latest InferGuard implementation commit included in the score:
   `edccffd feat: add LMCache evidence coverage`.
@@ -74,10 +79,10 @@ Scoring rules:
 | LMCache MP Prometheus coverage | 20 | 15 | partial | Official MP Observability doc plus `lmcache/v1/mp_observability/subscribers/metrics/` | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families, and source-discovered L1/L2 failure counters | Add live L2 fixture, live nonzero lookup-token fixture, and sampled throughput/lifecycle fixture |
 | Embedded / in-process LMCache metrics | 12 | 7 | partial | InferGuard aliases plus LMCache single-process `lmcache.` namespace guidance | Parses `lmcache:*` and `lmcache_*`; added production request/token/health/remote/P2P/chunk aliases; preserves unknown metrics | Add live embedded fixture and stale connector tests |
 | HTTP API evidence | 8 | 6 | partial | `docs/source/mp/http_api.rst` and public HTTP API docs | Parses saved LMCache MP health/status evidence and now packet-captures safe read-only MP HTTP routes including `/conf`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, and `/periodic-threads-health`; destructive routes are explicitly skipped | Add live fixtures for the full HTTP endpoint set and add source-backed quota/version/internal API packet evidence |
-| Trace recording `.lct` evidence | 8 | 5 | partial | MP Observability and Tracing/Debugging docs; `lmcache/v1/mp_observability/trace/` | Captures and summarizes length-prefixed records, supports real msgpack `.lct` records plus legacy JSON fixtures, and handles malformed traces | Validate against a real live LMCache `.lct` trace from `--trace-level storage` and add replay-info/replay-summary checks |
-| OTel span evidence | 8 | 5 | partial | MP Observability tracing section and Grafana dashboard span names | Parses JSONL and OTLP JSON span exports for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`; included in reports | Add real collector export fixture and span coverage for CacheBlend `cb.*` spans |
-| Log evidence | 8 | 3 | partial | MP logging docs and existing InferGuard log parser | Existing conservative LMCache log parsing exists | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
-| Diagnosis rules | 16 | 6 | early | InferGuard `diagnose-bottleneck` behavior and Touchdown playbook needs | Compatibility/coverage reports LMCache-specific findings for low MP hit rate, empty `cache_salt`, EventBus observability/loss, L1 eviction/failure pressure, L2 failures, trace-enabled-without-trace evidence, and OTel-enabled-without-spans; `diagnose-bottleneck` can surface them | Add live thresholds from real runs, log-backed zero-hit-after-restart detector, CacheBlend/P2P/PD detectors, and stronger remediation text |
+| Trace recording `.lct` evidence | 8 | 5 | partial | MP Observability and Tracing/Debugging docs; `lmcache/v1/mp_observability/trace/` | Captures and summarizes length-prefixed records, supports real msgpack `.lct` records plus legacy JSON fixtures, parses trace-info/replay JSON/JSONL/CSV summaries, and handles malformed traces | Validate against a real live LMCache `.lct` trace from `--trace-level storage` plus replay output from the same run |
+| OTel span evidence | 8 | 5 | partial | MP Observability tracing section and Grafana dashboard span names | Parses JSONL and OTLP JSON span exports for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`, root `request`, and CacheBlend `cb.*` spans; included in reports | Add real collector export fixture for MP and CacheBlend spans |
+| Log evidence | 8 | 3 | partial | MP logging docs and existing InferGuard log parser | Existing conservative LMCache log parsing exists and diagnosis can surface log-only P2P, PD, lifecycle, and stale-connector evidence as inferred findings | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
+| Diagnosis rules | 16 | 6 | early | InferGuard `diagnose-bottleneck` behavior and Touchdown playbook needs | Compatibility/coverage reports LMCache-specific findings for low MP hit rate, empty `cache_salt`, EventBus observability/loss, L1 eviction/failure pressure, L2 failures, trace-enabled-without-trace evidence, and OTel-enabled-without-spans; `diagnose-bottleneck` can surface them and now passes through new user-facing CacheBlend/P2P/PD/trace-replay/lookup-hash/log finding codes when parser/report lanes emit them | Add live thresholds from real runs, log-backed zero-hit-after-restart detector, first-class CacheBlend/P2P/PD parser-backed detectors, and stronger remediation text |
 | Live golden fixtures | 10 | 3 | partial | Existing Modal real-shaped slice plus synthetic tests | Modal real-shaped MP metric slice exists; synthetic tests cover new evidence parsers | Capture clean full MP packet, embedded packet, L2 packet, OTel packet, and `.lct` packet |
 | vLLM / SGLang bridge | 6 | 5 | partial | InferGuard vLLM/SGLang parsers and LMCache connector docs/source | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists; compatibility reports now emit architecture labels for `vllm_mp_lmcache`, `vllm_embedded_lmcache`, `sglang_embedded_lmcache`, and `sglang_mp_lmcache_candidate` | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
 | Docs / release readiness | 4 | 3 | partial | InferGuard docs and CLI reference | Coverage plan exists, is linked in docs nav, and now reflects the expanded HTTP/trace/OTel implementation and remaining live-proof gates | Refresh generated CLI reference and add a live-packet runbook after the Modal packet is captured |
@@ -678,7 +683,9 @@ Goal: make the coverage usable by engineers who were not in this session.
   - [x] HTTP evidence is no longer "raw only";
   - [x] `.lct` evidence is no longer "missing";
   - [x] OTel evidence is no longer "missing";
-  - [ ] detector gaps remain explicit.
+  - [x] diagnosis now documents pass-through handling for CacheBlend, P2P, PD,
+    trace-replay, lookup-hash, and log finding codes;
+  - [ ] live detector gaps remain explicit.
 - [x] Update `docs/guides/observability-coverage-matrix.md`.
 - [x] Update `docs/reference/cli.md` after CLI help changes.
 - [ ] Add one "run this on Modal output" example:

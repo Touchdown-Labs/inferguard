@@ -194,6 +194,28 @@ class DisaggSnapshot:
     lmcache_event_bus_drain_lag_seconds: float | None = None
     lmcache_event_bus_dropped_events_total: int | None = None
     lmcache_event_bus_subscriber_exceptions_total: int | None = None
+    lmcache_blend_lookup_requests: int | None = None
+    lmcache_blend_lookup_fingerprint_hits: int | None = None
+    lmcache_blend_lookup_storage_hits: int | None = None
+    lmcache_blend_lookup_stale_chunks: int | None = None
+    lmcache_blend_lookup_no_gpu_context_errors: int | None = None
+    lmcache_blend_retrieve_requests: int | None = None
+    lmcache_blend_retrieve_chunks: int | None = None
+    lmcache_blend_retrieve_failures: int | None = None
+    lmcache_blend_store_pre_computed_requests: int | None = None
+    lmcache_blend_store_pre_computed_chunks: int | None = None
+    lmcache_blend_store_pre_computed_failures: int | None = None
+    lmcache_blend_store_final_requests: int | None = None
+    lmcache_blend_store_final_chunks: int | None = None
+    lmcache_blend_store_final_failures: int | None = None
+    lmcache_blend_fingerprints_registered: int | None = None
+    lmcache_blend_chunks_evicted: int | None = None
+    lmcache_get_blocking_failed_count: int | None = None
+    lmcache_put_failed_count: int | None = None
+    lmcache_storage_events_ongoing_count: int | None = None
+    lmcache_storage_events_done_count: int | None = None
+    lmcache_storage_events_not_found_count: int | None = None
+    lmcache_chunk_statistics_count: int | None = None
     raw_metrics_extra: dict[str, float] = field(default_factory=dict)
     dynamo_block_residency_seconds: float | None = None
     dynamo_block_l1_count: int | None = None
@@ -347,6 +369,28 @@ class DisaggSnapshot:
             "lmcache_event_bus_drain_lag_seconds": self.lmcache_event_bus_drain_lag_seconds,
             "lmcache_event_bus_dropped_events_total": self.lmcache_event_bus_dropped_events_total,
             "lmcache_event_bus_subscriber_exceptions_total": self.lmcache_event_bus_subscriber_exceptions_total,
+            "lmcache_blend_lookup_requests": self.lmcache_blend_lookup_requests,
+            "lmcache_blend_lookup_fingerprint_hits": self.lmcache_blend_lookup_fingerprint_hits,
+            "lmcache_blend_lookup_storage_hits": self.lmcache_blend_lookup_storage_hits,
+            "lmcache_blend_lookup_stale_chunks": self.lmcache_blend_lookup_stale_chunks,
+            "lmcache_blend_lookup_no_gpu_context_errors": self.lmcache_blend_lookup_no_gpu_context_errors,
+            "lmcache_blend_retrieve_requests": self.lmcache_blend_retrieve_requests,
+            "lmcache_blend_retrieve_chunks": self.lmcache_blend_retrieve_chunks,
+            "lmcache_blend_retrieve_failures": self.lmcache_blend_retrieve_failures,
+            "lmcache_blend_store_pre_computed_requests": self.lmcache_blend_store_pre_computed_requests,
+            "lmcache_blend_store_pre_computed_chunks": self.lmcache_blend_store_pre_computed_chunks,
+            "lmcache_blend_store_pre_computed_failures": self.lmcache_blend_store_pre_computed_failures,
+            "lmcache_blend_store_final_requests": self.lmcache_blend_store_final_requests,
+            "lmcache_blend_store_final_chunks": self.lmcache_blend_store_final_chunks,
+            "lmcache_blend_store_final_failures": self.lmcache_blend_store_final_failures,
+            "lmcache_blend_fingerprints_registered": self.lmcache_blend_fingerprints_registered,
+            "lmcache_blend_chunks_evicted": self.lmcache_blend_chunks_evicted,
+            "lmcache_get_blocking_failed_count": self.lmcache_get_blocking_failed_count,
+            "lmcache_put_failed_count": self.lmcache_put_failed_count,
+            "lmcache_storage_events_ongoing_count": self.lmcache_storage_events_ongoing_count,
+            "lmcache_storage_events_done_count": self.lmcache_storage_events_done_count,
+            "lmcache_storage_events_not_found_count": self.lmcache_storage_events_not_found_count,
+            "lmcache_chunk_statistics_count": self.lmcache_chunk_statistics_count,
             "raw_metrics_extra": dict(self.raw_metrics_extra),
             "dynamo_block_residency_seconds": self.dynamo_block_residency_seconds,
             "dynamo_block_l1_count": self.dynamo_block_l1_count,

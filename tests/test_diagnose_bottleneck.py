@@ -185,6 +185,62 @@ def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: 
     assert diagnosis["metric_values"]["lmcache_compat.detected_architecture"]["label"] == "vllm_mp_lmcache"
 
 
+def test_lmcache_compat_new_evidence_surfaces_become_diagnosis(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_cacheblend_lookup_hash"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    compat = {
+        "schema_version": "inferguard-observability-compat/v1",
+        "detected_mode": "mp",
+        "diagnostic_findings": [
+            {
+                "code": "lmcache_lookup_hash_missing_rotation_config",
+                "severity": "info",
+                "message": "Lookup-hash JSONL is present without bounded rotation evidence.",
+            },
+            {
+                "code": "lmcache_cacheblend_retrieve_failures",
+                "severity": "warning",
+                "message": "CacheBlend retrieve failures were reported.",
+                "metrics": {"lmcache_blend_retrieve_failures_total": 2},
+            },
+        ],
+    }
+    (root / "metrics" / "lmcache_compat_report.json").write_text(
+        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["rule_fired"] == "lmcache_cacheblend_retrieve_failures"
+    assert diagnosis["claim_status"] == "measured"
+    assert any("lmcache_compat_report.json" in path for path in diagnosis["evidence_paths"])
+
+
+def test_lmcache_log_evidence_becomes_specific_diagnosis(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_log_pd"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    (root / "metrics" / "lmcache_log_evidence.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-lmcache-logs/v1",
+                "event_counts": {"pd_sender": 1, "pd_receiver": 1, "p2p_peer": 0},
+                "config": {"enable_pd": True, "stale_lmcache_connector_seen": False},
+                "mode_candidates": ["disaggregated_prefill"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["rule_fired"] == "lmcache_log_pd_evidence_present"
+    assert diagnosis["claim_status"] == "inferred"
+    assert "disaggregated_prefill" in diagnosis["metric_values"]["lmcache_log.mode_candidates"]
+
+
 def test_schema_version_locked() -> None:
     diagnosis = _diagnosis("prefill_bound")
 

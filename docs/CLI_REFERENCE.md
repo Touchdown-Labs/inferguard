@@ -38,10 +38,16 @@ inferguard collect-lmcache \
   --lmcache-metrics-file modal-out/lmcache.prom \
   --lmcache-health-file modal-out/lmcache-health.json \
   --lmcache-status-file modal-out/lmcache-status.json \
+  --lmcache-version-file modal-out/lmcache-version.txt \
+  --lmcache-lmc-version-file modal-out/lmcache-lmc-version.txt \
+  --lmcache-commit-id-file modal-out/lmcache-commit-id.txt \
+  --lmcache-quota-file modal-out/lmcache-quota.json \
   --engine-log-file modal-out/vllm.log \
   --lmcache-log-file modal-out/lmcache.log \
   --lmcache-trace-file modal-out/lmcache-trace.lct \
+  --lmcache-trace-replay-output modal-out/trace-replay \
   --lmcache-otel-file modal-out/lmcache-otel.jsonl \
+  --lmcache-lookup-hash-path modal-out/lookup-hashes \
   --expect-mode mp \
   --json
 ```
@@ -53,8 +59,11 @@ inferguard lmcache-compat \
   --engine-metrics-file modal-out/vllm.prom \
   --lmcache-metrics-file modal-out/lmcache.prom \
   --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
+  --lmcache-log-evidence-file modal-out/lmcache-packet/lmcache_log_evidence.json \
   --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
+  --lmcache-trace-replay-evidence-file modal-out/lmcache-packet/lmcache_trace_replay_evidence.json \
   --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
+  --lmcache-lookup-hash-evidence-file modal-out/lmcache-packet/lmcache_lookup_hash_evidence.json \
   --expect-mode mp \
   --fail-on missing-required \
   --json
@@ -63,8 +72,11 @@ inferguard observability-coverage \
   --engine-metrics-file modal-out/vllm.prom \
   --lmcache-metrics-file modal-out/lmcache.prom \
   --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
+  --lmcache-log-evidence-file modal-out/lmcache-packet/lmcache_log_evidence.json \
   --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
+  --lmcache-trace-replay-evidence-file modal-out/lmcache-packet/lmcache_trace_replay_evidence.json \
   --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
+  --lmcache-lookup-hash-evidence-file modal-out/lmcache-packet/lmcache_lookup_hash_evidence.json \
   --expected-engine vllm \
   --expect-lmcache-mode mp \
   --json

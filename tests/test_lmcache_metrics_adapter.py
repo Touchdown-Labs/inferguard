@@ -221,6 +221,64 @@ lmcache:unique_chunks 20
     assert metrics.lmcache_unique_chunks == 20
 
 
+def test_lmcache_cacheblend_metrics_and_embedded_aliases_parse() -> None:
+    metrics = parse_lmcache_prometheus(
+        """
+lmcache_blend_lookup_requests_total 10
+lmcache_blend_lookup_fingerprint_hits_total 7
+lmcache_blend_lookup_storage_hits_total 6
+lmcache_blend_lookup_stale_chunks_total 2
+lmcache_blend_lookup_no_gpu_context_errors_total 1
+lmcache_blend_retrieve_requests_total 5
+lmcache_blend_retrieve_chunks_total 12
+lmcache_blend_retrieve_failures_total 1
+lmcache_blend_store_pre_computed_requests_total 4
+lmcache_blend_store_pre_computed_chunks_total 9
+lmcache_blend_store_pre_computed_failures_total 2
+lmcache_blend_store_final_requests_total 3
+lmcache_blend_store_final_chunks_total 8
+lmcache_blend_store_final_failures_total 1
+lmcache_blend_fingerprints_registered_total 11
+lmcache_blend_chunks_evicted_total 2
+lmcache_blend_future_source_only_total 99
+lmcache:lmcache_is_healthy 1
+lmcache:get_blocking_failed_count 3
+lmcache:put_failed_count 4
+lmcache:storage_events_ongoing_count 5
+lmcache:storage_events_done_count 6
+lmcache:storage_events_not_found_count 7
+lmcache:chunk_statistics_chunks 8
+"""
+    )
+
+    assert metrics.lmcache_enabled is True
+    assert metrics.lmcache_cacheblend_enabled is True
+    assert metrics.lmcache_blend_lookup_requests == 10
+    assert metrics.lmcache_blend_lookup_fingerprint_hits == 7
+    assert metrics.lmcache_blend_lookup_storage_hits == 6
+    assert metrics.lmcache_blend_lookup_stale_chunks == 2
+    assert metrics.lmcache_blend_lookup_no_gpu_context_errors == 1
+    assert metrics.lmcache_blend_retrieve_requests == 5
+    assert metrics.lmcache_blend_retrieve_chunks == 12
+    assert metrics.lmcache_blend_retrieve_failures == 1
+    assert metrics.lmcache_blend_store_pre_computed_requests == 4
+    assert metrics.lmcache_blend_store_pre_computed_chunks == 9
+    assert metrics.lmcache_blend_store_pre_computed_failures == 2
+    assert metrics.lmcache_blend_store_final_requests == 3
+    assert metrics.lmcache_blend_store_final_chunks == 8
+    assert metrics.lmcache_blend_store_final_failures == 1
+    assert metrics.lmcache_blend_fingerprints_registered == 11
+    assert metrics.lmcache_blend_chunks_evicted == 2
+    assert metrics.lmcache_is_healthy is True
+    assert metrics.lmcache_get_blocking_failed_count == 3
+    assert metrics.lmcache_put_failed_count == 4
+    assert metrics.lmcache_storage_events_ongoing_count == 5
+    assert metrics.lmcache_storage_events_done_count == 6
+    assert metrics.lmcache_storage_events_not_found_count == 7
+    assert metrics.lmcache_chunk_statistics_count == 8
+    assert metrics.raw_metrics_extra["lmcache_blend_future_source_only_total"] == 99
+
+
 def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:
     from inferguard.analyze.operator_brief import (
         build_operator_brief,

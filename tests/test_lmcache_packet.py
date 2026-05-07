@@ -21,8 +21,14 @@ def test_collect_lmcache_packet_writes_partial_first_artifacts(tmp_path: Path) -
     lmcache_periodic_threads = tmp_path / "periodic_threads.json"
     lmcache_periodic_thread = tmp_path / "periodic_thread.json"
     lmcache_periodic_threads_health = tmp_path / "periodic_threads_health.json"
+    lmcache_version = tmp_path / "version.txt"
+    lmcache_lmc_version = tmp_path / "lmc_version.txt"
+    lmcache_commit_id = tmp_path / "commit_id.txt"
+    lmcache_quota = tmp_path / "quota.json"
     lmcache_trace = tmp_path / "trace.lct"
     lmcache_otel = tmp_path / "otel.jsonl"
+    trace_replay_output = tmp_path / "trace_replay_ops.csv"
+    lookup_hash_dir = tmp_path / "lookup_hashes"
     lmcache_metrics.write_text(
         """
 target_info{service_instance_id="mp-a"} 1
@@ -48,6 +54,16 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     lmcache_periodic_threads.write_text('{"periodic_threads": ["eviction"]}', encoding="utf-8")
     lmcache_periodic_thread.write_text('{"name": "eviction", "healthy": true}', encoding="utf-8")
     lmcache_periodic_threads_health.write_text('{"healthy": true}', encoding="utf-8")
+    lmcache_version.write_text("0.3.5", encoding="utf-8")
+    lmcache_lmc_version.write_text("0.3.5", encoding="utf-8")
+    lmcache_commit_id.write_text("abc123", encoding="utf-8")
+    lmcache_quota.write_text('{"quota": {"limit": 8, "used": 2}}', encoding="utf-8")
+    trace_replay_output.write_text("qualname,count,errors,mean_ms\nStorageManager.get,2,0,3.4\n", encoding="utf-8")
+    lookup_hash_dir.mkdir()
+    (lookup_hash_dir / "lookup_hashes_000.jsonl").write_text(
+        '{"request_id":"r1","chunk_hashes":["raw-hash"],"seq_len":512}\n',
+        encoding="utf-8",
+    )
     _write_lct(
         lmcache_trace,
         [
@@ -70,9 +86,15 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
             lmcache_periodic_threads_file=lmcache_periodic_threads,
             lmcache_periodic_thread_file=lmcache_periodic_thread,
             lmcache_periodic_threads_health_file=lmcache_periodic_threads_health,
+            lmcache_version_file=lmcache_version,
+            lmcache_lmc_version_file=lmcache_lmc_version,
+            lmcache_commit_id_file=lmcache_commit_id,
+            lmcache_quota_file=lmcache_quota,
             lmcache_log_file=lmcache_log,
             lmcache_trace_file=lmcache_trace,
             lmcache_otel_file=lmcache_otel,
+            lmcache_trace_replay_output=trace_replay_output,
+            lmcache_lookup_hash_path=lookup_hash_dir,
             expect_mode="mp",
             mp_observability={"event_bus_queue_size": 10000, "metrics_sample_rate": 0.01},
         )
@@ -90,19 +112,45 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     assert (output_dir / "lmcache_periodic_threads.txt").exists()
     assert (output_dir / "lmcache_periodic_thread.txt").exists()
     assert (output_dir / "lmcache_periodic_threads_health.txt").exists()
+    assert (output_dir / "lmcache_version.txt").exists()
+    assert (output_dir / "lmcache_lmc_version.txt").exists()
+    assert (output_dir / "lmcache_commit_id.txt").exists()
+    assert (output_dir / "lmcache_quota.txt").exists()
     assert (output_dir / "lmcache_log_evidence.json").exists()
     assert (output_dir / "lmcache_trace_evidence.json").exists()
     assert (output_dir / "lmcache_otel_evidence.json").exists()
+    assert (output_dir / "lmcache_trace_replay_evidence.json").exists()
+    assert (output_dir / "lmcache_lookup_hash_evidence.json").exists()
     assert manifest["http_evidence"]["booleans"]["is_healthy"] is True
     assert manifest["http_evidence"]["booleans"]["has_conf"] is True
     assert manifest["http_evidence"]["booleans"]["has_threads"] is True
-    assert manifest["http_evidence"]["skipped_endpoints"][0]["endpoint"] == "POST /api/clear-cache"
+    assert manifest["http_evidence"]["booleans"]["has_version"] is True
+    assert manifest["http_evidence"]["booleans"]["has_lmc_version"] is True
+    assert manifest["http_evidence"]["booleans"]["has_commit_id"] is True
+    assert manifest["http_evidence"]["booleans"]["has_quota"] is True
+    assert {item["endpoint"] for item in manifest["http_evidence"]["skipped_endpoints"]} >= {
+        "GET /env",
+        "POST /api/clear-cache",
+        "POST /metrics/reset",
+        "quota mutation endpoints",
+    }
+    assert {item["endpoint"] for item in manifest["skipped_endpoints"]} >= {
+        "GET /env",
+        "POST /api/clear-cache",
+        "POST /metrics/reset",
+        "quota mutation endpoints",
+    }
     assert manifest["log_evidence"]["event_counts"]["prefetch_complete"] == 1
     assert manifest["trace_evidence"]["claim_status"] == "measured"
     assert manifest["otel_evidence"]["claim_status"] == "measured"
+    assert manifest["trace_replay_evidence"]["claim_status"] == "measured"
+    assert manifest["lookup_hash_evidence"]["claim_status"] == "measured"
     report = json.loads((output_dir / "lmcache_compat_report.json").read_text(encoding="utf-8"))
     assert report["lmcache_mp_observability"]["service_instance_ids"] == ["mp-a"]
     assert report["lmcache_mp_observability"]["cache_salt_values"] == ["tenant-a"]
+    assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_trace_replay"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
 
 
 def test_collect_lmcache_packet_records_failed_inputs(tmp_path: Path) -> None:
@@ -123,7 +171,15 @@ def test_collect_lmcache_packet_records_failed_inputs(tmp_path: Path) -> None:
 
 def test_collect_lmcache_cli_writes_packet(tmp_path: Path) -> None:
     metrics = tmp_path / "lmcache.prom"
+    version = tmp_path / "version.txt"
+    quota = tmp_path / "quota.json"
+    trace_replay = tmp_path / "trace_replay_ops.csv"
+    lookup_hash = tmp_path / "lookup_hashes_000.jsonl"
     metrics.write_text("lmcache_mp_sm_read_requests_total 2\n", encoding="utf-8")
+    version.write_text("0.3.5", encoding="utf-8")
+    quota.write_text('{"quota": {"limit": 8}}', encoding="utf-8")
+    trace_replay.write_text("qualname,count,errors,mean_ms\nStorageManager.get,1,0,2.0\n", encoding="utf-8")
+    lookup_hash.write_text('{"request_id":"r1","chunk_hashes":["raw-hash"],"seq_len":128}\n', encoding="utf-8")
     output_dir = tmp_path / "packet"
 
     result = CliRunner().invoke(
@@ -134,6 +190,14 @@ def test_collect_lmcache_cli_writes_packet(tmp_path: Path) -> None:
             str(output_dir),
             "--lmcache-metrics-file",
             str(metrics),
+            "--lmcache-version-file",
+            str(version),
+            "--lmcache-quota-file",
+            str(quota),
+            "--lmcache-trace-replay-output",
+            str(trace_replay),
+            "--lmcache-lookup-hash-path",
+            str(lookup_hash),
             "--expect-mode",
             "mp",
             "--json",
@@ -143,6 +207,10 @@ def test_collect_lmcache_cli_writes_packet(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["detected_mode"] == "mp"
+    assert payload["http_evidence"]["booleans"]["has_version"] is True
+    assert payload["http_evidence"]["booleans"]["has_quota"] is True
+    assert payload["trace_replay_evidence"]["claim_status"] == "measured"
+    assert payload["lookup_hash_evidence"]["claim_status"] == "measured"
     assert (output_dir / "packet_manifest.json").exists()
 
 

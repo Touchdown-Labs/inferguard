@@ -73,6 +73,10 @@ def parse_lmcache_http_payloads(
         "has_periodic_threads": "periodic_threads" in evidence.endpoints,
         "has_periodic_thread": "periodic_thread" in evidence.endpoints,
         "has_periodic_threads_health": "periodic_threads_health" in evidence.endpoints,
+        "has_version": "version" in evidence.endpoints,
+        "has_lmc_version": "lmc_version" in evidence.endpoints,
+        "has_commit_id": "commit_id" in evidence.endpoints,
+        "has_quota": "quota" in evidence.endpoints,
         "is_healthy": _is_overall_healthy(evidence.endpoints),
     }
     evidence.failure_reasons = _failure_reasons(evidence.endpoints)

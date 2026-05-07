@@ -12,6 +12,16 @@ InferGuard's priority is the current LMCache architecture:
 
 The old `LMCacheConnector` v0-style string is not a priority. InferGuard should flag it as stale/unsupported unless the operator explicitly documents an older pinned stack.
 
+## Progress
+
+The upstream tracker for this effort is
+`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/188-2026-05-07-lmcache-inferguard-observability-source-of-truth.md`.
+As of that tracker, LMCache observability coverage remains **58 / 100**. This
+page documents parser, packet, report, and diagnosis behavior that exists in
+InferGuard; it does not claim live-complete coverage. The next score movement
+requires one clean live vLLM + standalone LMCache MP packet with metrics, HTTP,
+logs, trace recording, fixture replay, and tests.
+
 ## Support Levels
 
 | Surface | Typical launch shape | Evidence InferGuard can use today | Support level |
@@ -19,12 +29,15 @@ The old `LMCacheConnector` v0-style string is not a priority. InferGuard should 
 | Standalone MP | `lmcache server` plus vLLM `LMCacheMPConnector` | LMCache `/metrics` with `lmcache_mp_*`, vLLM `/metrics`, launch/config artifacts | Partial, highest priority |
 | Embedded vLLM LMCache | vLLM with `LMCacheConnectorV1`, `LMCacheConnectorV1Dynamic`, or `--kv-offloading-backend lmcache` | Engine `/metrics`, production `lmcache:*` metrics, launch/config artifacts, inline vLLM/LMCache logs | Partial, compatibility priority |
 | Embedded SGLang LMCache | SGLang `--enable-lmcache` using `LMCacheLayerwiseConnector` through SGLang's radix cache | SGLang `/metrics`, aggregate `sglang:cache_hit_rate`, HiCache/storage metrics when present, LMCache config/log evidence | Partial, compatibility priority |
-| P2P sharing | multiple engines, `enable_p2p`, controller, NIXL | production `lmcache:*` P2P metrics when present; logs/controller evidence are not first-class yet | Planned |
-| Disaggregated prefill | prefiller/decoder roles using NIXL | launch/config artifacts and external metrics; PD proof packet is not first-class yet | Planned |
+| P2P sharing | multiple engines, `enable_p2p`, controller, NIXL | production `lmcache:*` P2P metrics when present; logs can be parsed as conservative packet evidence and surfaced by diagnosis | Parser/report partial; live proof missing |
+| Disaggregated prefill | prefiller/decoder roles using NIXL | launch/config artifacts and NIXL/PD log hints can be parsed as conservative packet evidence and surfaced by diagnosis | Parser/report partial; live proof missing |
+| CacheBlend | blend-mode lookups/retrieve/store with `lmcache_blend_*` and `cb.*` spans | `lmcache_blend_*` metrics are normalized, CacheBlend OTel spans are parsed, and report/diagnosis can surface CacheBlend finding codes | Parser/report partial; live proof missing |
+| Lookup-hash JSONL | `lookup_hashes_*.jsonl` with redacted key-shape metadata | privacy-bounded parser redacts raw hashes and preserves request/model/chunk-shape summaries; packet/report plumbing accepts lookup-hash evidence | Parser/report partial; live proof missing |
 | Controller / internal API | `lmcache_controller` or internal API server | not collected as a structured packet yet | Planned |
 | Logs | engine and LMCache logs | copied into packets and parsed for conservative LMCache hints | Partial |
 | OTel spans | MP tracing exported to operator-supplied JSONL | parsed into LMCache OTel evidence for `mp.store`, `mp.retrieve`, and `mp.lookup_prefetch` | Partial |
 | Trace recording `.lct` | MP `--trace-level storage` binary trace recording | parsed as LMCache trace evidence; malformed traces are recorded without aborting packet creation | Partial |
+| Trace replay metadata | `lmcache trace info` / replay JSON, JSONL, and CSV summaries | replay info, JSON, JSONL, and `trace_replay_ops.csv` evidence can be parsed and surfaced in packet/report/diagnosis flows | Parser/report partial; live proof missing |
 
 ## What `lmcache-compat` Does Today
 
@@ -97,6 +110,15 @@ The JSON report includes an `lmcache_mp_observability` section with
 `service_instance_ids` from Prometheus `target_info`, `cache_salt` cardinality,
 L2 adapter labels, EventBus tail-drop risk, sampled-histogram sparsity, and
 whether metrics/tracing/logging were disabled by config.
+
+`diagnose-bottleneck` reads `metrics/lmcache_compat_report.json` and now
+promotes user-facing LMCache finding codes for MP logs, CacheBlend, P2P, PD,
+trace replay, and lookup-hash surfaces when those findings are present in the
+report. It also reads `metrics/lmcache_log_evidence.json` from collected
+packets and can emit conservative log-backed diagnoses such as
+`lmcache_log_p2p_evidence_present`,
+`lmcache_log_pd_evidence_present`, and `lmcache_log_stale_connector`. These are
+`inferred` unless paired with measured Prometheus/HTTP/trace evidence.
 
 ## Metric Surfaces
 

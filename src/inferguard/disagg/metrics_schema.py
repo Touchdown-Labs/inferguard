@@ -121,6 +121,28 @@ class LmcacheMetrics:
     lmcache_event_bus_drain_lag_seconds: float | None = None
     lmcache_event_bus_dropped_events_total: int | None = None
     lmcache_event_bus_subscriber_exceptions_total: int | None = None
+    lmcache_blend_lookup_requests: int | None = None
+    lmcache_blend_lookup_fingerprint_hits: int | None = None
+    lmcache_blend_lookup_storage_hits: int | None = None
+    lmcache_blend_lookup_stale_chunks: int | None = None
+    lmcache_blend_lookup_no_gpu_context_errors: int | None = None
+    lmcache_blend_retrieve_requests: int | None = None
+    lmcache_blend_retrieve_chunks: int | None = None
+    lmcache_blend_retrieve_failures: int | None = None
+    lmcache_blend_store_pre_computed_requests: int | None = None
+    lmcache_blend_store_pre_computed_chunks: int | None = None
+    lmcache_blend_store_pre_computed_failures: int | None = None
+    lmcache_blend_store_final_requests: int | None = None
+    lmcache_blend_store_final_chunks: int | None = None
+    lmcache_blend_store_final_failures: int | None = None
+    lmcache_blend_fingerprints_registered: int | None = None
+    lmcache_blend_chunks_evicted: int | None = None
+    lmcache_get_blocking_failed_count: int | None = None
+    lmcache_put_failed_count: int | None = None
+    lmcache_storage_events_ongoing_count: int | None = None
+    lmcache_storage_events_done_count: int | None = None
+    lmcache_storage_events_not_found_count: int | None = None
+    lmcache_chunk_statistics_count: int | None = None
     raw_metrics_extra: dict[str, float] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -298,13 +320,42 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     ),
     "lmcache_is_healthy": (
         {"name": "lmcache:is_healthy", "type": "bool"},
+        {"name": "lmcache:lmcache_is_healthy", "type": "bool"},
         {"name": "lmcache_is_healthy", "type": "bool"},
+        {"name": "lmcache_lmcache_is_healthy", "type": "bool"},
+    ),
+    "lmcache_get_blocking_failed_count": (
+        {"name": "lmcache:get_blocking_failed_count", "type": "int"},
+        {"name": "lmcache_get_blocking_failed_count", "type": "int"},
+        {"name": "lmcache:get_blocking_failed_count_total", "type": "int"},
+        {"name": "lmcache_get_blocking_failed_count_total", "type": "int"},
+        {"name": "lmcache:interval_get_blocking_failed_count", "type": "int"},
+    ),
+    "lmcache_put_failed_count": (
+        {"name": "lmcache:put_failed_count", "type": "int"},
+        {"name": "lmcache_put_failed_count", "type": "int"},
+        {"name": "lmcache:put_failed_count_total", "type": "int"},
+        {"name": "lmcache_put_failed_count_total", "type": "int"},
     ),
     "lmcache_storage_event_count": (
         {"name": "lmcache:storage_event_count", "type": "int"},
         {"name": "lmcache_storage_event_count", "type": "int"},
         {"name": "lmcache:storage_event_count_total", "type": "int"},
         {"name": "lmcache_storage_event_count_total", "type": "int"},
+        {"name": "lmcache:storage_events_done_count", "type": "int"},
+        {"name": "lmcache_storage_events_done_count", "type": "int"},
+    ),
+    "lmcache_storage_events_ongoing_count": (
+        {"name": "lmcache:storage_events_ongoing_count", "type": "int"},
+        {"name": "lmcache_storage_events_ongoing_count", "type": "int"},
+    ),
+    "lmcache_storage_events_done_count": (
+        {"name": "lmcache:storage_events_done_count", "type": "int"},
+        {"name": "lmcache_storage_events_done_count", "type": "int"},
+    ),
+    "lmcache_storage_events_not_found_count": (
+        {"name": "lmcache:storage_events_not_found_count", "type": "int"},
+        {"name": "lmcache_storage_events_not_found_count", "type": "int"},
     ),
     "lmcache_remote_read_bytes": (
         {"name": "lmcache:remote_read_bytes", "type": "int"},
@@ -355,6 +406,14 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_chunk_stats_enabled": (
         {"name": "lmcache:chunk_stats_enabled", "type": "bool"},
         {"name": "lmcache_chunk_stats_enabled", "type": "bool"},
+    ),
+    "lmcache_chunk_statistics_count": (
+        {"name": "lmcache:chunk_statistics_count", "type": "int"},
+        {"name": "lmcache_chunk_statistics_count", "type": "int"},
+        {"name": "lmcache:chunk_statistics_total", "type": "int"},
+        {"name": "lmcache_chunk_statistics_total", "type": "int"},
+        {"name": "lmcache:chunk_statistics_chunks", "type": "int"},
+        {"name": "lmcache_chunk_statistics_chunks", "type": "int"},
     ),
     "lmcache_total_chunk_requests": (
         {"name": "lmcache:total_chunk_requests", "type": "int"},
@@ -551,6 +610,70 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_cache_salt_enabled", "type": "bool"},
         {"name": "lmcache_config_info", "label": "cache_salt", "type": "bool_label"},
     ),
+    "lmcache_blend_lookup_requests": (
+        {"name": "lmcache_blend_lookup_requests_total", "type": "int"},
+        {"name": "lmcache_blend_lookup_requests", "type": "int"},
+    ),
+    "lmcache_blend_lookup_fingerprint_hits": (
+        {"name": "lmcache_blend_lookup_fingerprint_hits_total", "type": "int"},
+        {"name": "lmcache_blend_lookup_fingerprint_hits", "type": "int"},
+    ),
+    "lmcache_blend_lookup_storage_hits": (
+        {"name": "lmcache_blend_lookup_storage_hits_total", "type": "int"},
+        {"name": "lmcache_blend_lookup_storage_hits", "type": "int"},
+    ),
+    "lmcache_blend_lookup_stale_chunks": (
+        {"name": "lmcache_blend_lookup_stale_chunks_total", "type": "int"},
+        {"name": "lmcache_blend_lookup_stale_chunks", "type": "int"},
+    ),
+    "lmcache_blend_lookup_no_gpu_context_errors": (
+        {"name": "lmcache_blend_lookup_no_gpu_context_errors_total", "type": "int"},
+        {"name": "lmcache_blend_lookup_no_gpu_context_errors", "type": "int"},
+    ),
+    "lmcache_blend_retrieve_requests": (
+        {"name": "lmcache_blend_retrieve_requests_total", "type": "int"},
+        {"name": "lmcache_blend_retrieve_requests", "type": "int"},
+    ),
+    "lmcache_blend_retrieve_chunks": (
+        {"name": "lmcache_blend_retrieve_chunks_total", "type": "int"},
+        {"name": "lmcache_blend_retrieve_chunks", "type": "int"},
+    ),
+    "lmcache_blend_retrieve_failures": (
+        {"name": "lmcache_blend_retrieve_failures_total", "type": "int"},
+        {"name": "lmcache_blend_retrieve_failures", "type": "int"},
+    ),
+    "lmcache_blend_store_pre_computed_requests": (
+        {"name": "lmcache_blend_store_pre_computed_requests_total", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_requests", "type": "int"},
+    ),
+    "lmcache_blend_store_pre_computed_chunks": (
+        {"name": "lmcache_blend_store_pre_computed_chunks_total", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_chunks", "type": "int"},
+    ),
+    "lmcache_blend_store_pre_computed_failures": (
+        {"name": "lmcache_blend_store_pre_computed_failures_total", "type": "int"},
+        {"name": "lmcache_blend_store_pre_computed_failures", "type": "int"},
+    ),
+    "lmcache_blend_store_final_requests": (
+        {"name": "lmcache_blend_store_final_requests_total", "type": "int"},
+        {"name": "lmcache_blend_store_final_requests", "type": "int"},
+    ),
+    "lmcache_blend_store_final_chunks": (
+        {"name": "lmcache_blend_store_final_chunks_total", "type": "int"},
+        {"name": "lmcache_blend_store_final_chunks", "type": "int"},
+    ),
+    "lmcache_blend_store_final_failures": (
+        {"name": "lmcache_blend_store_final_failures_total", "type": "int"},
+        {"name": "lmcache_blend_store_final_failures", "type": "int"},
+    ),
+    "lmcache_blend_fingerprints_registered": (
+        {"name": "lmcache_blend_fingerprints_registered_total", "type": "int"},
+        {"name": "lmcache_blend_fingerprints_registered", "type": "int"},
+    ),
+    "lmcache_blend_chunks_evicted": (
+        {"name": "lmcache_blend_chunks_evicted_total", "type": "int"},
+        {"name": "lmcache_blend_chunks_evicted", "type": "int"},
+    ),
 }
 
 
@@ -580,6 +703,9 @@ def parse_lmcache_prometheus(text: str) -> LmcacheMetrics:
         values["lmcache_mp_mode_enabled"] = True
         values.setdefault("lmcache_enabled", True)
         values.setdefault("lmcache_connector_type", "LMCacheMPConnector")
+    if any(sample.name.startswith("lmcache_blend_") for sample in samples):
+        values["lmcache_cacheblend_enabled"] = True
+        values.setdefault("lmcache_enabled", True)
     values["raw_metrics_extra"] = _raw_extra(samples, matched_names)
     return LmcacheMetrics(**values)
 
