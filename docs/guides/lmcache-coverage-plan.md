@@ -33,6 +33,23 @@ Scoring source manifest:
 - RepoPrompt context: LMCache window `10`, context
   `44277818-F58D-4891-A5F3-97AC341DB0B2`. The selection has been reset to the
   explicit MP observability source set listed above.
+- vLLM repo used for bridge verification: `/Users/chen/Projects/vllm`.
+  - Upstream ref fetched: `upstream/main` at
+    `5a0a8fc1ea7542394ff315138bd5677b7b53bca1`
+    (`[Docs] add cache directory security guidance (#38920)`).
+  - Local fork branch during review:
+    `ocwc/simple-cpu-offload-metrics` at
+    `6509008424f243d874a91e76d34d8c67456a9855`
+    (`feat(kv-offload): expose SimpleCPU offload metrics`).
+  - RepoPrompt workspace: `/Users/chen/Projects/vllm`, window `8`.
+- SGLang repo used for bridge verification: `/Users/chen/Projects/sglang`.
+  - Upstream ref fetched: `upstream/main` at
+    `2e642ea1872d12e3d838bd3350d4d64f792042ec`
+    (`[diffusion] chore: align LTX-2 with official (#24313)`).
+  - Local fork branch during review: `kv-transfer-telemetry` at
+    `f26a73ea3407c620dd1c28d84b904bd3e1c8af50`
+    (`feat(pd): expose KV transfer size in load metrics`).
+  - RepoPrompt workspace: `/Users/chen/Projects/sglang`, window `8`.
 
 ## Progress Scoreboard
 
@@ -113,6 +130,242 @@ rp-cli -w 10 -e 'context --tree --files'
 
 Then copy the selected source list and LMCache `upstream/dev` commit into the
 source manifest above before changing score values.
+
+## Architecture Map: Old Embedded vs New MP
+
+InferGuard needs to support two LMCache generations at the same time, but the
+priority is the new standalone MP architecture. The old architecture is still
+important because many customer deployments will have copied vLLM/SGLang
+examples that run LMCache inside the serving process.
+
+| Lane | Connector / launch shape | Process boundary | Primary telemetry surface | InferGuard support target | Current status |
+| --- | --- | --- | --- | --- | --- |
+| Old vLLM embedded / in-process | `LMCacheConnectorV1` through vLLM `--kv-transfer-config`; `LMCacheConnectorV1Dynamic` with `kv_connector_module_path="lmcache.integration.vllm.lmcache_connector_v1"`; legacy `LMCacheConnector` should be treated as stale unless pinned | LMCache engine is initialized inside the vLLM worker process through `lmcache/integration/vllm/vllm_v1_adapter.py` | vLLM `/metrics`, embedded LMCache `lmcache:*` or exporter-normalized `lmcache_*`, vLLM logs containing LMCache store/retrieve lines, optional embedded internal API | Detect embedded mode, parse old metric namespace, detect connector name, explain that MP-only endpoints and `lmcache_mp_*` are not expected | Partial: aliases exist; live fixture and connector-specific stale/current detection still needed |
+| Old SGLang embedded / in-process | `lmcache.integration.sglang.sglang_adapter.LMCacheConnector` or `LMCacheLayerwiseConnector` from SGLang launch/config | LMCache engine is initialized inside the SGLang server/worker process | SGLang metrics when enabled, SGLang queue/cache/HiCache/KV-transfer counters, LMCache logs/config evidence, possible KV events | Detect SGLang+LMCache evidence separately from vLLM; parse SGLang cache pressure and queue signals; avoid claiming MP support unless a standalone LMCache server is present | Partial: SGLang metric families parse; live SGLang+LMCache fixture and connector proof still needed |
+| New vLLM MP | Standalone `lmcache server`; vLLM attaches with `LMCacheMPConnector`, for example `--kv-transfer-config '{"kv_connector":"LMCacheMPConnector","kv_role":"kv_both"}'`; newer vLLM offload flags may wrap this path | LMCache runs as a separate process and vLLM talks to it over ZMQ; HTTP/Prometheus/OTel live on the LMCache process | LMCache MP `/metrics` with `lmcache_mp_*`, MP HTTP API, EventBus metrics/logs, `.lct` trace recording, OTel spans, plus vLLM `/metrics` | This is the primary 100% target: collect LMCache MP evidence and correlate it with the engine that drove traffic | Best-covered structurally; live full packet and detectors still needed |
+| New SGLang MP candidate | SGLang-to-MP support is not yet treated as confirmed mainline coverage in this tracker; local LMCache source has SGLang embedded adapters and separate MP infrastructure, and an upstream branch exists for SGLang MP work | Expected shape is SGLang process talking to a standalone LMCache MP server, but this must be validated from current source/docs before scoring | Same LMCache MP surfaces as vLLM MP, plus SGLang engine metrics/logs | Track as planned/emerging until current mainline docs/source prove the exact connector and launch contract | Planned: do not claim 100% until source and fixture prove it |
+
+Source anchors in the LMCache repo:
+
+- vLLM embedded connector: `lmcache/integration/vllm/lmcache_connector_v1.py`
+  exposes `LMCacheConnectorV1Dynamic`, backed by
+  `lmcache/integration/vllm/vllm_v1_adapter.py`.
+- vLLM MP connector: `lmcache/integration/vllm/lmcache_mp_connector_0180.py`
+  exposes `LMCacheMPConnector`, backed by
+  `lmcache/integration/vllm/vllm_multi_process_adapter.py`.
+- SGLang embedded connector:
+  `lmcache/integration/sglang/sglang_adapter.py` exposes
+  `LMCacheConnector` and `LMCacheLayerwiseConnector`.
+- Public vLLM mode docs: `docs/source/getting_started/quickstart.rst`
+  explicitly split vLLM into MP mode via `LMCacheMPConnector` and in-process
+  mode via `LMCacheConnectorV1`.
+- Public dynamic connector docs:
+  `docs/source/api_reference/dynamic_connector.rst` explain
+  `LMCacheConnectorV1`, `LMCacheConnectorV1Dynamic`, and why old connector
+  updates may require vLLM-side synchronization.
+- Public MP docs: `docs/source/mp/index.rst`,
+  `docs/source/mp/configuration.rst`, `docs/source/mp/http_api.rst`, and
+  `docs/source/mp/observability.rst` define the new standalone architecture and
+  telemetry surface.
+
+Source anchors in the vLLM repo:
+
+- Current vLLM embedded wrapper:
+  `vllm/distributed/kv_transfer/kv_connector/v1/lmcache_connector.py`
+  exposes `LMCacheConnectorV1`. It lazy-loads either vLLM's vendored/native
+  LMCache adapter when `use_native=true`, or the latest installed LMCache
+  package's `lmcache.integration.vllm.vllm_v1_adapter.LMCacheConnectorV1Impl`
+  by default.
+- Current vLLM MP wrapper:
+  `vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py`
+  exposes `LMCacheMPConnector`. It imports
+  `lmcache.integration.vllm.vllm_multi_process_adapter` when available and
+  falls back to vLLM's `lmcache_integration` implementation.
+- Current vLLM MP connector telemetry gap:
+  `LMCacheMPConnector.build_prom_metrics()` returns `None`. Therefore, as of
+  the fetched vLLM refs, MP observability must be collected from the standalone
+  LMCache MP server (`lmcache_mp_*`, HTTP, EventBus, trace, OTel), not from
+  vLLM connector Prometheus metrics.
+- Current vLLM generic connector telemetry:
+  `vllm/distributed/kv_transfer/kv_connector/v1/metrics.py` defines the generic
+  `KVConnectorStats`, `KVConnectorLogging`, and `KVConnectorPromMetrics`
+  extension points. Connectors only export Prometheus metrics when they
+  implement `build_prom_metrics()`.
+- Current vLLM offload telemetry:
+  `vllm/distributed/kv_transfer/kv_connector/v1/offloading/metrics.py`
+  exports `vllm:kv_offload_total_bytes`,
+  `vllm:kv_offload_total_time`, and `vllm:kv_offload_size` by
+  `transfer_type`. This is adjacent to LMCache but is not proof that LMCache MP
+  is working.
+
+Source anchors in the SGLang repo:
+
+- Current SGLang LMCache integration:
+  `python/sglang/srt/mem_cache/storage/lmcache/README.md` documents
+  `python -m sglang.launch_server --model-path MODEL --enable-lmcache` with
+  `LMCACHE_CONFIG_FILE`.
+- Current SGLang LMCache implementation:
+  `python/sglang/srt/mem_cache/storage/lmcache/lmc_radix_cache.py` defines
+  `LMCRadixCache`, imports
+  `lmcache.integration.sglang.sglang_adapter.LMCacheLayerwiseConnector`, and
+  stores/retrieves KV through SGLang's radix-cache lifecycle.
+- Current SGLang launch flag:
+  `python/sglang/srt/server_args.py` defines `enable_lmcache` and the
+  `--enable-lmcache` CLI flag.
+- Current SGLang metrics:
+  `python/sglang/srt/observability/metrics_collector.py` exports
+  `sglang:cache_hit_rate`, scheduler queue gauges, KV-transfer histograms
+  (`kv_transfer_latency_ms`, `kv_transfer_total_mb`,
+  `kv_transfer_speed_gb_s`), HiCache host-token gauges, and storage metrics
+  (`sglang:prefetched_tokens_total`, `sglang:backuped_tokens_total`,
+  `sglang:prefetch_pgs`, `sglang:backup_pgs`,
+  `sglang:prefetch_bandwidth`, `sglang:backup_bandwidth`).
+- No current-mainline SGLang MP connector contract was proven in this pass.
+  Treat SGLang+LMCache as embedded/layerwise until a source-backed MP connector
+  and live fixture are added.
+
+## Old Architecture Signal Checklist
+
+These signals are required for backward compatibility. They are not the new
+primary target, but InferGuard must not misclassify them as broken MP.
+
+### vLLM Embedded LMCache
+
+Mode evidence:
+
+- Connector strings:
+  - `LMCacheConnectorV1` means current embedded vLLM path.
+  - `LMCacheConnectorV1Dynamic` means current embedded vLLM path loaded from the
+    LMCache package by module path.
+  - `LMCacheConnector` without `V1` should be flagged as stale or pinned legacy
+    evidence, not as the modern vLLM path.
+- Process evidence:
+  - LMCache log lines are inline with vLLM engine logs.
+  - No standalone LMCache MP `/api/healthcheck` or `lmcache_mp_*` scrape is
+    expected unless the deployment also runs MP.
+
+Metric evidence:
+
+- Embedded LMCache namespace:
+  - `lmcache:num_retrieve_requests`;
+  - `lmcache:num_store_requests`;
+  - `lmcache:num_lookup_requests`;
+  - `lmcache:num_requested_tokens`;
+  - `lmcache:num_hit_tokens`;
+  - `lmcache:num_lookup_tokens`;
+  - `lmcache:num_lookup_hits`;
+  - `lmcache:num_vllm_hit_tokens`;
+  - `lmcache:is_healthy`;
+  - `lmcache:storage_event_count`;
+  - remote backend read/write byte, latency, ping, and error counters;
+  - P2P transfer metrics when P2P sharing is configured;
+  - chunk-statistics metrics or HTTP evidence when the internal API server is
+    enabled.
+- vLLM bridge namespace:
+  - local prefix cache metrics such as `vllm:prefix_cache_*`;
+  - external prefix cache metrics such as `vllm:external_prefix_cache_*`;
+  - prompt-token source metrics if vLLM exposes them;
+  - KV offload or simple CPU-offload metrics when the vLLM build includes them.
+
+Required InferGuard behavior:
+
+- Report mode as `vllm_embedded_lmcache`.
+- Compute LMCache hit rate from embedded token counters when present.
+- Say MP observability is `not_applicable`, not missing, unless an MP endpoint
+  was explicitly supplied.
+- Detect hash-seed risk when `PYTHONHASHSEED` is absent or inconsistent across
+  processes.
+- Preserve unknown `lmcache:*` families so new LMCache releases are not hidden.
+
+### SGLang Embedded LMCache
+
+Mode evidence:
+
+- Connector classes:
+  - `lmcache.integration.sglang.sglang_adapter.LMCacheConnector`;
+  - `lmcache.integration.sglang.sglang_adapter.LMCacheLayerwiseConnector`.
+- Process evidence:
+  - LMCache is initialized through SGLang adapter code.
+  - SGLang metrics must be enabled separately; lack of `lmcache_mp_*` is normal
+    for embedded mode.
+
+Metric evidence:
+
+- SGLang queue and scheduler pressure:
+  - `sglang:num_running_reqs`;
+  - `sglang:num_queue_reqs`;
+  - related wait/latency counters where exposed.
+- SGLang cache evidence:
+  - aggregate cache hit rate such as `sglang:cache_hit_rate`;
+  - HiCache L1/L2/L3 hit, miss, and transfer counters where exposed;
+  - KV-transfer counters where exposed.
+- LMCache-adjacent evidence:
+  - LMCache config path/env;
+  - store/retrieve/hit-token log lines;
+  - KV events if configured through SGLang.
+
+Required InferGuard behavior:
+
+- Report mode as `sglang_embedded_lmcache` when SGLang and LMCache adapter
+  evidence are both present.
+- Report SGLang cache/queue pressure separately from LMCache MP health.
+- Do not infer MP just because L2/HiCache terms appear; MP requires a
+  standalone LMCache server evidence source.
+- Add a live SGLang fixture before claiming more than partial support.
+
+## New Architecture Signal Checklist
+
+This is the priority path for current LMCache work and for Touchdown AI Spend
+Recovery engagements.
+
+### vLLM With LMCache MP
+
+Mode evidence:
+
+- `lmcache server` process is running.
+- vLLM uses `LMCacheMPConnector`.
+- The LMCache MP HTTP API responds on its HTTP port.
+- The LMCache MP Prometheus endpoint emits `lmcache_mp_*`.
+- ZMQ host/port appears in either LMCache config, vLLM
+  `kv_connector_extra_config`, or logs.
+
+Metric and evidence requirements:
+
+- All canonical MP HTTP endpoints listed below are either collected or marked
+  intentionally skipped when they mutate state.
+- All canonical MP Prometheus metric families listed below are parsed.
+- Sampled histograms are classified separately from always-on counters.
+- L2 families are `not_applicable` when no L2 adapter is configured.
+- EventBus self-metrics are treated as first-class because tail-drop can hide
+  observability evidence.
+- vLLM `/metrics` is collected so InferGuard can compare engine-side external
+  cache claims against LMCache-side lookup/store/retrieve evidence.
+
+Required InferGuard behavior:
+
+- Report mode as `vllm_mp_lmcache`.
+- Compute LMCache MP lookup hit rate from `lookup_hit_tokens /
+  lookup_requested_tokens`.
+- Report missing cache-salt, empty cache-salt, or high-cardinality cache-salt as
+  separate findings.
+- Diagnose L1 pressure, L2 backlog, throughput regressions, and EventBus drops
+  from MP-native evidence.
+
+### SGLang With LMCache MP
+
+This is a planned lane, not a completed claim. The tracker should only move it
+from candidate to supported after source and fixtures confirm the current
+mainline connector contract.
+
+Required before scoring as supported:
+
+- Current LMCache source/docs show the exact SGLang MP connector or launch
+  contract.
+- A live SGLang run proves traffic reaches a standalone LMCache MP server.
+- InferGuard packet includes both SGLang engine metrics and LMCache MP HTTP /
+  Prometheus evidence.
+- The report can distinguish SGLang local/HiCache hits from LMCache MP L1/L2
+  hits.
 
 ### Canonical LMCache MP HTTP Endpoints To Support
 
@@ -221,7 +474,7 @@ InferGuard reaches "100 percent LMCache coverage" when the rows below are all
 
 | Area | Required capability | Status |
 | --- | --- | --- |
-| Mode detection | Distinguish MP, embedded, P2P candidate, disaggregated-prefill candidate, and controller-only packets | partial |
+| Mode detection | Distinguish `vllm_embedded_lmcache`, `vllm_mp_lmcache`, `sglang_embedded_lmcache`, `sglang_mp_lmcache_candidate`, P2P candidate, disaggregated-prefill candidate, and controller-only packets | partial |
 | MP Prometheus | Parse/report all documented `lmcache_mp_*` families | partial |
 | Embedded Prometheus | Parse/report production `lmcache:*` and exporter-normalized `lmcache_*` families | partial |
 | HTTP API | Parse health/status evidence and explain unhealthy/unreachable states | partial |
@@ -318,7 +571,12 @@ letting them distract from MP-first work.
   - [ ] chunk statistics.
 - [ ] Add stale connector detection:
   - [ ] `LMCacheConnectorV1` is supported;
+  - [ ] `LMCacheConnectorV1Dynamic` is supported when the module path points to
+    `lmcache.integration.vllm.lmcache_connector_v1`;
   - [ ] old `LMCacheConnector` is flagged as stale unless explicitly pinned.
+- [ ] Add embedded mode labels:
+  - [ ] `vllm_embedded_lmcache`;
+  - [ ] `sglang_embedded_lmcache`.
 
 Acceptance criteria:
 
@@ -371,7 +629,10 @@ Goal: connect LMCache evidence to the engine that is actually serving traffic.
   - [x] Parse queue and aggregate cache hit rate.
   - [x] Parse HiCache L1/L2/L3 counters.
   - [x] Parse KV transfer families when present.
-  - [ ] Capture live SGLang external-cache fixture.
+  - [ ] Capture live SGLang embedded LMCache fixture.
+  - [ ] Confirm current mainline SGLang MP connector/launch contract before
+    scoring SGLang MP as supported.
+  - [ ] Capture live SGLang MP fixture only after that contract is confirmed.
   - [ ] Confirm whether SGLang exposes request-level prefix hit/query counters.
   - [ ] Add SGLang-specific queue and KV transfer diagnostics.
 
