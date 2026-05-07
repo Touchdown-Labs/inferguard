@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from inferguard.diagnose_bottleneck import (
     BOTTLENECK_DIAGNOSIS_SCHEMA_VERSION,
     diagnose,
@@ -17,6 +19,29 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures" / "job_dirs"
 
 def _diagnosis(name: str) -> dict:
     return diagnose(FIXTURES / name).to_dict()
+
+
+def _write_lmcache_compat_report(
+    root: Path,
+    *,
+    detected_mode: str = "mp",
+    diagnostic_findings: list[dict] | None = None,
+    failure_reasons: list[dict] | None = None,
+    upstream_questions: list[dict] | None = None,
+    detected_architecture: dict | None = None,
+) -> None:
+    compat = {
+        "schema_version": "inferguard-observability-compat/v1",
+        "detected_mode": detected_mode,
+        "detected_architecture": detected_architecture
+        or {"label": "vllm_mp_lmcache", "claim_status": "measured"},
+        "diagnostic_findings": diagnostic_findings or [],
+        "failure_reasons": failure_reasons or [],
+        "upstream_questions": upstream_questions or [],
+    }
+    (root / "metrics" / "lmcache_compat_report.json").write_text(
+        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def test_prefill_bound_fixture() -> None:
@@ -129,19 +154,14 @@ def test_not_enough_fixture() -> None:
 def test_lmcache_compat_missing_signal_becomes_specific_diagnosis(tmp_path: Path) -> None:
     root = tmp_path / "lmcache_mp_missing_signal"
     shutil.copytree(FIXTURES / "not_enough_evidence", root)
-    compat = {
-        "schema_version": "inferguard-observability-compat/v1",
-        "detected_mode": "mp",
-        "surfaces": {"lmcache_mp": {"status": "partial"}},
-        "upstream_questions": [
+    _write_lmcache_compat_report(
+        root,
+        upstream_questions=[
             {
                 "code": "lmcache_mp_lookup_counters_missing",
                 "owner_question": "Should lookup counters populate?",
             }
         ],
-    }
-    (root / "metrics" / "lmcache_compat_report.json").write_text(
-        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
     diagnosis = diagnose(root).to_dict()
@@ -154,11 +174,10 @@ def test_lmcache_compat_missing_signal_becomes_specific_diagnosis(tmp_path: Path
 def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: Path) -> None:
     root = tmp_path / "lmcache_mp_l2_failure"
     shutil.copytree(FIXTURES / "not_enough_evidence", root)
-    compat = {
-        "schema_version": "inferguard-observability-compat/v1",
-        "detected_mode": "mp",
-        "detected_architecture": {"label": "vllm_mp_lmcache", "claim_status": "measured"},
-        "diagnostic_findings": [
+    _write_lmcache_compat_report(
+        root,
+        detected_architecture={"label": "vllm_mp_lmcache", "claim_status": "measured"},
+        diagnostic_findings=[
             {
                 "code": "lmcache_mp_low_hit_rate",
                 "severity": "warning",
@@ -172,9 +191,6 @@ def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: 
                 "metrics": {"l2_failed_operations_or_keys": 1},
             },
         ],
-    }
-    (root / "metrics" / "lmcache_compat_report.json").write_text(
-        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
     diagnosis = diagnose(root).to_dict()
@@ -188,10 +204,9 @@ def test_lmcache_compat_diagnostic_findings_become_specific_diagnosis(tmp_path: 
 def test_lmcache_compat_new_evidence_surfaces_become_diagnosis(tmp_path: Path) -> None:
     root = tmp_path / "lmcache_cacheblend_lookup_hash"
     shutil.copytree(FIXTURES / "not_enough_evidence", root)
-    compat = {
-        "schema_version": "inferguard-observability-compat/v1",
-        "detected_mode": "mp",
-        "diagnostic_findings": [
+    _write_lmcache_compat_report(
+        root,
+        diagnostic_findings=[
             {
                 "code": "lmcache_lookup_hash_missing_rotation_config",
                 "severity": "info",
@@ -204,9 +219,6 @@ def test_lmcache_compat_new_evidence_surfaces_become_diagnosis(tmp_path: Path) -
                 "metrics": {"lmcache_blend_retrieve_failures_total": 2},
             },
         ],
-    }
-    (root / "metrics" / "lmcache_compat_report.json").write_text(
-        json.dumps(compat, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
     diagnosis = diagnose(root).to_dict()
@@ -214,6 +226,131 @@ def test_lmcache_compat_new_evidence_surfaces_become_diagnosis(tmp_path: Path) -
     assert diagnosis["rule_fired"] == "lmcache_cacheblend_retrieve_failures"
     assert diagnosis["claim_status"] == "measured"
     assert any("lmcache_compat_report.json" in path for path in diagnosis["evidence_paths"])
+
+
+@pytest.mark.parametrize(
+    ("code", "severity", "expected_claim"),
+    [
+        ("lmcache_prometheus_unreachable", "warning", "measured"),
+        ("lmcache_mp_observability_disabled", "warning", "measured"),
+        ("lmcache_logging_disabled", "warning", "measured"),
+        ("otel_tracing_enabled_but_no_spans", "warning", "measured"),
+        ("lmcache_mp_trace_enabled_but_no_trace_artifact", "warning", "measured"),
+        ("lmcache_trace_file_parse_failure", "warning", "measured"),
+        ("lmcache_trace_replay_failure", "warning", "measured"),
+        ("lmcache_mp_l1_no_reads", "info", "inferred"),
+        ("lmcache_mp_l1_no_writes", "info", "inferred"),
+        ("lmcache_mp_l1_eviction_pressure", "warning", "measured"),
+        ("lmcache_mp_l1_saturation", "warning", "measured"),
+        ("lmcache_mp_l1_leak", "warning", "measured"),
+        ("lmcache_mp_sampled_histogram_sparse", "info", "inferred"),
+        ("lmcache_mp_real_reuse_missing", "info", "inferred"),
+        ("lmcache_mp_real_reuse_low", "warning", "measured"),
+        ("lmcache_mp_l0_lifecycle_missing", "info", "inferred"),
+        ("lmcache_mp_l0_l1_throughput_missing", "info", "inferred"),
+        ("lmcache_mp_l0_l1_throughput_low", "warning", "measured"),
+        ("lmcache_mp_l2_not_configured", "info", "inferred"),
+        ("lmcache_mp_l2_store_missing", "info", "inferred"),
+        ("lmcache_mp_l2_prefetch_missing", "info", "inferred"),
+        ("lmcache_mp_l2_load_missing", "info", "inferred"),
+        ("lmcache_mp_l2_store_backlog", "warning", "measured"),
+        ("lmcache_mp_l2_load_backlog", "warning", "measured"),
+        ("lmcache_mp_l2_throughput_low", "warning", "measured"),
+        ("lmcache_mp_l2_failures", "critical", "measured"),
+        ("lmcache_mp_l2_prefetch_memory_crowding", "warning", "measured"),
+        ("lmcache_lookup_zero_hit", "warning", "measured"),
+        ("lmcache_lookup_low_hit", "warning", "measured"),
+        ("vllm_l0_excluded_caveat", "info", "inferred"),
+        ("lmcache_cache_salt_cross_hit", "critical", "measured"),
+        ("lmcache_cache_salt_cardinality_risk", "warning", "measured"),
+        ("lmcache_cache_salt_quota_risk", "warning", "measured"),
+        ("lmcache_mp_eventbus_taildrop_unobservable", "warning", "measured"),
+        ("lmcache_mp_eventbus_pressure", "warning", "measured"),
+        ("lmcache_production_metrics_missing", "info", "inferred"),
+        ("lmcache_production_health_unhealthy", "warning", "measured"),
+        ("lmcache_remote_backend_unhealthy", "warning", "measured"),
+        ("lmcache_chunk_stats_disabled", "info", "inferred"),
+        ("lmcache_chunk_stats_low_reuse", "warning", "measured"),
+        ("lmcache_connector_invalid_blocks", "critical", "measured"),
+    ],
+)
+def test_lmcache_checklist_compat_findings_become_specific_diagnoses(
+    tmp_path: Path, code: str, severity: str, expected_claim: str
+) -> None:
+    root = tmp_path / code
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    _write_lmcache_compat_report(
+        root,
+        diagnostic_findings=[
+            {
+                "code": code,
+                "severity": severity,
+                "message": f"Fixture-backed LMCache checklist finding: {code}.",
+                "metrics": {"fixture": code},
+            }
+        ],
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["verdict"] == "not_enough_evidence"
+    assert diagnosis["rule_fired"] == code
+    assert diagnosis["claim_status"] == expected_claim
+    assert diagnosis["metric_values"]["lmcache_compat.diagnostic_findings"][0]["code"] == code
+
+
+def test_lmcache_compat_failure_reasons_override_findings(tmp_path: Path) -> None:
+    root = tmp_path / "lmcache_prometheus_unreachable"
+    shutil.copytree(FIXTURES / "not_enough_evidence", root)
+    _write_lmcache_compat_report(
+        root,
+        failure_reasons=[
+            {
+                "code": "lmcache_prometheus_unreachable",
+                "message": "LMCache Prometheus endpoint was configured but unreachable.",
+            }
+        ],
+        diagnostic_findings=[
+            {
+                "code": "lmcache_mp_low_hit_rate",
+                "severity": "warning",
+                "message": "Low hit rate should not mask missing metrics access.",
+            }
+        ],
+    )
+
+    diagnosis = diagnose(root).to_dict()
+
+    assert diagnosis["rule_fired"] == "lmcache_prometheus_unreachable"
+    assert diagnosis["claim_status"] == "not_proven"
+    assert diagnosis["metric_values"]["lmcache_compat.failure_reasons"][0]["code"] == (
+        "lmcache_prometheus_unreachable"
+    )
+
+
+def test_lmcache_embedded_and_unknown_mode_findings_are_not_dropped(tmp_path: Path) -> None:
+    for mode, code in (
+        ("embedded", "lmcache_stale_connector"),
+        ("unknown", "vllm_lmcache_offload_flag_without_metrics"),
+    ):
+        root = tmp_path / f"{mode}_{code}"
+        shutil.copytree(FIXTURES / "not_enough_evidence", root)
+        _write_lmcache_compat_report(
+            root,
+            detected_mode=mode,
+            diagnostic_findings=[
+                {
+                    "code": code,
+                    "severity": "warning",
+                    "message": f"{mode} mode finding should be surfaced.",
+                }
+            ],
+        )
+
+        diagnosis = diagnose(root).to_dict()
+
+        assert diagnosis["rule_fired"] == code
+        assert diagnosis["claim_status"] == "measured"
 
 
 def test_lmcache_log_evidence_becomes_specific_diagnosis(tmp_path: Path) -> None:

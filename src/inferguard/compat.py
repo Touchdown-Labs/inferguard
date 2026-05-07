@@ -41,6 +41,94 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")),
     MetricFamilySpec("lmcache_embedded", "production_requests", ("lmcache:num_*_requests*", "lmcache_num_*_requests*")),
     MetricFamilySpec("lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_hit_rate",
+        (
+            "lmcache:*hit_rate*",
+            "lmcache_*hit_rate*",
+            "lmcache:lookup_0_hit_requests*",
+            "lmcache_lookup_0_hit_requests*",
+        ),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_latency_performance",
+        (
+            "lmcache:time_to_*",
+            "lmcache_time_to_*",
+            "lmcache:retrieve_speed*",
+            "lmcache_retrieve_speed*",
+            "lmcache:store_speed*",
+            "lmcache_store_speed*",
+            "lmcache:num_slow_retrieval_by_*",
+            "lmcache_num_slow_retrieval_by_*",
+        ),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_detailed_profiling",
+        (
+            "lmcache:*_process_tokens_time*",
+            "lmcache_*_process_tokens_time*",
+            "lmcache:retrieve_broadcast_time*",
+            "lmcache_retrieve_broadcast_time*",
+            "lmcache:retrieve_to_gpu_time*",
+            "lmcache_retrieve_to_gpu_time*",
+            "lmcache:store_from_gpu_time*",
+            "lmcache_store_from_gpu_time*",
+            "lmcache:store_put_time*",
+            "lmcache_store_put_time*",
+            "lmcache:remote_backend_batched_get_blocking_time*",
+            "lmcache_remote_backend_batched_get_blocking_time*",
+            "lmcache:instrumented_connector_batched_get_time*",
+            "lmcache_instrumented_connector_batched_get_time*",
+        ),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_cache_usage_lifecycle",
+        (
+            "lmcache:*cache_usage*",
+            "lmcache_*cache_usage*",
+            "lmcache:local_storage_usage*",
+            "lmcache_local_storage_usage*",
+            "lmcache:request_cache_lifespan*",
+            "lmcache_request_cache_lifespan*",
+        ),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_remote_backend_network",
+        (
+            "lmcache:num_remote_*",
+            "lmcache_num_remote_*",
+            "lmcache:remote_time_to_*",
+            "lmcache_remote_time_to_*",
+            "lmcache:remote_ping_*",
+            "lmcache_remote_ping_*",
+        ),
+        required_when="optional",
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_local_cpu_backend",
+        ("lmcache:local_cpu_*", "lmcache_local_cpu_*"),
+        required_when="optional",
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_memory_management",
+        (
+            "lmcache:*memory_objs_count*",
+            "lmcache_*memory_objs_count*",
+            "lmcache:forced_unpin_count*",
+            "lmcache_forced_unpin_count*",
+            "lmcache:pin_monitor_pinned_objects_count*",
+            "lmcache_pin_monitor_pinned_objects_count*",
+        ),
+        required_when="optional",
+    ),
     MetricFamilySpec("lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")),
     MetricFamilySpec("lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")),
     MetricFamilySpec("lmcache_embedded", "production_p2p", ("lmcache:*p2p*", "lmcache_*p2p*"), required_when="optional"),
@@ -63,6 +151,25 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     ),
     MetricFamilySpec(
         "lmcache_embedded",
+        "production_health_internal",
+        (
+            "lmcache:lmcache_is_healthy",
+            "lmcache_lmcache_is_healthy",
+            "lmcache:is_healthy",
+            "lmcache_is_healthy",
+            "lmcache:interval_get_blocking_failed_count*",
+            "lmcache_interval_get_blocking_failed_count*",
+            "lmcache:kv_msg_queue_size",
+            "lmcache_kv_msg_queue_size",
+            "lmcache:remote_put_task_num",
+            "lmcache_remote_put_task_num",
+            "lmcache:storage_events_*_count*",
+            "lmcache_storage_events_*_count*",
+        ),
+        required_when="optional",
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
         "production_storage_events",
         ("lmcache:storage_events_*_count*", "lmcache_storage_events_*_count*"),
         required_when="optional",
@@ -73,39 +180,91 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ("lmcache:*chunk*", "lmcache_*chunk*", "lmcache:chunk_statistics_*", "lmcache_chunk_statistics_*"),
         required_when="optional",
     ),
-    MetricFamilySpec("lmcache_mp", "storage_manager", ("lmcache_mp_sm_*",)),
-    MetricFamilySpec("lmcache_mp", "lookup_tokens", ("lmcache_mp_lookup_*_tokens_total",)),
-    MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys_total",)),
-    MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes",)),
-    MetricFamilySpec("lmcache_mp", "l1_failures", ("lmcache_mp_l1_*_failure*",), required_when="optional"),
     MetricFamilySpec(
-        "lmcache_mp", "l1_lifecycle", ("lmcache_mp_l1_chunk_*_seconds*",), required_when="sampled"
+        "lmcache_embedded",
+        "production_connector_metrics",
+        (
+            "lmcache:scheduler_unfinished_requests_count",
+            "lmcache_scheduler_unfinished_requests_count",
+            "lmcache:connector_*_count",
+            "lmcache_connector_*_count",
+        ),
+        required_when="optional",
+    ),
+    MetricFamilySpec("lmcache_mp", "storage_manager", ("lmcache_mp_sm_*", "lmcache_mp.sm_*")),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "lookup_tokens",
+        ("lmcache_mp_lookup_*_tokens*", "lmcache_mp.lookup_*_tokens*"),
+    ),
+    MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys*", "lmcache_mp.l1_*_keys*")),
+    MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes", "lmcache_mp.l1_memory_usage_bytes")),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l1_failures",
+        ("lmcache_mp_l1_*_failure*", "lmcache_mp.l1_*_failure*"),
+        required_when="optional",
     ),
     MetricFamilySpec(
-        "lmcache_mp", "l0_lifecycle", ("lmcache_mp_l0_block_*_seconds*",), required_when="sampled"
+        "lmcache_mp",
+        "l1_lifecycle",
+        ("lmcache_mp_l1_chunk_*_seconds*", "lmcache_mp.l1_chunk_*_seconds*"),
+        required_when="sampled",
     ),
-    MetricFamilySpec("lmcache_mp", "real_reuse", ("lmcache_mp_real_reuse_gap_*",), required_when="sampled"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l0_lifecycle",
+        ("lmcache_mp_l0_block_*_seconds*", "lmcache_mp.l0_block_*_seconds*"),
+        required_when="sampled",
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "real_reuse",
+        ("lmcache_mp_real_reuse_gap_*", "lmcache_mp.real_reuse_gap_*"),
+        required_when="sampled",
+    ),
     MetricFamilySpec(
         "lmcache_mp",
         "l2_counters",
         (
-            "lmcache_mp_l2_store_*_total",
-            "lmcache_mp_l2_prefetch_*_total",
-            "lmcache_mp_l2_load_completed_total",
+            "lmcache_mp_l2_store_*",
+            "lmcache_mp_l2_prefetch_*",
+            "lmcache_mp_l2_load_completed*",
+            "lmcache_mp.l2_store_*",
+            "lmcache_mp.l2_prefetch_*",
+            "lmcache_mp.l2_load_completed*",
         ),
         required_when="l2_configured",
     ),
-    MetricFamilySpec("lmcache_mp", "l2_failures", ("lmcache_mp_l2_*_failure*",), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l2_failures",
+        ("lmcache_mp_l2_*_failure*", "lmcache_mp.l2_*_failure*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_mp",
         "l2_throughput",
-        ("lmcache_mp_l2_store_throughput_gbs*", "lmcache_mp_l2_load_throughput_gbs*"),
+        (
+            "lmcache_mp_l2_store_throughput_gbs*",
+            "lmcache_mp_l2_load_throughput_gbs*",
+            "lmcache_mp.l2_store_throughput_gbs*",
+            "lmcache_mp.l2_load_throughput_gbs*",
+        ),
         required_when="l2_configured",
     ),
     MetricFamilySpec(
-        "lmcache_mp", "l0_l1_throughput", ("lmcache_mp_l0_l1_*_throughput_gbs*",), required_when="sampled"
+        "lmcache_mp",
+        "l0_l1_throughput",
+        ("lmcache_mp_l0_l1_*_throughput_gbs*", "lmcache_mp.l0_l1_*_throughput_gbs*"),
+        required_when="sampled",
     ),
-    MetricFamilySpec("lmcache_mp", "engine_counters", ("lmcache_mp_num_chunks_loaded_total",), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "engine_counters",
+        ("lmcache_mp_num_chunks_loaded*", "lmcache_mp.num_chunks_loaded*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_mp",
         "gauges",
@@ -113,6 +272,9 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp_active_prefetch_jobs",
             "lmcache_mp_num_inflight_l2_*",
             "lmcache_mp_inflight_load_memory_usage_bytes",
+            "lmcache_mp.active_prefetch_jobs",
+            "lmcache_mp.num_inflight_l2_*",
+            "lmcache_mp.inflight_load_memory_usage_bytes",
         ),
         required_when="optional",
     ),
@@ -123,10 +285,13 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp_active_prefetch_jobs",
             "lmcache_mp_num_inflight_l2_*",
             "lmcache_mp_inflight_load_memory_usage_bytes",
+            "lmcache_mp.active_prefetch_jobs",
+            "lmcache_mp.num_inflight_l2_*",
+            "lmcache_mp.inflight_load_memory_usage_bytes",
         ),
         required_when="l2_configured",
     ),
-    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*",), required_when="optional"),
+    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*", "lmcache_mp.event_bus.*"), required_when="optional"),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "lookup",
@@ -223,11 +388,11 @@ def build_compat_report(
 
     samples = _tag_samples(engine_text, "engine") + _tag_samples(lmcache_text, "lmcache")
     observed_names = {sample.name for sample in samples}
-    observed_lmcache_mp = any(name.startswith("lmcache_mp_") for name in observed_names)
+    observed_lmcache_mp = any(name.startswith(("lmcache_mp_", "lmcache_mp.")) for name in observed_names)
     observed_lmcache_cacheblend = any(name.startswith("lmcache_blend_") for name in observed_names)
     observed_lmcache_embedded = any(
         (name.startswith("lmcache:") or name.startswith("lmcache_"))
-        and not name.startswith("lmcache_mp_")
+        and not name.startswith(("lmcache_mp_", "lmcache_mp."))
         and not name.startswith("lmcache_blend_")
         for name in observed_names
     )
@@ -783,7 +948,7 @@ def _upstream_questions(
             }
         )
     empty_salt = any(
-        sample.name.startswith("lmcache_mp_lookup_")
+        sample.name.startswith(("lmcache_mp_lookup_", "lmcache_mp.lookup_"))
         and "cache_salt" in sample.labels
         and sample.labels.get("cache_salt", "") == ""
         and sample.value != 0.0
@@ -822,8 +987,8 @@ def _diagnostic_findings(
     mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    requested = _sum_matching(samples, "lmcache_mp_lookup_requested_tokens_total")
-    hit = _sum_matching(samples, "lmcache_mp_lookup_hit_tokens_total")
+    requested = _mp_sum(samples, "lmcache_mp.lookup_requested_tokens", counter=True)
+    hit = _mp_sum(samples, "lmcache_mp.lookup_hit_tokens", counter=True)
     if requested > 0:
         hit_rate = hit / requested
         if hit_rate < 0.3:
@@ -841,7 +1006,7 @@ def _diagnostic_findings(
                 }
             )
     empty_salt = any(
-        sample.name.startswith("lmcache_mp_lookup_")
+        sample.name.startswith(("lmcache_mp_lookup_", "lmcache_mp.lookup_"))
         and "cache_salt" in sample.labels
         and sample.labels.get("cache_salt", "") == ""
         and sample.value != 0.0
@@ -870,8 +1035,8 @@ def _diagnostic_findings(
                 "recommendation": "Ask LMCache to expose stable EventBus queue depth, dropped event, drain lag, and subscriber exception counters.",
             }
         )
-    dropped = _sum_matching(samples, "lmcache_mp_event_bus_dropped_events_total")
-    subscriber_errors = _sum_matching(samples, "lmcache_mp_event_bus_subscriber_exceptions_total")
+    dropped = _mp_sum(samples, "lmcache_mp.event_bus.dropped_events", counter=True)
+    subscriber_errors = _mp_sum(samples, "lmcache_mp.event_bus.subscriber_exceptions", counter=True)
     if dropped > 0 or subscriber_errors > 0:
         findings.append(
             {
@@ -885,8 +1050,8 @@ def _diagnostic_findings(
                 "recommendation": "Increase EventBus capacity, inspect subscriber errors, and treat sampled lifecycle metrics as incomplete for this window.",
             }
         )
-    l1_evicted = _sum_matching(samples, "lmcache_mp_l1_evicted_keys_total")
-    l1_written = _sum_matching(samples, "lmcache_mp_l1_write_keys_total")
+    l1_evicted = _mp_sum(samples, "lmcache_mp.l1_evicted_keys", counter=True)
+    l1_written = _mp_sum(samples, "lmcache_mp.l1_write_keys", counter=True)
     if l1_evicted > 0 and (l1_written <= 0 or l1_evicted / max(l1_written, 1.0) > 0.2):
         findings.append(
             {
@@ -901,8 +1066,8 @@ def _diagnostic_findings(
                 "recommendation": "Check L1 sizing, eviction watermarks, and whether L2 is fast enough to absorb spill traffic.",
             }
         )
-    l1_alloc_failures = _sum_matching(samples, "lmcache_mp_l1_allocation_failure_total")
-    l1_read_failures = _sum_matching(samples, "lmcache_mp_l1_read_failure_total")
+    l1_alloc_failures = _mp_sum(samples, "lmcache_mp.l1_allocation_failure", counter=True)
+    l1_read_failures = _mp_sum(samples, "lmcache_mp.l1_read_failure", counter=True)
     if l1_alloc_failures > 0 or l1_read_failures > 0:
         findings.append(
             {
@@ -917,9 +1082,9 @@ def _diagnostic_findings(
             }
         )
     l2_failed = (
-        _sum_matching(samples, "lmcache_mp_l2_store_failed_keys_total")
-        + _sum_matching(samples, "lmcache_mp_l2_prefetch_failed_keys_total")
-        + _sum_matching(samples, "lmcache_mp_l2_prefetch_failure_total")
+        _mp_sum(samples, "lmcache_mp.l2_store_failed_keys", counter=True)
+        + _mp_sum(samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True)
+        + _mp_sum(samples, "lmcache_mp.l2_prefetch_failure", counter=True)
     )
     if l2_failed > 0:
         findings.append(
@@ -931,9 +1096,9 @@ def _diagnostic_findings(
                 "recommendation": "Check the configured L2 adapter, backend throughput, credentials, and per-adapter in-flight gauges.",
             }
         )
-    l2_store_tasks = _sum_matching(samples, "lmcache_mp_l2_store_tasks_total")
-    l2_store_completed = _sum_matching(samples, "lmcache_mp_l2_store_completed_total")
-    inflight_l2_stores = _sum_matching(samples, "lmcache_mp_num_inflight_l2_stores")
+    l2_store_tasks = _mp_sum(samples, "lmcache_mp.l2_store_tasks", counter=True)
+    l2_store_completed = _mp_sum(samples, "lmcache_mp.l2_store_completed", counter=True)
+    inflight_l2_stores = _mp_sum(samples, "lmcache_mp.num_inflight_l2_stores")
     if inflight_l2_stores > 0 and (l2_store_completed <= 0 or l2_store_completed < l2_store_tasks):
         findings.append(
             {
@@ -948,13 +1113,13 @@ def _diagnostic_findings(
                 "recommendation": "Check the L2 adapter backend, queue depth, and per-adapter store completion rate.",
             }
         )
-    l2_load_tasks = _sum_matching(samples, "lmcache_mp_l2_prefetch_load_tasks_total")
-    l2_load_completed = _sum_matching(samples, "lmcache_mp_l2_load_completed_total")
-    l2_loaded_keys = _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total")
-    inflight_l2_loads = _sum_matching(samples, "lmcache_mp_num_inflight_l2_loads")
-    active_prefetch_jobs = _sum_matching(samples, "lmcache_mp_active_prefetch_jobs")
+    l2_load_tasks = _mp_sum(samples, "lmcache_mp.l2_prefetch_load_tasks", counter=True)
+    l2_load_completed = _mp_sum(samples, "lmcache_mp.l2_load_completed", counter=True)
+    l2_loaded_keys = _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True)
+    inflight_l2_loads = _mp_sum(samples, "lmcache_mp.num_inflight_l2_loads")
+    active_prefetch_jobs = _mp_sum(samples, "lmcache_mp.active_prefetch_jobs")
     if (inflight_l2_loads > 0 or active_prefetch_jobs > 0) and (
-        l2_load_completed <= 0 or l2_loaded_keys < _sum_matching(samples, "lmcache_mp_l2_prefetch_load_keys_total")
+        l2_load_completed <= 0 or l2_loaded_keys < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
     ):
         findings.append(
             {
@@ -971,8 +1136,8 @@ def _diagnostic_findings(
                 "recommendation": "Inspect L2 read latency, prefetch controller health, and adapter-specific in-flight load state.",
             }
         )
-    store_throughput = _hist_avg(samples, "lmcache_mp_l2_store_throughput_gbs")
-    load_throughput = _hist_avg(samples, "lmcache_mp_l2_load_throughput_gbs")
+    store_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_store_throughput_gbs")
+    load_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_load_throughput_gbs")
     low_store = store_throughput is not None and store_throughput < 0.1 and inflight_l2_stores > 0
     low_load = load_throughput is not None and load_throughput < 0.1 and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
     if low_store or low_load:
@@ -1117,37 +1282,37 @@ def _mp_observability_report(
         {
             sample.labels.get("cache_salt", "")
             for sample in samples
-            if sample.name.startswith("lmcache_mp_") and "cache_salt" in sample.labels
+            if _is_lmcache_mp_name(sample.name) and "cache_salt" in sample.labels
         }
     )
     l2_names = sorted(
         {
             sample.labels["l2_name"]
             for sample in samples
-            if sample.name.startswith("lmcache_mp_") and sample.labels.get("l2_name")
+            if _is_lmcache_mp_name(sample.name) and sample.labels.get("l2_name")
         }
     )
     adapter_indices = sorted(
         {
             sample.labels["adapter_index"]
             for sample in samples
-            if sample.name.startswith("lmcache_mp_") and sample.labels.get("adapter_index")
+            if _is_lmcache_mp_name(sample.name) and sample.labels.get("adapter_index")
         }
     )
     event_bus_metric_names = sorted(
-        {sample.name for sample in samples if sample.name.startswith("lmcache_mp_event_bus_")}
+        {sample.name for sample in samples if sample.name.startswith(("lmcache_mp_event_bus_", "lmcache_mp.event_bus."))}
     )
     counter_names = {
         sample.name
         for sample in samples
-        if sample.name.startswith("lmcache_mp_")
+        if _is_lmcache_mp_name(sample.name)
         and (sample.name.endswith("_total") or "_requests" in sample.name or "_keys" in sample.name)
         and sample.value != 0.0
     }
     sampled_histogram_names = {
         sample.name
         for sample in samples
-        if sample.name.startswith("lmcache_mp_")
+        if _is_lmcache_mp_name(sample.name)
         and (
             "_l1_chunk_" in sample.name
             or "_l0_block_" in sample.name
@@ -1192,6 +1357,30 @@ def _sum_matching(samples: list[LabeledSample], pattern: str) -> float:
     return sum(sample.value for sample in samples if fnmatch.fnmatchcase(sample.name, pattern))
 
 
+def _metric_name_variants(canonical_name: str, *, counter: bool = False) -> tuple[str, ...]:
+    names = [canonical_name, canonical_name.replace(".", "_")]
+    if counter:
+        names.extend(f"{name}_total" for name in tuple(names))
+    return tuple(dict.fromkeys(names))
+
+
+def _mp_sum(samples: list[LabeledSample], canonical_name: str, *, counter: bool = False) -> float:
+    names = set(_metric_name_variants(canonical_name, counter=counter))
+    return sum(sample.value for sample in samples if sample.name in names)
+
+
+def _mp_hist_avg(samples: list[LabeledSample], canonical_name: str) -> float | None:
+    for name in _metric_name_variants(canonical_name):
+        value = _hist_avg(samples, name)
+        if value is not None:
+            return value
+    return None
+
+
+def _is_lmcache_mp_name(name: str) -> bool:
+    return name.startswith(("lmcache_mp_", "lmcache_mp."))
+
+
 def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
     total = _sum_matching(samples, f"{base_name}_sum")
     count = _sum_matching(samples, f"{base_name}_count")
@@ -1201,44 +1390,43 @@ def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
 
 
 def _l2_summary(samples: list[LabeledSample]) -> dict[str, Any]:
-    store_throughput = _hist_avg(samples, "lmcache_mp_l2_store_throughput_gbs")
-    load_throughput = _hist_avg(samples, "lmcache_mp_l2_load_throughput_gbs")
-    store_tasks = _sum_matching(samples, "lmcache_mp_l2_store_tasks_total")
-    load_tasks = _sum_matching(samples, "lmcache_mp_l2_prefetch_load_tasks_total")
-    store_completed = _sum_matching(samples, "lmcache_mp_l2_store_completed_total")
-    load_completed = _sum_matching(samples, "lmcache_mp_l2_load_completed_total")
-    inflight_stores = _sum_matching(samples, "lmcache_mp_num_inflight_l2_stores")
-    inflight_loads = _sum_matching(samples, "lmcache_mp_num_inflight_l2_loads")
-    active_prefetch = _sum_matching(samples, "lmcache_mp_active_prefetch_jobs")
+    store_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_store_throughput_gbs")
+    load_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_load_throughput_gbs")
+    store_tasks = _mp_sum(samples, "lmcache_mp.l2_store_tasks", counter=True)
+    load_tasks = _mp_sum(samples, "lmcache_mp.l2_prefetch_load_tasks", counter=True)
+    store_completed = _mp_sum(samples, "lmcache_mp.l2_store_completed", counter=True)
+    load_completed = _mp_sum(samples, "lmcache_mp.l2_load_completed", counter=True)
+    inflight_stores = _mp_sum(samples, "lmcache_mp.num_inflight_l2_stores")
+    inflight_loads = _mp_sum(samples, "lmcache_mp.num_inflight_l2_loads")
+    active_prefetch = _mp_sum(samples, "lmcache_mp.active_prefetch_jobs")
     observed = any(
-        sample.name.startswith("lmcache_mp_l2_")
-        or sample.name in {
-            "lmcache_mp_num_inflight_l2_stores",
-            "lmcache_mp_num_inflight_l2_loads",
-            "lmcache_mp_inflight_load_memory_usage_bytes",
-            "lmcache_mp_active_prefetch_jobs",
-        }
+        sample.name.startswith(("lmcache_mp_l2_", "lmcache_mp.l2_"))
+        or sample.name
+        in set(_metric_name_variants("lmcache_mp.num_inflight_l2_stores"))
+        | set(_metric_name_variants("lmcache_mp.num_inflight_l2_loads"))
+        | set(_metric_name_variants("lmcache_mp.inflight_load_memory_usage_bytes"))
+        | set(_metric_name_variants("lmcache_mp.active_prefetch_jobs"))
         for sample in samples
     )
     return {
         "observed": observed,
         "store_tasks": store_tasks,
         "store_completed": store_completed,
-        "store_failed_keys": _sum_matching(samples, "lmcache_mp_l2_store_failed_keys_total"),
+        "store_failed_keys": _mp_sum(samples, "lmcache_mp.l2_store_failed_keys", counter=True),
         "prefetch_load_tasks": load_tasks,
         "load_completed": load_completed,
-        "prefetch_loaded_keys": _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total"),
-        "prefetch_failed_keys": _sum_matching(samples, "lmcache_mp_l2_prefetch_failed_keys_total"),
-        "prefetch_failures": _sum_matching(samples, "lmcache_mp_l2_prefetch_failure_total"),
+        "prefetch_loaded_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True),
+        "prefetch_failed_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True),
+        "prefetch_failures": _mp_sum(samples, "lmcache_mp.l2_prefetch_failure", counter=True),
         "num_inflight_l2_stores": inflight_stores,
         "num_inflight_l2_loads": inflight_loads,
         "active_prefetch_jobs": active_prefetch,
-        "inflight_load_memory_usage_bytes": _sum_matching(samples, "lmcache_mp_inflight_load_memory_usage_bytes"),
+        "inflight_load_memory_usage_bytes": _mp_sum(samples, "lmcache_mp.inflight_load_memory_usage_bytes"),
         "store_backlog": inflight_stores > 0 and (store_completed <= 0 or store_completed < store_tasks),
         "load_backlog": (inflight_loads > 0 or active_prefetch > 0) and (
             load_completed <= 0
-            or _sum_matching(samples, "lmcache_mp_l2_prefetch_loaded_keys_total")
-            < _sum_matching(samples, "lmcache_mp_l2_prefetch_load_keys_total")
+            or _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True)
+            < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
         ),
         "store_throughput_gbs": store_throughput,
         "load_throughput_gbs": load_throughput,

@@ -59,6 +59,65 @@ RULES_TABLE: tuple[str, ...] = (
     "host_bound",
 )
 
+LMCACHE_COMPAT_PRIORITY: tuple[str, ...] = (
+    "lmcache_mp_observability_disabled",
+    "lmcache_mode_mismatch",
+    "lmcache_http_health_unhealthy",
+    "lmcache_http_unhealthy",
+    "lmcache_remote_backend_unhealthy",
+    "lmcache_stale_connector",
+    "lmcache_connector_invalid_blocks",
+    "lmcache_mp_l1_failures",
+    "lmcache_mp_l2_failures",
+    "lmcache_log_p2p_transfer_failure",
+    "lmcache_log_pd_role_mismatch",
+    "lmcache_log_pd_stall",
+    "lmcache_mp_eventbus_loss",
+    "lmcache_mp_l2_store_backlog",
+    "lmcache_mp_l2_load_backlog",
+    "lmcache_mp_l2_throughput_low",
+    "lmcache_mp_l2_prefetch_memory_crowding",
+    "lmcache_mp_l0_l1_throughput_low",
+    "lmcache_mp_l0_l1_throughput_missing",
+    "lmcache_mp_l1_eviction_pressure",
+    "lmcache_mp_l1_saturation",
+    "lmcache_mp_l1_leak",
+    "lmcache_mp_low_hit_rate",
+    "lmcache_lookup_zero_hit",
+    "lmcache_lookup_low_hit",
+    "lmcache_mp_real_reuse_missing",
+    "lmcache_mp_real_reuse_low",
+    "lmcache_cache_salt_cross_hit",
+    "lmcache_cache_salt_cardinality_risk",
+    "lmcache_cache_salt_quota_risk",
+    "lmcache_mp_eventbus_pressure",
+    "lmcache_cacheblend_failures",
+    "lmcache_cacheblend_retrieve_failures",
+    "lmcache_log_p2p_transfer_speed_hint",
+    "lmcache_log_nixl_proxy_indicator",
+    "lmcache_log_nixl_request_indicator",
+    "lmcache_production_metrics_missing",
+    "lmcache_production_health_unhealthy",
+    "lmcache_chunk_stats_disabled",
+    "lmcache_chunk_stats_low_reuse",
+    "otel_tracing_enabled_but_no_spans",
+    "lmcache_mp_trace_enabled_but_no_trace_artifact",
+    "lmcache_trace_file_parse_failure",
+    "lmcache_trace_replay_failure",
+    "lmcache_mp_eventbus_taildrop_unobservable",
+    "lmcache_mp_empty_cache_salt",
+    "lmcache_mp_family_missing",
+    "lmcache_mp_lookup_counters_missing",
+    "lmcache_eventbus_self_metrics_missing",
+    "lmcache_mp_eventbus_taildrop_risk",
+    "lmcache_mp_sampled_histogram_sparse",
+    "vllm_external_prefix_no_hits",
+    "vllm_l0_excluded_caveat",
+    "vllm_lmcache_offload_flag_without_metrics",
+    "sglang_hicache_not_lmcache",
+    "sglang_lmcache_with_hicache_metrics",
+)
+
 
 @dataclass(frozen=True)
 class EvidenceBundle:
@@ -791,35 +850,52 @@ def _lmcache_missing_signal_downgrade(
 ) -> RuleResult | None:
     del thresholds
     report = bundle.lmcache_compat_report
-    report_mode = (report or {}).get("detected_mode")
-    compat_report_active = bool(report) and report_mode in {"mp", "mixed"}
-    if report and not compat_report_active and not bundle.lmcache_log_evidence:
-        return None
+    compat_report_active = bool(report)
     if not report and not bundle.lmcache_log_evidence:
         return None
+    failures = [
+        item
+        for item in ((report or {}).get("failure_reasons") if compat_report_active else []) or []
+        if isinstance(item, Mapping)
+    ]
+    selected_failure_code = _select_lmcache_finding_code(failures, list(LMCACHE_COMPAT_PRIORITY))
+    if selected_failure_code:
+        selected_failure = next(
+            item for item in failures if str(item.get("code")) == selected_failure_code
+        )
+        return _not_enough_result(
+            bundle,
+            rule_fired=selected_failure_code,
+            reasoning=str(
+                selected_failure.get("message")
+                or "LMCache compatibility evidence contains a blocking observability failure."
+            ),
+            metric_values={
+                "lmcache_compat.detected_mode": (report or {}).get("detected_mode"),
+                "lmcache_compat.detected_architecture": (
+                    (report or {}).get("detected_architecture") or {}
+                ),
+                "lmcache_compat.failure_reasons": failures,
+            },
+            claim_status="not_proven",
+            downgrades=[
+                Downgrade(
+                    "lmcache_compatibility",
+                    "measured",
+                    "not_proven",
+                    selected_failure_code,
+                )
+            ],
+            evidence_source_key="lmcache_compat_report",
+        )
     findings = [
         item
         for item in ((report or {}).get("diagnostic_findings") if compat_report_active else []) or []
         if isinstance(item, Mapping)
     ]
-    finding_priority = [
-        "lmcache_mp_l1_failures",
-        "lmcache_mp_l2_failures",
-        "lmcache_log_p2p_transfer_failure",
-        "lmcache_log_pd_role_mismatch",
-        "lmcache_log_pd_stall",
-        "lmcache_mp_eventbus_loss",
-        "lmcache_mp_l1_eviction_pressure",
-        "lmcache_mp_low_hit_rate",
-        "lmcache_log_p2p_transfer_speed_hint",
-        "lmcache_log_nixl_proxy_indicator",
-        "lmcache_log_nixl_request_indicator",
-        "otel_tracing_enabled_but_no_spans",
-        "lmcache_mp_trace_enabled_but_no_trace_artifact",
-        "lmcache_mp_eventbus_taildrop_unobservable",
-        "lmcache_mp_empty_cache_salt",
-    ]
-    selected_finding_code = _select_lmcache_finding_code(findings, finding_priority)
+    selected_finding_code = _select_lmcache_finding_code(
+        findings, list(LMCACHE_COMPAT_PRIORITY)
+    )
     if selected_finding_code:
         selected_finding = next(
             item for item in findings if str(item.get("code")) == selected_finding_code
@@ -864,13 +940,7 @@ def _lmcache_missing_signal_downgrade(
     ]
     codes = {str(item.get("code")) for item in questions}
     if codes:
-        priority = [
-            "lmcache_mp_lookup_counters_missing",
-            "vllm_external_prefix_no_hits",
-            "lmcache_eventbus_self_metrics_missing",
-            "lmcache_mp_empty_cache_salt",
-        ]
-        selected = _select_lmcache_code(codes, priority) or sorted(codes)[0]
+        selected = _select_lmcache_code(codes, list(LMCACHE_COMPAT_PRIORITY)) or sorted(codes)[0]
         return _not_enough_result(
             bundle,
             rule_fired=selected,
@@ -906,7 +976,21 @@ def _select_lmcache_finding_code(
     priority: list[str],
 ) -> str:
     codes = {str(item.get("code")) for item in findings}
-    return _select_lmcache_code(codes, priority)
+    selected = _select_lmcache_code(codes, priority)
+    if selected:
+        return selected
+    for severity in ("critical", "warning", "info"):
+        selected = next(
+            (
+                str(item.get("code"))
+                for item in findings
+                if item.get("code") and str(item.get("severity") or "info") == severity
+            ),
+            "",
+        )
+        if selected:
+            return selected
+    return sorted(codes)[0] if codes else ""
 
 
 def _select_lmcache_code(codes: set[str], priority: list[str]) -> str:
@@ -920,6 +1004,11 @@ def _select_lmcache_code(codes: set[str], priority: list[str]) -> str:
         "lmcache_pd",
         "lmcache_trace_replay",
         "lmcache_lookup_hash",
+        "lmcache_remote",
+        "lmcache_production",
+        "lmcache_chunk",
+        "cache_salt",
+        "connector",
         "cacheblend",
         "cb.",
         "p2p",

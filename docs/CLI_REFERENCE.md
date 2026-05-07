@@ -108,6 +108,95 @@ Current source-backed caveats:
   `--enable-lmcache` and `LMCacheLayerwiseConnector`. SGLang MP is not a
   supported claim until source and live fixtures prove the connector contract.
 
+Source-backed checklist links:
+
+- LMCache MP observability:
+  <https://docs.lmcache.ai/mp/observability.html>
+- LMCache MP HTTP API:
+  <https://docs.lmcache.ai/mp/http_api.html>
+- LMCache production metrics:
+  <https://docs.lmcache.ai/production/observability/metrics.html>
+- LMCache production vLLM metrics endpoint:
+  <https://docs.lmcache.ai/production/observability/vllm_endpoint.html>
+- LMCache trace recording/replay:
+  <https://docs.lmcache.ai/mp/tracing_and_debugging.html>
+- vLLM `LMCacheMPConnector`:
+  <https://docs.vllm.ai/en/v0.20.1/api/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector/>
+
+Use this exact status language in CLI output reviews and release notes:
+
+- Current LMCache observability status is **58 / 100, partial**.
+- MP parser/report support is **fixture_backed for core families** and
+  **parser_only for live-only throughput, gauges, and replay proofs**.
+- Embedded production metrics are **fixture_backed for core aliases** and
+  **parser_only for live backend, P2P, local CPU, memory-management, and
+  profiling packets**.
+- No lane is `live_validated` until a real packet is collected and replayed
+  through `collect-lmcache`, `lmcache-compat`, `observability-coverage`, and
+  `diagnose-bottleneck`.
+
+Full docs/CLI closeout command set:
+
+```bash
+modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a
+
+inferguard collect-lmcache \
+  --output-dir "$PACKET_DIR/lmcache-packet" \
+  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
+  --lmcache-health-file "$PACKET_DIR/lmcache-health.json" \
+  --lmcache-status-file "$PACKET_DIR/lmcache-status.json" \
+  --lmcache-version-file "$PACKET_DIR/lmcache-version.txt" \
+  --lmcache-lmc-version-file "$PACKET_DIR/lmcache-lmc-version.txt" \
+  --lmcache-commit-id-file "$PACKET_DIR/lmcache-commit-id.txt" \
+  --lmcache-quota-file "$PACKET_DIR/lmcache-quota.json" \
+  --engine-log-file "$PACKET_DIR/vllm.log" \
+  --lmcache-log-file "$PACKET_DIR/lmcache.log" \
+  --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" \
+  --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" \
+  --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" \
+  --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes" \
+  --expect-mode mp \
+  --json
+
+inferguard lmcache-compat \
+  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
+  --lmcache-http-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_log_evidence.json" \
+  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_evidence.json" \
+  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_replay_evidence.json" \
+  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_otel_evidence.json" \
+  --lmcache-lookup-hash-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_lookup_hash_evidence.json" \
+  --expect-mode mp \
+  --fail-on missing-required \
+  --json
+
+inferguard observability-coverage \
+  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
+  --lmcache-http-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_log_evidence.json" \
+  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_evidence.json" \
+  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_replay_evidence.json" \
+  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_otel_evidence.json" \
+  --lmcache-lookup-hash-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_lookup_hash_evidence.json" \
+  --expected-engine vllm \
+  --expect-lmcache-mode mp \
+  --json
+
+inferguard diagnose-bottleneck "$JOB_DIR" \
+  --output "$PACKET_DIR/bottleneck_diagnosis.json"
+```
+
+Every 100% checklist update must account for these metric families:
+
+| Surface | Families |
+| --- | --- |
+| LMCache MP | StorageManager counters; L1 counters/memory/failures/lifecycle; StorageManager real reuse; L2 counters/failures/throughput/in-flight gauges; lookup hit rate; L0 lifecycle; L0-L1 throughput; engine counter; active prefetch jobs; EventBus; CacheBlend. |
+| Embedded production LMCache | Core request; token; hit rate; performance and latency; detailed profiling; cache usage and lifecycle; remote backend and network; local CPU backend; memory management; P2P transfer; health/internal; chunk statistics. |
+| Workload packets | MP Packet A; MP L2; embedded vLLM; embedded SGLang; CacheBlend; P2P; PD; trace replay and lookup hash; release readiness. |
+
 ## Exit-code conventions
 
 | Code | Typical meaning |

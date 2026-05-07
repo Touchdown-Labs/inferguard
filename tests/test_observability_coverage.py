@@ -308,6 +308,33 @@ lmcache:chunk_statistics_chunks 6
     assert families[("lmcache_embedded", "chunk_stats")]["status"] == "populated"
 
 
+def test_lmcache_production_metrics_reference_families_are_reported() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text=_lmcache_fixture("production_full.prom"),
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    expected_populated = {
+        "production_requests",
+        "production_tokens",
+        "production_hit_rate",
+        "production_latency_performance",
+        "production_detailed_profiling",
+        "production_cache_usage_lifecycle",
+        "production_remote_backend_network",
+        "production_local_cpu_backend",
+        "production_memory_management",
+        "production_p2p",
+        "production_health_internal",
+        "chunk_stats",
+        "production_connector_metrics",
+    }
+    assert report["detected_lmcache_mode"] == "embedded"
+    for family in expected_populated:
+        assert families[("lmcache_embedded", family)]["status"] == "populated"
+
+
 def test_vllm_embedded_dynamic_offload_fixture_is_classified() -> None:
     report = build_observability_coverage_report(
         engine_text=_lmcache_fixture("vllm_embedded_dynamic_offload.prom"),

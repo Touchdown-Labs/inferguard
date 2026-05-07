@@ -9,6 +9,72 @@ from inferguard.disagg.metrics_schema import NORMALIZED_LMCACHE_FIELDS
 
 FIXTURES = Path(__file__).parent / "fixtures" / "lmcache_metrics"
 
+MP_COUNTER_FIELDS = (
+    ("lmcache_mp.lookup_requested_tokens", "lmcache_lookup_requested_tokens"),
+    ("lmcache_mp.lookup_hit_tokens", "lmcache_lookup_hit_tokens"),
+    ("lmcache_mp.sm_read_requests", "lmcache_sm_read_requests"),
+    ("lmcache_mp.sm_read_succeed_keys", "lmcache_sm_read_succeed_keys"),
+    ("lmcache_mp.sm_read_failed_keys", "lmcache_sm_read_failed_keys"),
+    ("lmcache_mp.sm_write_requests", "lmcache_sm_write_requests"),
+    ("lmcache_mp.sm_write_succeed_keys", "lmcache_sm_write_succeed_keys"),
+    ("lmcache_mp.sm_write_failed_keys", "lmcache_sm_write_failed_keys"),
+    ("lmcache_mp.l1_read_keys", "lmcache_l1_read_keys"),
+    ("lmcache_mp.l1_write_keys", "lmcache_l1_write_keys"),
+    ("lmcache_mp.l1_evicted_keys", "lmcache_l1_evicted_keys"),
+    ("lmcache_mp.l1_allocation_failure", "lmcache_l1_allocation_failure"),
+    ("lmcache_mp.l1_read_failure", "lmcache_l1_read_failure"),
+    ("lmcache_mp.l2_store_tasks", "lmcache_l2_store_tasks"),
+    ("lmcache_mp.l2_store_keys", "lmcache_l2_store_keys"),
+    ("lmcache_mp.l2_store_completed", "lmcache_l2_store_completed"),
+    ("lmcache_mp.l2_store_succeeded_keys", "lmcache_l2_store_succeeded_keys"),
+    ("lmcache_mp.l2_store_failed_keys", "lmcache_l2_store_failed_keys"),
+    ("lmcache_mp.l2_prefetch_lookups", "lmcache_l2_prefetch_lookups"),
+    ("lmcache_mp.l2_prefetch_lookup_keys", "lmcache_l2_prefetch_lookup_keys"),
+    ("lmcache_mp.l2_prefetch_hit_keys", "lmcache_l2_prefetch_hit_keys"),
+    ("lmcache_mp.l2_prefetch_load_tasks", "lmcache_l2_prefetch_load_tasks"),
+    ("lmcache_mp.l2_prefetch_load_keys", "lmcache_l2_prefetch_load_keys"),
+    ("lmcache_mp.l2_prefetch_loaded_keys", "lmcache_l2_prefetch_loaded_keys"),
+    ("lmcache_mp.l2_prefetch_failed_keys", "lmcache_l2_prefetch_failed_keys"),
+    ("lmcache_mp.l2_prefetch_failure", "lmcache_l2_prefetch_failure"),
+    ("lmcache_mp.l2_load_completed", "lmcache_l2_load_completed"),
+    ("lmcache_mp.num_chunks_loaded", "lmcache_num_chunks_loaded"),
+    ("lmcache_mp.event_bus.dropped_events", "lmcache_event_bus_dropped_events_total"),
+    ("lmcache_mp.event_bus.subscriber_exceptions", "lmcache_event_bus_subscriber_exceptions_total"),
+)
+
+MP_GAUGE_FIELDS = (
+    ("lmcache_mp.l1_memory_usage_bytes", "lmcache_l1_memory_usage_bytes"),
+    ("lmcache_mp.active_prefetch_jobs", "lmcache_active_prefetch_jobs"),
+    ("lmcache_mp.num_inflight_l2_stores", "lmcache_num_inflight_l2_stores"),
+    ("lmcache_mp.num_inflight_l2_loads", "lmcache_num_inflight_l2_loads"),
+    ("lmcache_mp.inflight_load_memory_usage_bytes", "lmcache_inflight_load_memory_usage_bytes"),
+    ("lmcache_mp.event_bus.queue_depth", "lmcache_event_bus_queue_depth"),
+)
+
+MP_HIST_FIELDS = (
+    ("lmcache_mp.l1_chunk_lifetime_seconds", "lmcache_l1_chunk_lifetime_seconds"),
+    ("lmcache_mp.l1_chunk_idle_before_evict_seconds", "lmcache_l1_chunk_idle_before_evict_seconds"),
+    ("lmcache_mp.l1_chunk_reuse_gap_seconds", "lmcache_l1_chunk_reuse_gap_seconds"),
+    ("lmcache_mp.l1_chunk_evict_reuse_gap_seconds", "lmcache_l1_chunk_evict_reuse_gap_seconds"),
+    ("lmcache_mp.real_reuse_gap_seconds", "lmcache_real_reuse_gap_seconds"),
+    ("lmcache_mp.real_reuse_gap_chunks", "lmcache_real_reuse_gap_chunks"),
+    ("lmcache_mp.l0_block_lifetime_seconds", "lmcache_l0_block_lifetime_seconds"),
+    ("lmcache_mp.l0_block_idle_before_evict_seconds", "lmcache_l0_block_idle_before_evict_seconds"),
+    ("lmcache_mp.l0_block_reuse_gap_seconds", "lmcache_l0_block_reuse_gap_seconds"),
+    ("lmcache_mp.l0_l1_store_throughput_gbs", "lmcache_l0_l1_store_throughput_gbs"),
+    ("lmcache_mp.l0_l1_load_throughput_gbs", "lmcache_l0_l1_load_throughput_gbs"),
+    ("lmcache_mp.l2_store_throughput_gbs", "lmcache_l2_store_throughput_gbs"),
+    ("lmcache_mp.l2_load_throughput_gbs", "lmcache_l2_load_throughput_gbs"),
+    ("lmcache_mp.event_bus.drain_lag_seconds", "lmcache_event_bus_drain_lag_seconds"),
+)
+
+
+def _mp_name_variants(canonical: str, *, counter: bool = False) -> tuple[str, ...]:
+    names = [canonical, canonical.replace(".", "_")]
+    if counter:
+        names.extend(f"{name}_total" for name in tuple(names))
+    return tuple(dict.fromkeys(names))
+
 
 def test_lmcache_prometheus_fixture_parses_normalized_fields() -> None:
     metrics = parse_lmcache_prometheus((FIXTURES / "full.prom").read_text(encoding="utf-8"))
@@ -242,6 +308,119 @@ def test_lmcache_real_modal_mp_slice_parses_storage_and_l0_fields() -> None:
     assert metrics.lmcache_l0_block_lifetime_seconds > 400
 
 
+@pytest.mark.parametrize(("canonical", "field_name"), MP_COUNTER_FIELDS)
+def test_lmcache_mp_counter_spellings_parse(canonical: str, field_name: str) -> None:
+    for metric_name in _mp_name_variants(canonical, counter=True):
+        metrics = parse_lmcache_prometheus(f'{metric_name}{{cache_salt="tenant-a",l2_name="fs"}} 7\n')
+        assert getattr(metrics, field_name) == 7
+        assert metrics.lmcache_enabled is True
+        assert metrics.lmcache_mp_mode_enabled is True
+
+
+@pytest.mark.parametrize(("canonical", "field_name"), MP_GAUGE_FIELDS)
+def test_lmcache_mp_gauge_spellings_parse(canonical: str, field_name: str) -> None:
+    for metric_name in _mp_name_variants(canonical):
+        metrics = parse_lmcache_prometheus(f'{metric_name}{{l2_name="fs",adapter_index="0"}} 7\n')
+        assert getattr(metrics, field_name) == 7
+        assert metrics.lmcache_enabled is True
+        assert metrics.lmcache_mp_mode_enabled is True
+
+
+@pytest.mark.parametrize(("canonical", "field_name"), MP_HIST_FIELDS)
+def test_lmcache_mp_histogram_spellings_parse(canonical: str, field_name: str) -> None:
+    for metric_name in _mp_name_variants(canonical):
+        metrics = parse_lmcache_prometheus(
+            f'{metric_name}_sum{{cache_salt="tenant-a",l2_name="fs"}} 12\n'
+            f'{metric_name}_count{{cache_salt="tenant-a",l2_name="fs"}} 3\n'
+        )
+        assert getattr(metrics, field_name) == 4
+        assert metrics.lmcache_enabled is True
+        assert metrics.lmcache_mp_mode_enabled is True
+
+
+def test_lmcache_mp_registry_recognizes_dotted_source_names_and_prometheus_names() -> None:
+    dotted_report = build_compat_report(
+        lmcache_text="""
+lmcache_mp.sm_read_requests 1
+lmcache_mp.lookup_requested_tokens{cache_salt="tenant-a"} 10
+lmcache_mp.lookup_hit_tokens{cache_salt="tenant-a"} 8
+lmcache_mp.l1_read_keys 2
+lmcache_mp.l1_memory_usage_bytes 2048
+lmcache_mp.l1_allocation_failure 1
+lmcache_mp.l1_chunk_reuse_gap_seconds_sum 6
+lmcache_mp.l1_chunk_reuse_gap_seconds_count 2
+lmcache_mp.l0_block_lifetime_seconds_sum 8
+lmcache_mp.l0_block_lifetime_seconds_count 2
+lmcache_mp.real_reuse_gap_seconds_sum 12
+lmcache_mp.real_reuse_gap_seconds_count 3
+lmcache_mp.l2_store_tasks{l2_name="fs"} 5
+lmcache_mp.l2_prefetch_failure{l2_name="fs"} 1
+lmcache_mp.l2_store_throughput_gbs_sum{l2_name="fs"} 4
+lmcache_mp.l2_store_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp.l0_l1_store_throughput_gbs_sum 10
+lmcache_mp.l0_l1_store_throughput_gbs_count 2
+lmcache_mp.num_chunks_loaded 3
+lmcache_mp.active_prefetch_jobs 1
+lmcache_mp.num_inflight_l2_stores{l2_name="fs"} 1
+lmcache_mp.event_bus.queue_depth 2
+lmcache_mp.event_bus.dropped_events 1
+""",
+        expect_mode="mp",
+        l2_configured=True,
+    )
+    prom_report = build_compat_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_lookup_requested_tokens_total{cache_salt="tenant-a"} 10
+lmcache_mp_lookup_hit_tokens_total{cache_salt="tenant-a"} 8
+lmcache_mp_l1_read_keys_total 2
+lmcache_mp_l1_memory_usage_bytes 2048
+lmcache_mp_l1_allocation_failure_total 1
+lmcache_mp_l1_chunk_reuse_gap_seconds_sum 6
+lmcache_mp_l1_chunk_reuse_gap_seconds_count 2
+lmcache_mp_l0_block_lifetime_seconds_sum 8
+lmcache_mp_l0_block_lifetime_seconds_count 2
+lmcache_mp_real_reuse_gap_seconds_sum 12
+lmcache_mp_real_reuse_gap_seconds_count 3
+lmcache_mp_l2_store_tasks_total{l2_name="fs"} 5
+lmcache_mp_l2_prefetch_failure_total{l2_name="fs"} 1
+lmcache_mp_l2_store_throughput_gbs_sum{l2_name="fs"} 4
+lmcache_mp_l2_store_throughput_gbs_count{l2_name="fs"} 2
+lmcache_mp_l0_l1_store_throughput_gbs_sum 10
+lmcache_mp_l0_l1_store_throughput_gbs_count 2
+lmcache_mp_num_chunks_loaded_total 3
+lmcache_mp_active_prefetch_jobs 1
+lmcache_mp_num_inflight_l2_stores{l2_name="fs"} 1
+lmcache_mp_event_bus_queue_depth 2
+lmcache_mp_event_bus_dropped_events_total 1
+""",
+        expect_mode="mp",
+        l2_configured=True,
+    )
+
+    for report in (dotted_report, prom_report):
+        families = {(row["surface"], row["family"]): row for row in report["families"]}
+        assert report["detected_mode"] == "mp"
+        assert report["observed"]["lmcache_mp"] is True
+        assert families[("lmcache_mp", "storage_manager")]["status"] == "populated"
+        assert families[("lmcache_mp", "lookup_tokens")]["status"] == "populated"
+        assert families[("lmcache_mp", "l1_counters")]["status"] == "populated"
+        assert families[("lmcache_mp", "l1_memory")]["status"] == "populated"
+        assert families[("lmcache_mp", "l1_failures")]["status"] == "populated"
+        assert families[("lmcache_mp", "l1_lifecycle")]["status"] == "populated"
+        assert families[("lmcache_mp", "l0_lifecycle")]["status"] == "populated"
+        assert families[("lmcache_mp", "real_reuse")]["status"] == "populated"
+        assert families[("lmcache_mp", "l2_counters")]["status"] == "populated"
+        assert families[("lmcache_mp", "l2_failures")]["status"] == "populated"
+        assert families[("lmcache_mp", "l2_throughput")]["status"] == "populated"
+        assert families[("lmcache_mp", "l0_l1_throughput")]["status"] == "populated"
+        assert families[("lmcache_mp", "engine_counters")]["status"] == "populated"
+        assert families[("lmcache_mp", "gauges")]["status"] == "populated"
+        assert families[("lmcache_mp", "event_bus")]["status"] == "populated"
+        assert report["lmcache_l2_summary"]["observed"] is True
+        assert any(item["code"] == "lmcache_mp_l2_failures" for item in report["diagnostic_findings"])
+
+
 def test_lmcache_unknown_metrics_are_preserved() -> None:
     snap = _parse_lmcache((FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"), url="http://lmcache", role="prefill")
 
@@ -301,6 +480,79 @@ lmcache:unique_chunks 20
     assert metrics.lmcache_total_chunk_requests == 44
     assert metrics.lmcache_total_chunks == 30
     assert metrics.lmcache_unique_chunks == 20
+
+
+def test_lmcache_production_metrics_reference_families_parse_fixture() -> None:
+    metrics = parse_lmcache_prometheus((FIXTURES / "production_full.prom").read_text(encoding="utf-8"))
+
+    assert metrics.lmcache_num_retrieve_requests == 11
+    assert metrics.lmcache_num_stored_tokens == 700
+    assert metrics.lmcache_num_vllm_hit_tokens == 400
+    assert metrics.lmcache_num_prompt_tokens == 1200
+    assert metrics.lmcache_retrieve_hit_rate == 0.6
+    assert metrics.lmcache_lookup_hit_rate == 0.55
+    assert metrics.lmcache_request_cache_hit_rate == 0.6
+    assert metrics.lmcache_lookup_0_hit_requests == 4
+    assert metrics.lmcache_time_to_retrieve_seconds == pytest.approx(0.02)
+    assert metrics.lmcache_time_to_store_seconds == pytest.approx(0.05)
+    assert metrics.lmcache_time_to_lookup_seconds == pytest.approx(0.01)
+    assert metrics.lmcache_retrieve_speed_tokens_per_second == 1000
+    assert metrics.lmcache_store_speed_tokens_per_second == 500
+    assert metrics.lmcache_num_slow_retrieval_by_time == 2
+    assert metrics.lmcache_num_slow_retrieval_by_speed == 1
+    assert metrics.lmcache_retrieve_process_tokens_time_seconds == pytest.approx(0.01)
+    assert metrics.lmcache_retrieve_broadcast_time_seconds == pytest.approx(0.02)
+    assert metrics.lmcache_retrieve_to_gpu_time_seconds == pytest.approx(0.03)
+    assert metrics.lmcache_store_process_tokens_time_seconds == pytest.approx(0.04)
+    assert metrics.lmcache_store_from_gpu_time_seconds == pytest.approx(0.05)
+    assert metrics.lmcache_store_put_time_seconds == pytest.approx(0.06)
+    assert metrics.lmcache_remote_backend_batched_get_blocking_time_seconds == pytest.approx(0.07)
+    assert metrics.lmcache_instrumented_connector_batched_get_time_seconds == pytest.approx(0.08)
+    assert metrics.lmcache_local_cache_usage_bytes == 1024
+    assert metrics.lmcache_remote_cache_usage_bytes == 2048
+    assert metrics.lmcache_local_storage_usage_bytes == 4096
+    assert metrics.lmcache_request_cache_lifespan_minutes == 15
+    assert metrics.lmcache_num_remote_read_requests == 5
+    assert metrics.lmcache_remote_read_bytes == 111
+    assert metrics.lmcache_num_remote_write_requests == 6
+    assert metrics.lmcache_remote_write_bytes == 222
+    assert metrics.lmcache_remote_time_to_get_ms == 4
+    assert metrics.lmcache_remote_time_to_put_ms == 5
+    assert metrics.lmcache_remote_time_to_get_sync_ms == 7
+    assert metrics.lmcache_remote_ping_latency_ms == 3.5
+    assert metrics.lmcache_remote_ping_successes == 8
+    assert metrics.lmcache_remote_ping_error_code == 503
+    assert metrics.lmcache_local_cpu_evict_count == 1
+    assert metrics.lmcache_local_cpu_evict_keys_count == 2
+    assert metrics.lmcache_local_cpu_evict_failed_count == 3
+    assert metrics.lmcache_local_cpu_hot_cache_count == 4
+    assert metrics.lmcache_local_cpu_keys_in_request_count == 5
+    assert metrics.lmcache_active_memory_objs_count == 6
+    assert metrics.lmcache_pinned_memory_objs_count == 7
+    assert metrics.lmcache_forced_unpin_count == 8
+    assert metrics.lmcache_pin_monitor_pinned_objects_count == 9
+    assert metrics.lmcache_p2p_time_to_transfer_ms == 50
+    assert metrics.lmcache_p2p_transfer_speed == 10
+    assert metrics.lmcache_get_blocking_failed_count == 10
+    assert metrics.lmcache_put_failed_count == 11
+    assert metrics.lmcache_kv_msg_queue_size == 12
+    assert metrics.lmcache_remote_put_task_num == 13
+    assert metrics.lmcache_chunk_stats_enabled is True
+    assert metrics.lmcache_total_chunk_requests == 44
+    assert metrics.lmcache_total_chunks == 30
+    assert metrics.lmcache_unique_chunks == 20
+    assert metrics.lmcache_chunk_statistics_reuse_rate == 0.25
+    assert metrics.lmcache_chunk_statistics_bloom_filter_size_mb == 11.5
+    assert metrics.lmcache_chunk_statistics_bloom_filter_fill_rate == 0.1
+    assert metrics.lmcache_chunk_statistics_file_count == 2
+    assert metrics.lmcache_chunk_statistics_current_file_size == 8192
+    assert metrics.lmcache_scheduler_unfinished_requests_count == 1
+    assert metrics.lmcache_connector_load_specs_count == 2
+    assert metrics.lmcache_connector_request_trackers_count == 3
+    assert metrics.lmcache_connector_kv_caches_count == 4
+    assert metrics.lmcache_connector_layerwise_retrievers_count == 5
+    assert metrics.lmcache_connector_invalid_block_ids_count == 6
+    assert metrics.lmcache_connector_requests_priority_count == 7
 
 
 def test_lmcache_cacheblend_metrics_and_embedded_aliases_parse() -> None:

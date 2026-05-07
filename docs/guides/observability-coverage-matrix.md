@@ -24,6 +24,26 @@ parser, packet, report, and diagnosis surfaces that exist now. Live validation
 is still pending for the Modal Packet A gate, so these rows must not be read as
 100% LMCache compatibility.
 
+Source refresh for the Worker Docs/CLI checklist on 2026-05-07 used:
+
+- LMCache MP observability:
+  <https://docs.lmcache.ai/mp/observability.html>
+- LMCache MP HTTP API:
+  <https://docs.lmcache.ai/mp/http_api.html>
+- LMCache production metrics:
+  <https://docs.lmcache.ai/production/observability/metrics.html>
+- LMCache production vLLM metrics endpoint:
+  <https://docs.lmcache.ai/production/observability/vllm_endpoint.html>
+- LMCache trace recording/replay:
+  <https://docs.lmcache.ai/mp/tracing_and_debugging.html>
+- vLLM `LMCacheMPConnector`:
+  <https://docs.vllm.ai/en/v0.20.1/api/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector/>
+
+Status language for coverage accounting remains conservative: `supported` means
+the parser or collector path exists and is fixture-tested, not that the lane is
+100% done. A lane reaches customer-proof only after it is also
+`live_validated` in the source-of-truth tracker.
+
 ## Matrix
 
 | Runtime | Surface | Status | Artifact name | Current parser or CLI entrypoint | Missing proof | Exact next command |
@@ -46,6 +66,37 @@ is still pending for the Modal Packet A gate, so these rows must not be read as
 | SGLang | Prometheus KV transfer, if present | supported | `engine_metrics_timeline.jsonl`, `metrics_summary.json`, `observability_coverage.json` | `_parse_sglang`, connector label detection on `sglang:kv_transfer_*`, `observability-coverage --disaggregated-or-external-cache` | Live SGLang deployments using Mooncake/NIXL labels. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_kv_transfer.prom" --expected-engine sglang --disaggregated-or-external-cache --output "$PACKET_DIR/sglang_kv_transfer_coverage.json"` |
 | SGLang | Embedded LMCache evidence | partial | `engine_metrics_timeline.jsonl`, `metrics_summary.json`, `observability_coverage.json`, optional LMCache packet artifacts | `normalize_engine_sample("sglang", ...)`, `_parse_sglang`, LMCache embedded metric parser | Live SGLang `--enable-lmcache` fixture. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
 | SGLang | LMCache MP evidence | missing | none | none yet | Current-mainline SGLang MP connector/launch contract plus live proof. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_mp_candidate_coverage.json" --expect-lmcache-mode mp` |
+
+## 100% Checklist Matrix
+
+This is the docs/CLI coverage checklist that must be green before the score can
+reach 100/100. The states intentionally use the stricter SDLC taxonomy.
+
+| Lane | Current state | Required evidence | Missing proof | Exact next command |
+| --- | --- | --- | --- | --- |
+| MP architecture | fixture_backed | `LMCacheMPConnector` launch/config, standalone `lmcache server`, ZMQ config, vLLM `/metrics`, LMCache HTTP and `/metrics` | Live Packet A with config/log proof. | `modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a` |
+| MP HTTP safe endpoints | parser_only / fixture_backed mixed | `/`, `/api/healthcheck`, `/api/status`, `/conf`, `/version`, `/lmc_version`, `/commit_id`, `/api/quota`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, `/periodic-threads-health` | Live endpoint packet; `/env` and `/loglevel` opt-in redaction/safety policy. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
+| MP destructive endpoint guard | destructive_skipped | `POST /api/clear-cache`, `POST /metrics/reset`, quota mutation routes recorded but not called | Packet manifest row proving skipped status. | `printf '%s\n' 'POST /api/clear-cache destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
+| MP Prometheus metric families | fixture_backed / parser_only mixed | StorageManager, L1, L1 failures, L1 lifecycle, real reuse, L2, L2 failures, lookup hit rate, L0 lifecycle, L0-L1 throughput, L1-L2 throughput, engine counter, observable gauges, EventBus, CacheBlend | Live nonzero lookup, L2, sampled lifecycle/throughput, EventBus clean/failure, CacheBlend packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-lmcache-mode mp` |
+| Embedded production metric families | fixture_backed / parser_only mixed | Core request, token, hit rate, performance/latency, profiling, cache usage/lifecycle, remote backend/network, local CPU backend, memory management, P2P, health/internal, chunk statistics | Live embedded vLLM and SGLang fixtures with backend/P2P/chunk-stat surfaces. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/embedded_lmcache.prom" --output "$PACKET_DIR/embedded_report.json" --expect-lmcache-mode embedded` |
+| Trace recording `.lct` | fixture_backed | `.lct` file from `--trace-level storage`, trace header, storage operation records | Live `.lct` from the same Packet A run. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/trace" --lmcache-trace-file "$PACKET_DIR/trace/lmcache-trace.lct"` |
+| Trace replay metadata | fixture_backed | `lmcache trace info`, replay JSON, replay JSONL, replay CSV, config digest comparison | Live replay output tied to same `.lct`. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/trace-replay" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay"` |
+| OTel spans | fixture_backed | `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`, root `request`, CacheBlend `cb.*` spans | Real collector export, not hand-authored JSONL. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/otel" --lmcache-otel-file "$PACKET_DIR/otel/lmcache-otel.jsonl"` |
+| Logs | fixture_backed structurally | store/retrieve/prefetch/startup, P2P, PD, hashseed, stale connector, lifecycle lines | Live MP, embedded, P2P, and PD logs converted to compact fixtures. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
+| Lookup-hash JSONL | fixture_backed | redacted hashes, request/model/chunk metadata, rotation/config evidence | Live lookup-hash directory from Packet A. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/lookup-hash" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
+| P2P and PD | parser_only | P2P transfer metrics/logs, peer evidence, PD role/config/proxy/NIXL logs, request profile | Live two-engine P2P and 1p1d PD packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/pd" --engine-log-file "$PACKET_DIR/pd/engine.log" --lmcache-log-file "$PACKET_DIR/pd/lmcache.log"` |
+| Diagnostics | missing / fixture_backed mixed | mode-aware findings for hit rate, cache salt, L1/L2 pressure, EventBus loss, trace gaps, CacheBlend, P2P, PD, stale connector | Calibrated thresholds from live packets. | `inferguard diagnose-bottleneck "$JOB_DIR" --output "$PACKET_DIR/bottleneck_diagnosis.json"` |
+| Release readiness | partial | docs, CLI reference, fixture tests, docs build, release notes, upstream question log | Full test/build proof after fixture import. | `uv run mkdocs build` |
+
+## Metric Family Closeout
+
+| Source | Family coverage required | Current state | Missing proof | Exact next command |
+| --- | --- | --- | --- | --- |
+| LMCache MP observability | StorageManager, L1, lifecycle, real reuse, L2, lookup, L0, throughput, engine, gauges | fixture_backed / parser_only mixed | Live MP packet plus L2 and sampled histogram packets. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/observability_coverage.json" --expect-lmcache-mode mp` |
+| LMCache MP source additions | EventBus, L1 allocation/read failure, L2 prefetch failure, CacheBlend counters | fixture_backed | Clean/failure EventBus, L1/L2 failure, and CacheBlend live packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_eventbus.prom" --output "$PACKET_DIR/eventbus_report.json" --expect-lmcache-mode mp` |
+| LMCache production metrics | Core request, token, hit rate, performance/latency, profiling, cache usage/lifecycle, remote/backend/network, local CPU, memory, P2P, health/internal, chunk statistics | fixture_backed / parser_only mixed | Live embedded and backend/P2P/chunk-stat fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
+| vLLM bridge | local prefix, external prefix, prompt-token source, KV CPU offload caveat, connector identity | supported structurally | Live vLLM + LMCache MP connector packet and mismatch detector. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
+| SGLang bridge | queue/cache/HiCache/KV-transfer plus embedded LMCache adapter evidence | partial | Live SGLang `--enable-lmcache`; source-backed MP contract before MP scoring. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
 
 ## Current Fixture Coverage
 

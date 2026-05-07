@@ -73,6 +73,80 @@ def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) 
     assert cmd[cmd.index("--metrics-sample-rate") + 1] == "1.0"
 
 
+def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+
+    cmd = lab._build_lmcache_command(tmp_path, spec)
+
+    assert spec.workload == "reuse_eviction"
+    assert cmd[cmd.index("--metrics-sample-rate") + 1] == "1.0"
+    assert cmd[cmd.index("--event-bus-queue-size") + 1] == "10000"
+    assert cmd[cmd.index("--eviction-policy") + 1] == "LRU"
+
+
+def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["c"]
+    (tmp_path / "lmcache-packet").mkdir()
+    (tmp_path / "lmcache-packet" / "lmcache_trace_replay_evidence.json").write_text("{}", encoding="utf-8")
+
+    config_path = lab._write_l2_config(tmp_path, spec)
+    env = lab._build_lmcache_env(tmp_path, spec)
+    collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
+    compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
+    coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
+
+    assert config_path == tmp_path / "lmcache_l2_config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config["adapter"] == "fs"
+    assert env["LMCACHE_CONFIG_FILE"] == str(config_path)
+    assert env["LMCACHE_L2_ADAPTER"] == "fs"
+    assert "--l2-configured" in collect
+    assert "--l2-configured" in compat
+    assert "--l2-configured" in coverage
+    assert "lmcache_l2_config.json" in lab._required_artifacts(spec)
+
+
+def test_packet_d_wires_otel_collector_evidence_into_reports(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["d"]
+    packet_dir = tmp_path / "lmcache-packet"
+    packet_dir.mkdir()
+    (tmp_path / "lmcache_otel.jsonl").write_text('{"name":"mp.store"}\n', encoding="utf-8")
+    (packet_dir / "lmcache_otel_evidence.json").write_text('{"claim_status":"measured"}', encoding="utf-8")
+
+    cmd = lab._build_lmcache_command(tmp_path, spec)
+    env = lab._build_lmcache_env(tmp_path, spec)
+    collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
+    compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
+    coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
+
+    assert "--enable-tracing" in cmd
+    assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
+    assert collect[collect.index("--lmcache-otel-file") + 1] == str(tmp_path / "lmcache_otel.jsonl")
+    assert "--mp-tracing-enabled" in collect
+    assert "--mp-tracing-enabled" in compat
+    assert compat[compat.index("--lmcache-otel-evidence-file") + 1] == str(
+        packet_dir / "lmcache_otel_evidence.json"
+    )
+    assert coverage[coverage.index("--lmcache-otel-evidence-file") + 1] == str(
+        packet_dir / "lmcache_otel_evidence.json"
+    )
+    assert "lmcache_otel.jsonl" in lab._required_artifacts(spec)
+
+
+def test_packet_f_uses_cache_salt_workload_and_isolated_lru(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["f"]
+
+    cmd = lab._build_lmcache_command(tmp_path, spec)
+
+    assert spec.enable_cache_salt is True
+    assert spec.workload == "cache_salt_isolated_lru"
+    assert cmd[cmd.index("--eviction-policy") + 1] == "IsolatedLRU"
+
+
 def test_packet_a_collect_command_uses_saved_safe_http_and_optional_outputs(tmp_path: Path) -> None:
     lab = _load_lab_module()
     (tmp_path / "http").mkdir()
@@ -125,3 +199,18 @@ def test_packet_a_summary_marks_missing_required_artifacts(tmp_path: Path) -> No
     assert "## Missing Required" in summary
     assert "`vllm.log`" in summary
     assert any(item["path"] == "env.txt" for item in index)
+
+
+def test_packet_command_script_lists_exact_modal_functions() -> None:
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_mp_packet_commands.py"
+    spec = importlib.util.spec_from_file_location("_lmcache_mp_packet_commands_test", path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    commands = module.packet_commands()
+    assert commands["A"] == "modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_a"
+    assert commands["F"].endswith("::run_packet_f")
