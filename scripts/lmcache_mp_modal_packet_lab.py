@@ -38,6 +38,7 @@ LMCACHE_PROMETHEUS_PORT = 9090
 OTLP_HTTP_PORT = 4318
 MP_EVENT_BUS_QUEUE_SIZE = 10000
 MP_METRICS_SAMPLE_RATE = 1.0
+LMCACHE_L1_SIZE_GB = "8"
 
 VLLM_BASE_URL = f"http://127.0.0.1:{VLLM_PORT}"
 VLLM_HEALTH_URL = f"{VLLM_BASE_URL}/health"
@@ -305,7 +306,7 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--http-port",
         str(LMCACHE_HTTP_PORT),
         "--l1-size-gb",
-        "8",
+        LMCACHE_L1_SIZE_GB,
         "--eviction-policy",
         spec.eviction_policy,
         "--prometheus-port",
@@ -491,7 +492,28 @@ def _capture_metrics(run_dir: Path, suffix: str) -> None:
     _curl_to_file(LMCACHE_METRICS_URL, run_dir / f"lmcache_metrics_{suffix}.prom", log_path)
 
 
-def _run_trace_replay(run_dir: Path) -> None:
+def _build_trace_replay_command(run_dir: Path, spec: PacketSpec | None = None) -> list[str]:
+    spec = spec or PACKETS["a"]
+    replay_dir = run_dir / TRACE_REPLAY_DIR
+    return [
+        "lmcache",
+        "trace",
+        "replay",
+        str(run_dir / LMCACHE_TRACE_FILE),
+        "--output-dir",
+        str(replay_dir),
+        "--json",
+        "--jsonl-out",
+        str(replay_dir / "trace_replay.jsonl"),
+        "--l1-size-gb",
+        LMCACHE_L1_SIZE_GB,
+        "--eviction-policy",
+        spec.eviction_policy,
+        "--disable-metrics",
+    ]
+
+
+def _run_trace_replay(run_dir: Path, spec: PacketSpec | None = None) -> None:
     trace_path = run_dir / LMCACHE_TRACE_FILE
     replay_dir = run_dir / TRACE_REPLAY_DIR
     log_path = run_dir / "trace_replay.log"
@@ -505,21 +527,7 @@ def _run_trace_replay(run_dir: Path) -> None:
         replay_dir / "trace_info.txt",
         timeout=120,
     )
-    _run_required(
-        [
-            "lmcache",
-            "trace",
-            "replay",
-            str(trace_path),
-            "--output-dir",
-            str(replay_dir),
-            "--json",
-            "--jsonl-out",
-            str(replay_dir / "trace_replay.jsonl"),
-        ],
-        log_path,
-        timeout=10 * 60,
-    )
+    _run_required(_build_trace_replay_command(run_dir, spec), log_path, timeout=10 * 60)
 
 
 def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
@@ -1004,7 +1012,7 @@ def _run_packet(spec: PacketSpec) -> str:
         _drive_traffic(run_dir, spec)
         _capture_metrics(run_dir, "loaded")
         _capture_safe_http(run_dir)
-        _run_trace_replay(run_dir)
+        _run_trace_replay(run_dir, spec)
         _run_inferguard_packet(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
     finally:

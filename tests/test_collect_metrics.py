@@ -195,6 +195,59 @@ def test_lmcache_compat_report_distinguishes_mp_and_external_prefix() -> None:
     }
 
 
+def test_lmcache_compat_report_marks_live_alternate_evidence_as_strict_upstream_blocker() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+target_info 1
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_sm_write_requests_total 11
+lmcache_mp_l1_read_keys_total 72
+lmcache_mp_l1_write_keys_total 13
+lmcache_mp_l1_chunk_reuse_gap_seconds_sum 127
+lmcache_mp_l1_chunk_reuse_gap_seconds_count 72
+""",
+        expect_mode="mp",
+        lmcache_http_evidence={
+            "endpoints": {
+                "status": {
+                    "fields": {
+                        "storage_manager": {
+                            "l1_manager": {
+                                "memory_used_bytes": 490733568,
+                                "total_object_count": 13,
+                            }
+                        }
+                    }
+                }
+            },
+            "failure_reasons": [],
+        },
+        lmcache_log_evidence={"event_counts": {"prefetch_complete": 9}},
+        lmcache_lookup_hash_evidence={
+            "claim_status": "measured",
+            "files": [{"row_count": 10, "seq_len": {"total": 22130}}],
+        },
+    )
+
+    assert {
+        (item["code"], item.get("family")) for item in report["failure_reasons"]
+    } >= {
+        ("lmcache_mp_family_missing", "lookup_tokens"),
+        ("lmcache_mp_family_missing", "l1_memory"),
+    }
+    finding_by_code = {item["code"]: item for item in report["diagnostic_findings"]}
+    lookup = finding_by_code["lmcache_mp_lookup_tokens_prometheus_missing_with_live_lookup_evidence"]
+    assert lookup["evidence_status"] == "live_alternate_not_scoreable"
+    assert lookup["metrics"]["prefetch_complete_events"] == 9
+    assert lookup["metrics"]["lookup_hash_rows"] == 10
+    memory = finding_by_code["lmcache_mp_l1_memory_prometheus_missing_with_http_memory_evidence"]
+    assert memory["evidence_status"] == "live_alternate_not_scoreable"
+    assert memory["metrics"]["http_status_l1_memory_used_bytes"] == 490733568
+    assert {
+        item["code"] for item in report["upstream_questions"]
+    } >= {"lmcache_mp_lookup_counters_missing", "lmcache_mp_l1_memory_gauge_missing"}
+
+
 def test_lmcache_compat_report_marks_l2_required_when_configured() -> None:
     report = build_compat_report_from_paths(
         engine_metrics_file=FIXTURES / "lmcache_metrics/mp_modal_real_slice.prom",

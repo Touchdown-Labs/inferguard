@@ -142,6 +142,21 @@ def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) 
     assert cmd[cmd.index("--metrics-sample-rate") + 1] == "1.0"
 
 
+def test_trace_replay_command_mirrors_required_lmcache_launch_config(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+
+    replay = lab._build_trace_replay_command(tmp_path)
+    lmcache = lab._build_lmcache_command(tmp_path)
+
+    assert replay[:3] == ["lmcache", "trace", "replay"]
+    assert replay[3] == str(tmp_path / "lmcache_trace.lct")
+    assert replay[replay.index("--output-dir") + 1] == str(tmp_path / "trace-replay")
+    assert replay[replay.index("--jsonl-out") + 1] == str(tmp_path / "trace-replay" / "trace_replay.jsonl")
+    assert replay[replay.index("--l1-size-gb") + 1] == lmcache[lmcache.index("--l1-size-gb") + 1]
+    assert replay[replay.index("--eviction-policy") + 1] == lmcache[lmcache.index("--eviction-policy") + 1]
+    assert "--disable-metrics" in replay
+
+
 def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]

@@ -448,6 +448,14 @@ def build_compat_report(
             mp_observability=mp_observability_report,
         )
     )
+    diagnostic_findings.extend(
+        _required_prometheus_blocker_findings(
+            families,
+            lmcache_http_evidence=lmcache_http_evidence,
+            lmcache_log_evidence=lmcache_log_evidence,
+            lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+        )
+    )
     upstream_questions = _upstream_questions(families, samples, mp_observability_report)
     failures = _failures(
         families,
@@ -921,6 +929,17 @@ def _upstream_questions(
             {
                 "code": "lmcache_mp_lookup_counters_missing",
                 "owner_question": "Should lmcache_mp_lookup_requested_tokens_total and lmcache_mp_lookup_hit_tokens_total populate for this LMCacheMPConnector workload?",
+            }
+        )
+    if (
+        by_key.get(("lmcache_mp", "storage_manager"), {}).get("status") == "populated"
+        and by_key.get(("lmcache_mp", "l1_counters"), {}).get("status") == "populated"
+        and by_key.get(("lmcache_mp", "l1_memory"), {}).get("status") == "missing"
+    ):
+        questions.append(
+            {
+                "code": "lmcache_mp_l1_memory_gauge_missing",
+                "owner_question": "Which LMCache release exposes lmcache_mp_l1_memory_usage_bytes, and should external tools use HTTP /api/status as a non-Prometheus fallback before that release?",
             }
         )
     if (
@@ -1511,6 +1530,115 @@ def _evidence_failures(
             }
         )
     return failures
+
+
+def _required_prometheus_blocker_findings(
+    families: list[dict[str, Any]],
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_log_evidence: dict[str, Any] | None,
+    lmcache_lookup_hash_evidence: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Explain live alternate evidence that cannot replace required metrics.
+
+    Packet gates require Prometheus families for score movement. When a live
+    LMCache release exposes the underlying behavior only through HTTP/log/hash
+    evidence, keep the compatibility report strict while telling operators the
+    blocker is upstream observability rather than workload absence.
+    """
+
+    by_key = {(row["surface"], row["family"]): row for row in families}
+    findings: list[dict[str, Any]] = []
+    lookup_missing = by_key.get(("lmcache_mp", "lookup_tokens"), {}).get("status") == "missing"
+    l1_memory_missing = by_key.get(("lmcache_mp", "l1_memory"), {}).get("status") == "missing"
+
+    log_counts = (lmcache_log_evidence or {}).get("event_counts") or {}
+    prefetch_events = _coerce_float(log_counts.get("prefetch_complete"))
+    lookup_rows, lookup_seq_len_total = _lookup_hash_totals(lmcache_lookup_hash_evidence)
+    if lookup_missing and (prefetch_events > 0 or lookup_rows > 0):
+        findings.append(
+            {
+                "code": "lmcache_mp_lookup_tokens_prometheus_missing_with_live_lookup_evidence",
+                "severity": "critical",
+                "message": (
+                    "LMCache MP lookup activity is present in live log or lookup-hash evidence, "
+                    "but required Prometheus lookup token counters are absent."
+                ),
+                "metrics": {
+                    "prefetch_complete_events": prefetch_events,
+                    "lookup_hash_rows": lookup_rows,
+                    "lookup_hash_seq_len_total": lookup_seq_len_total,
+                },
+                "evidence_status": "live_alternate_not_scoreable",
+                "recommendation": (
+                    "Do not synthesize lmcache_mp_lookup_requested_tokens_total or "
+                    "lmcache_mp_lookup_hit_tokens_total from logs. Run against an LMCache "
+                    "release that registers LookupMetricsSubscriber, then rerun Packet A."
+                ),
+            }
+        )
+
+    l1_memory_bytes = _http_status_l1_memory_bytes(lmcache_http_evidence)
+    l1_object_count = _http_status_l1_object_count(lmcache_http_evidence)
+    if l1_memory_missing and (l1_memory_bytes > 0 or l1_object_count > 0):
+        findings.append(
+            {
+                "code": "lmcache_mp_l1_memory_prometheus_missing_with_http_memory_evidence",
+                "severity": "critical",
+                "message": (
+                    "LMCache MP L1 memory is present in live HTTP /api/status evidence, "
+                    "but required Prometheus l1_memory gauge is absent."
+                ),
+                "metrics": {
+                    "http_status_l1_memory_used_bytes": l1_memory_bytes,
+                    "http_status_l1_object_count": l1_object_count,
+                },
+                "evidence_status": "live_alternate_not_scoreable",
+                "recommendation": (
+                    "Do not treat HTTP status memory as lmcache_mp_l1_memory_usage_bytes. "
+                    "Run against an LMCache release that exports the L1 memory gauge, then rerun Packet A."
+                ),
+            }
+        )
+    return findings
+
+
+def _lookup_hash_totals(evidence: dict[str, Any] | None) -> tuple[int, int]:
+    rows = 0
+    seq_total = 0
+    if not evidence or evidence.get("claim_status") != "measured":
+        return rows, seq_total
+    for item in evidence.get("files", []) or []:
+        if not isinstance(item, dict):
+            continue
+        rows += int(_coerce_float(item.get("row_count")))
+        seq_len = item.get("seq_len")
+        if isinstance(seq_len, dict):
+            seq_total += int(_coerce_float(seq_len.get("total")))
+    return rows, seq_total
+
+
+def _http_status_l1_memory_bytes(evidence: dict[str, Any] | None) -> int:
+    return int(_coerce_float(_http_status_l1_manager(evidence).get("memory_used_bytes")))
+
+
+def _http_status_l1_object_count(evidence: dict[str, Any] | None) -> int:
+    return int(_coerce_float(_http_status_l1_manager(evidence).get("total_object_count")))
+
+
+def _http_status_l1_manager(evidence: dict[str, Any] | None) -> dict[str, Any]:
+    status = ((evidence or {}).get("endpoints") or {}).get("status") or {}
+    fields = status.get("fields") if isinstance(status, dict) else None
+    storage_manager = (fields or {}).get("storage_manager") if isinstance(fields, dict) else None
+    l1_manager = (storage_manager or {}).get("l1_manager") if isinstance(storage_manager, dict) else None
+    return l1_manager if isinstance(l1_manager, dict) else {}
+
+
+def _coerce_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _evidence_diagnostic_findings(
