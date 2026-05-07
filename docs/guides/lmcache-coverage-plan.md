@@ -15,6 +15,43 @@ Latest pushed InferGuard commit:
 
 - `edccffd feat: add LMCache evidence coverage`
 
+## Progress Scoreboard
+
+Current LMCache coverage: **48 / 100 points complete**.
+
+This score is intentionally conservative. Parser support without real live
+fixtures counts as partial progress, not complete support. A surface only gets
+full credit when InferGuard has code, tests, real artifacts, and user-facing
+diagnosis or reporting.
+
+| Workstream | Weight | Done | Status | What is complete | What is still needed |
+| --- | ---: | ---: | --- | --- | --- |
+| LMCache MP Prometheus coverage | 20 | 14 | partial | Parses and reports documented MP metric families; supports mode detection, L1, L2, lookup, lifecycle, throughput, gauges, EventBus families | Add live L2 fixture, live nonzero lookup-token fixture, and sampled throughput/lifecycle fixture |
+| Embedded / in-process LMCache metrics | 12 | 7 | partial | Parses `lmcache:*` and `lmcache_*`; added production request/token/health/remote/P2P/chunk aliases; preserves unknown metrics | Add live embedded fixture and stale connector tests |
+| HTTP health/status evidence | 8 | 5 | partial | Parses saved LMCache MP health/status evidence; included in packet, compat, and coverage reports | Add live HTTP fixtures for healthy, unhealthy, unreachable, and richer `/api/status` payloads |
+| Trace recording `.lct` evidence | 8 | 4 | partial | Captures and summarizes `.lct`-style length-prefixed records; handles malformed traces | Validate against real LMCache `.lct` msgpack trace from `--trace-level storage` |
+| OTel span evidence | 8 | 4 | partial | Parses JSONL spans for `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`; included in reports | Add real OTel export fixture and tracing-enabled/no-spans detector |
+| Log evidence | 8 | 3 | partial | Existing conservative LMCache log parsing exists | Expand MP lifecycle, hash-seed, P2P, PD, and zero-hit-after-warmup log detectors |
+| Diagnosis rules | 16 | 2 | early | Compatibility/coverage can report missing families and evidence gaps | Add LMCache-specific `diagnose-bottleneck` detectors with thresholds and recommendations |
+| Live golden fixtures | 10 | 3 | partial | Modal real-shaped MP metric slice exists; synthetic tests cover new evidence parsers | Capture clean full MP packet, embedded packet, L2 packet, OTel packet, `.lct` packet |
+| vLLM / SGLang bridge | 6 | 4 | partial | vLLM prefix/external/CPU-offload and SGLang queue/HiCache/KV-transfer parsing exists | Add live vLLM+LMCache MP connector fixture and SGLang external-cache fixture |
+| Docs / release readiness | 4 | 2 | partial | Coverage plan exists and is linked in docs nav | Update existing LMCache docs to reflect new HTTP/trace/OTel support and refresh CLI reference |
+
+Percent by category:
+
+- **Collection/parsing:** about **65%** complete.
+- **Compatibility/coverage reporting:** about **70%** complete.
+- **Real live validation:** about **30%** complete.
+- **Actionable diagnostics:** about **15%** complete.
+- **Public docs/release readiness:** about **45%** complete.
+
+The next meaningful milestone is **60 / 100**. To reach it, finish:
+
+1. A clean live LMCache MP packet with metrics, HTTP, logs, and summary output.
+2. Golden fixture tests from that packet.
+3. First detector pack for missing lookup counters, zero hit rate, cache salt,
+   EventBus observability, and tracing artifacts.
+
 What shipped before `edccffd`:
 
 - LMCache MP Prometheus compatibility reporting for `lmcache_mp_*`.
@@ -284,4 +321,3 @@ Would a small upstream PR for <metric/log/span/HTTP field> be useful to you?
 The goal would be to make cache behavior easier to verify automatically in
 customer deployments, especially around <cache_salt/EventBus/L2/lookup counters>.
 ```
-
