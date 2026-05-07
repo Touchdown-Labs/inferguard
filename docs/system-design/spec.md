@@ -1482,7 +1482,26 @@ Behavior:
 
 ### 5.7 LMCache / TensorMesh / other KV offload layers
 
-**Support level:** provisional LMCache metric normalization implemented; live endpoint validation still pending.
+**Support level:** partial, mode-specific LMCache observability implemented;
+live golden fixtures and detector coverage still pending.
+
+InferGuard treats LMCache as two architecture families:
+
+- **New priority architecture: standalone MP.** LMCache runs as
+  `lmcache server`; vLLM attaches with `LMCacheMPConnector`; required cache
+  telemetry comes from the LMCache MP server (`lmcache_mp_*`, MP HTTP API,
+  EventBus metrics/logs, optional `.lct` trace recording, optional OTel spans).
+  Current vLLM source does not export LMCache MP connector-specific Prometheus
+  metrics because `LMCacheMPConnector.build_prom_metrics()` returns `None`.
+- **Old/backcompat architecture: embedded/in-process.** vLLM uses
+  `LMCacheConnectorV1` or `LMCacheConnectorV1Dynamic`; SGLang current mainline
+  uses `--enable-lmcache` with `LMCacheLayerwiseConnector` through SGLang's
+  radix-cache path. Legacy vLLM `LMCacheConnector` without `V1` is stale unless
+  the operator documents a pinned old stack.
+
+SGLang MP is not a supported claim yet. It remains a candidate lane until a
+current-mainline connector contract and live fixture prove SGLang traffic
+reaches a standalone LMCache MP server.
 
 `EngineName` includes `lmcache` alongside `vllm`, `sglang`, `dynamo`, `llm-d`, and `unknown`.
 
@@ -1491,6 +1510,11 @@ Current adapter state:
 - `src/inferguard/disagg/adapters.py` remains the public compatibility import surface.
 - `src/inferguard/disagg/adapters/lmcache.py` contains the focused LMCache parser shim.
 - `src/inferguard/disagg/metrics_schema.py` defines `LmcacheMetrics`, alias matching, and `raw_metrics_extra` preservation.
+- `src/inferguard/lmcache_http.py` parses LMCache HTTP evidence.
+- `src/inferguard/lmcache_trace.py` parses LMCache `.lct` trace evidence.
+- `src/inferguard/lmcache_otel.py` parses LMCache OTel JSONL span evidence.
+- `src/inferguard/lmcache_packet.py` writes packet artifacts and
+  `lmcache_compat_report.json` through `inferguard collect-lmcache`.
 
 Normalized LMCache fields exposed when live metrics are present:
 
@@ -1523,6 +1547,8 @@ raw_metrics_extra
 Validation caveat:
 
 - These LMCache metric names are alias-matched across plausible upstream variants and covered by synthetic Prometheus fixtures under `tests/fixtures/lmcache_metrics/`; live endpoint validation is still required before partner-facing compatibility claims.
+- MP Prometheus, HTTP, `.lct`, and OTel inputs are accepted as evidence, but
+  full support requires live fixtures and detector rules.
 - Do not claim LMCache compatibility for DSv4 hybrid-attention deployments until upstream LMCache support is validated.
 - Do not claim real LMCache compatibility, true eviction proof, fragmentation proof, CacheBlend proof, cache-salt isolation proof, or TensorMesh production-stack support unless live LMCache/vLLM/SGLang metrics prove them. Inferred-only findings must remain labeled `inferred_without_engine_metrics`.
 

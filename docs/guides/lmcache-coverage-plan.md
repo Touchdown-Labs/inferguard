@@ -646,12 +646,12 @@ Acceptance criteria:
 Goal: make the coverage usable by engineers who were not in this session.
 
 - [ ] Update `docs/guides/lmcache-compatibility.md` to match current support:
-  - [ ] HTTP evidence is no longer "raw only";
-  - [ ] `.lct` evidence is no longer "missing";
-  - [ ] OTel evidence is no longer "missing";
+  - [x] HTTP evidence is no longer "raw only";
+  - [x] `.lct` evidence is no longer "missing";
+  - [x] OTel evidence is no longer "missing";
   - [ ] detector gaps remain explicit.
-- [ ] Update `docs/guides/observability-coverage-matrix.md`.
-- [ ] Update `docs/reference/cli.md` after CLI help changes.
+- [x] Update `docs/guides/observability-coverage-matrix.md`.
+- [x] Update `docs/reference/cli.md` after CLI help changes.
 - [ ] Add one "run this on Modal output" example:
   - [ ] collect packet;
   - [ ] run compatibility;

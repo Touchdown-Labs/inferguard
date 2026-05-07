@@ -26,6 +26,65 @@ PYTHONPATH=src python3 -m inferguard.cli --help
 5. `validate-completed` to decide whether the run can be published.
 6. `diagnose-bottleneck`, `classify-failures`, `find-cliffs`, `compute-cost`, and `report-completed` for operator analysis.
 
+## LMCache observability workflow
+
+LMCache is mode-specific. For current standalone MP, collect the LMCache server
+endpoint, not just the engine endpoint. For embedded compatibility, collect the
+serving-engine endpoint and any `lmcache:*` metrics/logs it exposes.
+
+Recommended MP evidence packet:
+
+```bash
+inferguard collect-lmcache \
+  --output-dir modal-out/lmcache-packet \
+  --engine-metrics-file modal-out/vllm.prom \
+  --lmcache-metrics-file modal-out/lmcache.prom \
+  --lmcache-health-file modal-out/lmcache-health.json \
+  --lmcache-status-file modal-out/lmcache-status.json \
+  --engine-log-file modal-out/vllm.log \
+  --lmcache-log-file modal-out/lmcache.log \
+  --lmcache-trace-file modal-out/lmcache-trace.lct \
+  --lmcache-otel-file modal-out/lmcache-otel.jsonl \
+  --expect-mode mp \
+  --json
+```
+
+Standalone reports:
+
+```bash
+inferguard lmcache-compat \
+  --engine-metrics-file modal-out/vllm.prom \
+  --lmcache-metrics-file modal-out/lmcache.prom \
+  --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
+  --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
+  --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
+  --expect-mode mp \
+  --fail-on missing-required \
+  --json
+
+inferguard observability-coverage \
+  --engine-metrics-file modal-out/vllm.prom \
+  --lmcache-metrics-file modal-out/lmcache.prom \
+  --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
+  --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
+  --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
+  --expected-engine vllm \
+  --expect-lmcache-mode mp \
+  --json
+```
+
+Current source-backed caveats:
+
+- vLLM embedded LMCache uses `LMCacheConnectorV1` or
+  `LMCacheConnectorV1Dynamic`; legacy `LMCacheConnector` should be treated as a
+  stale/pinned stack.
+- vLLM MP uses `LMCacheMPConnector`, but current vLLM connector code does not
+  export LMCache MP connector-specific Prometheus metrics. Collect
+  `lmcache_mp_*` from the standalone LMCache server.
+- SGLang current mainline LMCache evidence is embedded/layerwise via
+  `--enable-lmcache` and `LMCacheLayerwiseConnector`. SGLang MP is not a
+  supported claim until source and live fixtures prove the connector contract.
+
 ## Exit-code conventions
 
 | Code | Typical meaning |

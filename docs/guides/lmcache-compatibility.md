@@ -8,7 +8,7 @@ InferGuard's priority is the current LMCache architecture:
 
 1. **Primary target: standalone MP.** LMCache runs as `lmcache server`; vLLM connects with `LMCacheMPConnector`; telemetry comes from `lmcache_mp_*`, LMCache HTTP health/status endpoints, logs, and optional OTel/trace replay.
 2. **Compatibility target: embedded/in-process.** LMCache runs inside the engine through `LMCacheConnectorV1` or the vLLM LMCache offload flag path; telemetry commonly appears as production `lmcache:*` metrics and inline engine logs.
-3. **Detection-only until fixtures exist: P2P, disaggregated prefill, controller/internal API, logs, OTel, and trace replay.** These are important, but they should not displace MP-first implementation work.
+3. **Detection/evidence-only until fixtures exist: P2P, disaggregated prefill, controller/internal API, logs, OTel, and trace recording.** HTTP, log, OTel, and `.lct` inputs are now accepted as packet evidence, but they still need live golden fixtures and detector rules before they can support customer-facing claims by themselves.
 
 The old `LMCacheConnector` v0-style string is not a priority. InferGuard should flag it as stale/unsupported unless the operator explicitly documents an older pinned stack.
 
@@ -17,12 +17,14 @@ The old `LMCacheConnector` v0-style string is not a priority. InferGuard should 
 | Surface | Typical launch shape | Evidence InferGuard can use today | Support level |
 | --- | --- | --- | --- |
 | Standalone MP | `lmcache server` plus vLLM `LMCacheMPConnector` | LMCache `/metrics` with `lmcache_mp_*`, vLLM `/metrics`, launch/config artifacts | Partial, highest priority |
-| Embedded LMCache | vLLM with `LMCacheConnectorV1` or `--kv-offloading-backend lmcache` | Engine `/metrics`, production `lmcache:*` metrics, launch/config artifacts | Partial, compatibility priority |
+| Embedded vLLM LMCache | vLLM with `LMCacheConnectorV1`, `LMCacheConnectorV1Dynamic`, or `--kv-offloading-backend lmcache` | Engine `/metrics`, production `lmcache:*` metrics, launch/config artifacts, inline vLLM/LMCache logs | Partial, compatibility priority |
+| Embedded SGLang LMCache | SGLang `--enable-lmcache` using `LMCacheLayerwiseConnector` through SGLang's radix cache | SGLang `/metrics`, aggregate `sglang:cache_hit_rate`, HiCache/storage metrics when present, LMCache config/log evidence | Partial, compatibility priority |
 | P2P sharing | multiple engines, `enable_p2p`, controller, NIXL | production `lmcache:*` P2P metrics when present; logs/controller evidence are not first-class yet | Planned |
 | Disaggregated prefill | prefiller/decoder roles using NIXL | launch/config artifacts and external metrics; PD proof packet is not first-class yet | Planned |
 | Controller / internal API | `lmcache_controller` or internal API server | not collected as a structured packet yet | Planned |
-| Logs | engine and LMCache logs | not parsed as structured evidence yet | Planned |
-| OTel traces / `.lct` replay | MP tracing and trace recording | not collected yet | Planned |
+| Logs | engine and LMCache logs | copied into packets and parsed for conservative LMCache hints | Partial |
+| OTel spans | MP tracing exported to operator-supplied JSONL | parsed into LMCache OTel evidence for `mp.store`, `mp.retrieve`, and `mp.lookup_prefetch` | Partial |
+| Trace recording `.lct` | MP `--trace-level storage` binary trace recording | parsed as LMCache trace evidence; malformed traces are recorded without aborting packet creation | Partial |
 
 ## What `lmcache-compat` Does Today
 
@@ -37,6 +39,8 @@ Use it when you have one or both of:
 
 - engine metrics from vLLM/SGLang/Dynamo-compatible Prometheus endpoints;
 - LMCache metrics from a standalone MP server or embedded production endpoint.
+- Optional LMCache HTTP, `.lct`, and OTel evidence JSON files produced by
+  `collect-lmcache` or equivalent local parsing.
 
 Example:
 
@@ -44,6 +48,9 @@ Example:
 inferguard lmcache-compat \
   --engine-metrics-file vllm.prom \
   --lmcache-metrics-file lmcache.prom \
+  --lmcache-http-evidence-file lmcache_http_evidence.json \
+  --lmcache-trace-evidence-file lmcache_trace_evidence.json \
+  --lmcache-otel-evidence-file lmcache_otel_evidence.json \
   --expect-mode mp \
   --fail-on missing-required
 ```
@@ -84,6 +91,25 @@ The embedded and production surface commonly includes:
 - P2P transfer metrics such as `lmcache:num_p2p_requests`, `lmcache:num_p2p_transferred_tokens`, `lmcache:p2p_time_to_transfer`, and `lmcache:p2p_transfer_speed`.
 
 Prometheus exporters may normalize colons to underscores depending on the scrape path. InferGuard preserves unknown LMCache-like metric names so new upstream metrics are not discarded.
+
+For vLLM embedded mode, the current source-backed connector strings are:
+
+- `LMCacheConnectorV1`;
+- `LMCacheConnectorV1Dynamic` with
+  `kv_connector_module_path="lmcache.integration.vllm.lmcache_connector_v1"`;
+- legacy `LMCacheConnector`, which InferGuard should treat as stale/pinned
+  evidence unless the operator documents an old stack.
+
+For SGLang embedded mode, current mainline source evidence points to:
+
+- `python -m sglang.launch_server --enable-lmcache`;
+- SGLang `LMCRadixCache`;
+- LMCache `LMCacheLayerwiseConnector`;
+- SGLang metrics such as `sglang:cache_hit_rate`, queue gauges, HiCache
+  host-token gauges, KV-transfer histograms, and storage metrics.
+
+No current-mainline SGLang MP connector contract has been proven yet. InferGuard
+must not mark SGLang MP as supported until source and a live fixture prove it.
 
 ### Standalone MP `lmcache_mp_*`
 
@@ -141,6 +167,12 @@ Do not claim full LMCache compatibility from one metric prefix. A complete packe
 - LMCache server logs;
 - optional OTel/trace replay artifacts if tracing is in scope.
 
+Important source-backed caveat: current vLLM `LMCacheMPConnector` does not
+export connector-specific Prometheus metrics through vLLM because its
+`build_prom_metrics()` implementation returns `None`. For MP, the required
+cache observability source is the standalone LMCache server, not the vLLM
+connector metrics surface.
+
 ### P2P
 
 - at least two engine launch commands;
@@ -165,13 +197,18 @@ Do not claim full LMCache compatibility from one metric prefix. A complete packe
 
 Current InferGuard support is not 100% LMCache compatible. The highest-priority gaps are MP-first:
 
-1. Complete MP schema/report coverage for every documented `lmcache_mp_*` family.
+1. Add a clean full MP golden fixture with LMCache MP metrics, HTTP evidence,
+   logs, and optional `.lct` / OTel evidence.
 2. Add an MP L2 live fixture.
-3. Add detector rules for MP mode mismatch, missing MP metrics, zero-hit-after-warmup, hash-seed risk, missing lookup counters, L1 pressure, L2 stalls, and unobservable EventBus drop risk.
-4. Add structured log parsing for MP store/retrieve evidence.
-5. Add P2P mode detection and P2P metric normalization.
-6. Add controller and internal API collection.
-7. Add live compatibility fixtures for embedded, P2P, PD, and trace replay.
+3. Add detector rules for MP mode mismatch, missing MP metrics,
+   zero-hit-after-warmup, hash-seed risk, missing lookup counters, L1 pressure,
+   L2 stalls, and EventBus drop risk.
+4. Expand structured log parsing for MP store/retrieve lifecycle proof.
+5. Add explicit embedded mode detection for vLLM and SGLang connector strings.
+6. Add P2P mode detection and P2P metric normalization.
+7. Add controller and internal API collection.
+8. Add live compatibility fixtures for embedded, P2P, PD, OTel, and trace
+   recording.
 
 Until those are complete, InferGuard should describe LMCache findings as evidence levels:
 
