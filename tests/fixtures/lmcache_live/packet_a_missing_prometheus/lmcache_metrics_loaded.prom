@@ -1,0 +1,13 @@
+# Non-scoreable Packet A failure-mode slice: storage/L1 activity exists, but lookup_tokens and l1_memory are absent.
+target_info{service_instance_id="packet-a-missing-prom"} 1
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_sm_write_requests_total 11
+lmcache_mp_sm_read_succeed_keys_total 17
+lmcache_mp_sm_write_succeed_keys_total 13
+lmcache_mp_sm_read_failed_keys_total 0
+lmcache_mp_sm_write_failed_keys_total 0
+lmcache_mp_l1_read_keys_total 72
+lmcache_mp_l1_write_keys_total 13
+lmcache_mp_l1_evicted_keys_total 0
+lmcache_mp_l1_chunk_reuse_gap_seconds_sum 127
+lmcache_mp_l1_chunk_reuse_gap_seconds_count 72

@@ -1,0 +1,40 @@
+{
+  "booleans": {
+    "has_health": true,
+    "has_status": true,
+    "is_healthy": true
+  },
+  "endpoints": {
+    "health": {
+      "content_type": "json",
+      "fields": {
+        "is_healthy": true,
+        "status": "ok"
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 41,
+      "status": "healthy"
+    },
+    "status": {
+      "content_type": "json",
+      "fields": {
+        "engine_type": "mp",
+        "status": "ok",
+        "storage_manager": {
+          "l1_manager": {
+            "memory_used_bytes": 490733568,
+            "total_object_count": 13
+          }
+        }
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 173,
+      "status": "healthy"
+    }
+  },
+  "failure_reasons": [],
+  "schema_version": "inferguard-lmcache-http-evidence/v1",
+  "skipped_endpoints": []
+}

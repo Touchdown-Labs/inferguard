@@ -111,6 +111,32 @@ The JSON report includes an `lmcache_mp_observability` section with
 L2 adapter labels, EventBus tail-drop risk, sampled-histogram sparsity, and
 whether metrics/tracing/logging were disabled by config.
 
+### Testing the Packet A missing-family failure mode
+
+Before a live Packet A fixture is accepted, developers can test the strict
+failure path with the non-scoreable fixture at
+`tests/fixtures/lmcache_live/packet_a_missing_prometheus/`:
+
+```bash
+PACKET=tests/fixtures/lmcache_live/packet_a_missing_prometheus
+inferguard lmcache-compat \
+  --engine-metrics-file "$PACKET/vllm_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET/lmcache_metrics_loaded.prom" \
+  --lmcache-http-evidence-file "$PACKET/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET/lmcache_log_evidence.json" \
+  --lmcache-lookup-hash-evidence-file "$PACKET/lmcache_lookup_hash_evidence.json" \
+  --expect-mode mp \
+  --fail-on missing-required \
+  --json
+```
+
+This fixture proves only the diagnostic shape. It should show `detected_mode=mp`,
+then fail on missing required Prometheus families such as `lookup_tokens` and
+`l1_memory`. The bundled HTTP/log/lookup-hash evidence is alternate live-shaped
+evidence, not scoreable replacement metrics. Keep coverage at **58 / 100** until
+a real Packet A run exports those Prometheus families, is imported as an
+accepted compact fixture, and passes tests.
+
 `diagnose-bottleneck` reads `metrics/lmcache_compat_report.json` and now
 promotes user-facing LMCache finding codes for MP logs, CacheBlend, P2P, PD,
 trace replay, and lookup-hash surfaces when those findings are present in the

@@ -1,0 +1,10 @@
+{
+  "engine_type": "mp",
+  "status": "ok",
+  "storage_manager": {
+    "l1_manager": {
+      "memory_used_bytes": 490733568,
+      "total_object_count": 13
+    }
+  }
+}

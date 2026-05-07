@@ -1,0 +1,11 @@
+{
+  "acceptance_status": "rejected_missing_prometheus_families",
+  "packet_id": "a",
+  "raw_hashes_removed": true,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "row_id": "B1",
+  "score_points": 0,
+  "source": "packet_a_failure_mode_fixture",
+  "status_reason": "Non-scoreable fixture: LMCache MP/vLLM wiring is visible, but required B1 Prometheus families are missing."
+}

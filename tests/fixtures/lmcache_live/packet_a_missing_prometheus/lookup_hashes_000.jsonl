@@ -1,0 +1,1 @@
+{"request_id":"packet-a-1","model_name":"Qwen/Qwen3-8B","chunk_hashes":["sha256:redacted-a","sha256:redacted-b"],"seq_len":2213,"chunk_size":256,"config":{"lookup_hash_rotation_interval":"60s","lookup_hash_max_files":4}}

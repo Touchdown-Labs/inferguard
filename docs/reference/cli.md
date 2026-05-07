@@ -105,6 +105,47 @@ InferGuard repo contents. B1 still remains unscored until a live Packet A run is
 collected, replayed through the report commands, imported as compact fixtures,
 and pinned by passing tests.
 
+### Local B1 missing-family diagnostic smoke
+
+A non-scoreable Packet A failure-mode fixture lives at
+`tests/fixtures/lmcache_live/packet_a_missing_prometheus/`. It is intentionally
+marked `score_points=0` and
+`acceptance_status=rejected_missing_prometheus_families`. Use it to test the
+Diagnostic CLI output shape before a real packet lands:
+
+```bash
+PACKET=tests/fixtures/lmcache_live/packet_a_missing_prometheus
+
+inferguard lmcache-compat \
+  --engine-metrics-file "$PACKET/vllm_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET/lmcache_metrics_loaded.prom" \
+  --lmcache-http-evidence-file "$PACKET/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET/lmcache_log_evidence.json" \
+  --lmcache-lookup-hash-evidence-file "$PACKET/lmcache_lookup_hash_evidence.json" \
+  --expect-mode mp \
+  --fail-on missing-required \
+  --json
+
+inferguard observability-coverage \
+  --engine-metrics-file "$PACKET/vllm_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET/lmcache_metrics_loaded.prom" \
+  --lmcache-http-evidence-file "$PACKET/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET/lmcache_log_evidence.json" \
+  --lmcache-lookup-hash-evidence-file "$PACKET/lmcache_lookup_hash_evidence.json" \
+  --expected-engine vllm \
+  --expect-lmcache-mode mp \
+  --json
+```
+
+Expected result: `lmcache-compat` exits nonzero under
+`--fail-on missing-required`, reports `detected_mode=mp`, and lists missing
+`lmcache_mp` Prometheus families including `lookup_tokens` and `l1_memory`.
+HTTP/log/lookup-hash evidence is shown as
+`live_alternate_not_scoreable`; it explains the failure mode but does not replace
+`lmcache_mp_lookup_requested_tokens_total`,
+`lmcache_mp_lookup_hit_tokens_total`, or `lmcache_mp_l1_memory_usage_bytes`.
+Do not move the 58/100 score from this fixture.
+
 Use these exact next commands when updating endpoint, signal, or rule status:
 
 | Lane | Status now | Missing proof | Exact next command |

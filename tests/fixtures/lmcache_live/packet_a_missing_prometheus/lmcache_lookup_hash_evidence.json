@@ -1,0 +1,17 @@
+{
+  "claim_status": "measured",
+  "files": [
+    {
+      "path": "lookup_hashes_000.jsonl",
+      "row_count": 1,
+      "seq_len": {
+        "count": 1,
+        "max": 2213,
+        "min": 2213,
+        "total": 2213
+      }
+    }
+  ],
+  "present": true,
+  "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1"
+}

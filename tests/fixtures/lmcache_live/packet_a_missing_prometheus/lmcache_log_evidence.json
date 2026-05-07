@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "event_counts": {
+    "prefetch_complete": 9
+  },
+  "findings": [],
+  "line_count": 2,
+  "mode_candidates": [
+    "mp"
+  ],
+  "schema_version": "inferguard-lmcache-logs/v1"
+}

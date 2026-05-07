@@ -1,0 +1,17 @@
+# Non-scoreable Packet A failure-mode slice: vLLM sees LMCacheMPConnector but no external-prefix hit proof.
+vllm:cache_config_info{kv_connector="LMCacheMPConnector",kv_role="kv_both"} 1
+vllm:time_to_first_token_seconds_sum 2
+vllm:time_to_first_token_seconds_count 4
+vllm:time_per_output_token_seconds_sum 1
+vllm:time_per_output_token_seconds_count 8
+vllm:prompt_tokens_total 4096
+vllm:generation_tokens_total 512
+vllm:num_requests_running 1
+vllm:num_requests_waiting 0
+vllm:kv_cache_usage_perc 0.42
+vllm:prefix_cache_queries_total 32
+vllm:prefix_cache_hits_total 16
+vllm:external_prefix_cache_queries_total 12
+vllm:external_prefix_cache_hits_total 0
+vllm:prompt_tokens_by_source_total{source="local_compute"} 2048
+vllm:prompt_tokens_by_source_total{source="external_kv_transfer"} 0
