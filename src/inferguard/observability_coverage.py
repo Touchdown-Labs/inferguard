@@ -215,6 +215,7 @@ def build_observability_coverage_report(
     for surface, row in lmcache_report.get("surfaces", {}).items():
         surfaces[str(surface)] = row
     gaps = _coverage_gaps(engine_families, lmcache_report)
+    kv_cache_offload = _kv_cache_offload_report(samples)
     return {
         "schema_version": SCHEMA_VERSION,
         "engine_source": engine_source,
@@ -233,6 +234,7 @@ def build_observability_coverage_report(
             "total_series": len(observed_names),
             "populated_nonzero_series": len({sample.name for sample in samples if sample.value != 0.0}),
         },
+        "kv_cache_offload": kv_cache_offload,
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
@@ -390,6 +392,81 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         else:
             row["status"] = "complete"
     return rows
+
+
+def _kv_cache_offload_report(samples: list[Any]) -> dict[str, Any]:
+    """Summarize CPU<->GPU KV movement separately from generic cache coverage."""
+
+    vllm_gpu_to_cpu_bytes = _sum_labeled(samples, "vllm:kv_offload_total_bytes", "transfer_type", "GPU_to_CPU")
+    vllm_cpu_to_gpu_bytes = _sum_labeled(samples, "vllm:kv_offload_total_bytes", "transfer_type", "CPU_to_GPU")
+    vllm_gpu_to_cpu_time = _sum_labeled(samples, "vllm:kv_offload_total_time", "transfer_type", "GPU_to_CPU")
+    vllm_cpu_to_gpu_time = _sum_labeled(samples, "vllm:kv_offload_total_time", "transfer_type", "CPU_to_GPU")
+    vllm_gpu_to_cpu_bytes += _sum_names(samples, "vllm:kv_offload_bytes_gpu_to_cpu")
+    vllm_cpu_to_gpu_bytes += _sum_names(samples, "vllm:kv_offload_bytes_cpu_to_gpu")
+    vllm_gpu_to_cpu_time += _sum_names(samples, "vllm:kv_offload_time_gpu_to_cpu")
+    vllm_cpu_to_gpu_time += _sum_names(samples, "vllm:kv_offload_time_cpu_to_gpu")
+
+    lmcache_store_gbs = _hist_avg(samples, "lmcache_mp_l0_l1_store_throughput_gbs")
+    lmcache_load_gbs = _hist_avg(samples, "lmcache_mp_l0_l1_load_throughput_gbs")
+    lmcache_store_gbs = lmcache_store_gbs or _hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
+    lmcache_load_gbs = lmcache_load_gbs or _hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
+
+    native_present = any(
+        sample.name.startswith(("vllm:kv_offload_", "vllm:simple_cpu_offload_")) for sample in samples
+    )
+    lmcache_present = any(
+        sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples
+    )
+    return {
+        "schema_version": "inferguard-kv-cache-offload/v1",
+        "purpose": "Profile KV cache movement between GPU memory and CPU/host memory for long-context runs.",
+        "vllm_native_cpu_offload": {
+            "status": "populated"
+            if any(value > 0 for value in (vllm_gpu_to_cpu_bytes, vllm_cpu_to_gpu_bytes))
+            else ("zero" if native_present else "missing"),
+            "metric_source": "vllm /metrics",
+            "interpretation": "Native vLLM CPU offload metrics; useful for offload pressure, but not proof that LMCache is serving KV.",
+            "gpu_to_cpu_bytes": vllm_gpu_to_cpu_bytes,
+            "cpu_to_gpu_bytes": vllm_cpu_to_gpu_bytes,
+            "gpu_to_cpu_seconds": vllm_gpu_to_cpu_time,
+            "cpu_to_gpu_seconds": vllm_cpu_to_gpu_time,
+            "simple_cpu_offload_used_blocks": _max_names(samples, "vllm:simple_cpu_offload_used_blocks"),
+            "simple_cpu_offload_usage_perc": _max_names(samples, "vllm:simple_cpu_offload_usage_perc"),
+            "simple_cpu_offload_pending_loads": _max_names(samples, "vllm:simple_cpu_offload_pending_loads"),
+            "simple_cpu_offload_pending_stores": _max_names(samples, "vllm:simple_cpu_offload_pending_stores"),
+        },
+        "lmcache_mp_l0_l1_kv_transfer": {
+            "status": "populated"
+            if any(value is not None and value > 0 for value in (lmcache_store_gbs, lmcache_load_gbs))
+            else ("zero" if lmcache_present else "missing"),
+            "metric_source": "standalone LMCache MP /metrics",
+            "interpretation": "LMCache MP GPU<->CPU KV transfer throughput; this is the offload lane that proves LMCache moved KV between L0 GPU blocks and L1 CPU memory.",
+            "gpu_to_cpu_store_throughput_gbs": lmcache_store_gbs,
+            "cpu_to_gpu_load_throughput_gbs": lmcache_load_gbs,
+        },
+    }
+
+
+def _sum_labeled(samples: list[Any], name: str, label: str, value: str) -> float:
+    return sum(sample.value for sample in samples if sample.name == name and sample.labels.get(label) == value)
+
+
+def _sum_names(samples: list[Any], *names: str) -> float:
+    names_set = set(names)
+    return sum(sample.value for sample in samples if sample.name in names_set)
+
+
+def _max_names(samples: list[Any], *names: str) -> float | None:
+    values = [sample.value for sample in samples if sample.name in set(names)]
+    return max(values) if values else None
+
+
+def _hist_avg(samples: list[Any], prefix: str) -> float | None:
+    total = _sum_names(samples, f"{prefix}_sum")
+    count = _sum_names(samples, f"{prefix}_count")
+    if count <= 0:
+        return None
+    return total / count
 
 
 def _coverage_gaps(

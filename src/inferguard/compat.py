@@ -1100,6 +1100,39 @@ def _diagnostic_findings(
                 "recommendation": "Inspect L1 memory capacity, object locks, and read/write conflict logs before interpreting hit-rate economics.",
             }
         )
+    l0_l1_store_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
+    l0_l1_load_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
+    lmcache_mp_present = any(sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples)
+    l0_l1_present = any(sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples)
+    if lmcache_mp_present and not l0_l1_present:
+        findings.append(
+            {
+                "code": "lmcache_mp_l0_l1_throughput_missing",
+                "severity": "info",
+                "message": "LMCache MP is present, but GPU<->CPU KV transfer throughput metrics are missing.",
+                "metrics": {
+                    "lmcache_mp_l0_l1_store_throughput_gbs": None,
+                    "lmcache_mp_l0_l1_load_throughput_gbs": None,
+                },
+                "recommendation": "For KV cache offload profiling, run a workload/ref that emits lmcache_mp_l0_l1_store_throughput_gbs and lmcache_mp_l0_l1_load_throughput_gbs.",
+            }
+        )
+    elif (
+        (l0_l1_store_throughput is not None and l0_l1_store_throughput < 0.1)
+        or (l0_l1_load_throughput is not None and l0_l1_load_throughput < 0.1)
+    ):
+        findings.append(
+            {
+                "code": "lmcache_mp_l0_l1_throughput_low",
+                "severity": "warning",
+                "message": "LMCache MP GPU<->CPU KV transfer throughput is low for the scrape window.",
+                "metrics": {
+                    "lmcache_mp_l0_l1_store_throughput_gbs": l0_l1_store_throughput,
+                    "lmcache_mp_l0_l1_load_throughput_gbs": l0_l1_load_throughput,
+                },
+                "recommendation": "Check PCIe/NVLink path, pinned CPU memory behavior, chunk size, request size, and whether offload is increasing TTFT/prefill latency.",
+            }
+        )
     l2_failed = (
         _mp_sum(samples, "lmcache_mp.l2_store_failed_keys", counter=True)
         + _mp_sum(samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True)

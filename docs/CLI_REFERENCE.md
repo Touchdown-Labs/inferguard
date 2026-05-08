@@ -260,6 +260,7 @@ Every 100% checklist update must account for these metric families:
 | Surface | Families |
 | --- | --- |
 | LMCache MP | StorageManager counters; L1 counters/memory/failures/lifecycle; StorageManager real reuse; L2 counters/failures/throughput/in-flight gauges; lookup hit rate; L0 lifecycle; L0-L1 throughput; engine counter; active prefetch jobs; EventBus; CacheBlend. |
+| KV cache offload | Native vLLM CPU offload (`vllm:kv_offload_total_bytes`, `vllm:kv_offload_total_time`, `vllm:simple_cpu_offload_*`) and LMCache MP L0-L1 KV movement (`lmcache_mp_l0_l1_store_throughput_gbs`, `lmcache_mp_l0_l1_load_throughput_gbs`). Treat native vLLM CPU offload as useful pressure evidence, not LMCache proof. |
 | Embedded production LMCache | Core request; token; hit rate; performance and latency; detailed profiling; cache usage and lifecycle; remote backend and network; local CPU backend; memory management; P2P transfer; health/internal; chunk statistics. |
 | Workload packets | accepted MP Packet A; Packet B lifecycle; MP L2; embedded vLLM; embedded SGLang; CacheBlend; P2P; PD; trace replay and lookup hash; release readiness. |
 

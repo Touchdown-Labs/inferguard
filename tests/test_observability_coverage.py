@@ -45,6 +45,10 @@ vllm:kv_transfer_sent_bytes_total 123
     assert families[("vllm", "external_prefix_cache")]["status"] == "populated"
     assert families[("vllm", "cpu_offload")]["status"] == "populated"
     assert families[("vllm", "kv_transfer")]["status"] == "populated"
+    offload = report["kv_cache_offload"]
+    assert offload["vllm_native_cpu_offload"]["status"] == "populated"
+    assert offload["vllm_native_cpu_offload"]["gpu_to_cpu_bytes"] == 4096
+    assert offload["lmcache_mp_l0_l1_kv_transfer"]["status"] == "missing"
     assert report["surfaces"]["sglang"]["status"] == "not_applicable"
 
 
@@ -358,6 +362,25 @@ def test_vllm_embedded_dynamic_offload_fixture_is_classified() -> None:
     assert families[("lmcache_embedded", "production_requests")]["status"] == "populated"
     assert families[("lmcache_embedded", "production_tokens")]["status"] == "populated"
     assert report["surfaces"]["vllm_simple_cpu_offload"]["status"] == "complete"
+
+
+def test_observability_coverage_summarizes_lmcache_mp_kv_cpu_gpu_transfer() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l0_l1_store_throughput_gbs_sum 12
+lmcache_mp_l0_l1_store_throughput_gbs_count 3
+lmcache_mp_l0_l1_load_throughput_gbs_sum 6
+lmcache_mp_l0_l1_load_throughput_gbs_count 2
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    transfer = report["kv_cache_offload"]["lmcache_mp_l0_l1_kv_transfer"]
+    assert transfer["status"] == "populated"
+    assert transfer["gpu_to_cpu_store_throughput_gbs"] == 4
+    assert transfer["cpu_to_gpu_load_throughput_gbs"] == 3
 
 
 def test_vllm_stale_connector_fixture_emits_user_finding() -> None:

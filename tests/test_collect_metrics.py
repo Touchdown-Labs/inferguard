@@ -302,6 +302,26 @@ lmcache_mp_num_inflight_l2_stores{l2_name="fs",adapter_index="0"} 0
     } >= {"lmcache_mp_eventbus_taildrop_risk", "lmcache_mp_sampled_histogram_sparse"}
 
 
+def test_lmcache_compat_report_flags_missing_l0_l1_kv_transfer_metrics() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 10
+lmcache_mp_sm_write_requests_total 5
+lmcache_mp_l1_read_keys_total 9
+lmcache_mp_l1_write_keys_total 7
+""",
+        expect_mode="mp",
+    )
+
+    finding = next(
+        item
+        for item in report["diagnostic_findings"]
+        if item["code"] == "lmcache_mp_l0_l1_throughput_missing"
+    )
+    assert finding["severity"] == "info"
+    assert "GPU<->CPU KV transfer" in finding["message"]
+
+
 def test_lmcache_compat_report_explains_disabled_mp_metrics() -> None:
     report = build_compat_report(
         lmcache_text="",
