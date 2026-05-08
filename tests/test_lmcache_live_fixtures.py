@@ -36,6 +36,7 @@ PACKET_B_REQUIRED_FILES = (
     "workload_manifest.json",
     "traffic_requests.jsonl",
     "packet-b-lifecycle-evidence.json",
+    "agent_kv_offload_report.json",
 )
 PACKET_B_REQUIRED_FAMILIES = (
     "lookup_reuse",
@@ -109,6 +110,9 @@ def test_packet_b_acceptance_contract_rejects_incomplete_lifecycle_fixture(tmp_p
         {
             "row_id": "C1",
             "packet_id": "b",
+            "benchmark_id": "LC1",
+            "workload_profile": "long_context_agent_kv_offload",
+            "raw_prompts_recorded": False,
             "source": "live_modal_h100",
             "score_points": 6,
             "redacted": True,
@@ -138,7 +142,10 @@ def _assert_packet_a_b1_acceptance(fixture_dir: Path) -> None:
     _assert_packet_a_manifest(manifest)
     _assert_required_files(fixture_dir, PACKET_A_REQUIRED_FILES)
     _assert_fixture_sanitized(fixture_dir)
+    _assert_shared_mp_artifact_metric_acceptance(fixture_dir)
 
+
+def _assert_shared_mp_artifact_metric_acceptance(fixture_dir: Path) -> None:
     packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
     compat = _read_json(fixture_dir / "lmcache_compat_report.json")
     coverage = _read_json(fixture_dir / "observability_coverage.json")
@@ -204,16 +211,21 @@ def _assert_packet_b_c1_acceptance(fixture_dir: Path) -> None:
     _assert_required_files(fixture_dir, PACKET_B_REQUIRED_FILES, row_id="C1")
     _assert_fixture_sanitized(fixture_dir)
 
-    _assert_packet_a_b1_acceptance(fixture_dir)
+    _assert_shared_mp_artifact_metric_acceptance(fixture_dir)
     workload = _read_json(fixture_dir / "workload_manifest.json")
     evidence = _read_json(fixture_dir / "packet-b-lifecycle-evidence.json")
     lmcache_command = _read_json_list(fixture_dir / "lmcache_command.json")
     compat = _read_json(fixture_dir / "lmcache_compat_report.json")
 
     assert workload.get("packet_id") == "b"
+    assert workload.get("sdlc_row_id") == "C1"
+    assert workload.get("benchmark_id") == "LC1"
     assert workload.get("workload") == "reuse_eviction"
+    assert workload.get("workload_profile") == "long_context_agent_kv_offload"
+    assert str(workload.get("trace_source", "")).startswith("traces/isb1-dsv4-agent")
     assert workload.get("metrics_sample_rate") == 1.0
     assert workload.get("raw_prompts_recorded") is False
+    _assert_packet_b_traffic_rows_metadata_only(fixture_dir / "traffic_requests.jsonl")
     assert [phase.get("phase") for phase in workload.get("phases", [])] == [
         "warm",
         "pressure",
@@ -239,9 +251,29 @@ def _assert_packet_b_c1_acceptance(fixture_dir: Path) -> None:
         for row in compat.get("families", [])
         if isinstance(row, dict)
     }
-    for family in ("l1_lifecycle", "real_reuse", "l0_l1_throughput"):
+    for family in ("l1_lifecycle", "l0_lifecycle", "real_reuse", "l0_l1_throughput"):
         row = family_rows.get(("lmcache_mp", family))
         assert row and row.get("status") == "populated", f"compat report missing Packet B {family}"
+
+
+def _assert_packet_b_traffic_rows_metadata_only(path: Path) -> None:
+    required = {
+        "request_index",
+        "phase",
+        "prefix_group",
+        "prompt_chars",
+        "trace_id",
+        "synthetic_redaction_status",
+        "cache_salt",
+    }
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert rows, "Packet B traffic request log must contain metadata rows"
+    for row in rows:
+        assert "prompt" not in row
+        assert "messages" not in row
+        assert "secret" not in {str(key).lower() for key in row}
+        assert required.issubset(row), f"Packet B traffic row missing metadata keys: {row}"
+        assert row.get("raw_prompt_recorded") is False
 
 
 def _assert_packet_a_launch_proof(
@@ -290,6 +322,9 @@ def _assert_packet_a_manifest(manifest: dict[str, Any]) -> None:
 def _assert_packet_b_manifest(manifest: dict[str, Any]) -> None:
     assert manifest.get("row_id") == "C1"
     assert manifest.get("packet_id") == "b"
+    assert manifest.get("benchmark_id") == "LC1"
+    assert manifest.get("workload_profile") == "long_context_agent_kv_offload"
+    assert manifest.get("raw_prompts_recorded", False) is False
     assert manifest.get("source") == "live_modal_h100"
     assert manifest.get("score_points") == 6
     assert manifest.get("redacted") is True

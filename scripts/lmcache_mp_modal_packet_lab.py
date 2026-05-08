@@ -18,6 +18,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -95,7 +96,17 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
     "lmcache_mp_l1_memory_usage_bytes",
 )
 PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
+AGENT_KV_OFFLOAD_REPORT_FILE = "agent_kv_offload_report.json"
 WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
+PACKET_B_TRACE_SOURCE = "traces/isb1-dsv4-agent"
+PACKET_B_TRACE_CLASSES = (
+    "coding-long",
+    "kv-pressure",
+    "multi-agent-coding",
+    "prefix-reuse",
+    "session-resume",
+    "tool-heavy",
+)
 PACKET_B_REQUIRED_TELEMETRY = {
     "lookup_reuse": ("lmcache_mp_lookup_requested_tokens", "lmcache_mp.lookup_requested_tokens"),
     "lookup_hits": ("lmcache_mp_lookup_hit_tokens", "lmcache_mp.lookup_hit_tokens"),
@@ -437,6 +448,12 @@ class PacketSpec:
     strict_inferguard_gate: bool = True
     extra_required_artifacts: tuple[str, ...] = ()
     extra_optional_artifacts: tuple[str, ...] = ()
+    sdlc_row_id: str | None = None
+    benchmark_id: str | None = None
+    workload_profile: str | None = None
+    trace_source: str | None = None
+    trace_workload_classes: tuple[str, ...] = ()
+    requires_l0_block_metrics: bool = False
     notes: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -449,7 +466,7 @@ PACKETS: dict[str, PacketSpec] = {
     ),
     "b": PacketSpec(
         packet_id="b",
-        name="Packet B MP sampled lifecycle",
+        name="Packet B LC1/C1 long-context agent KV/offload",
         workload="reuse_eviction",
         output_slug="packet-b-lifecycle-reuse-eviction",
         l1_size_gb="1",
@@ -459,14 +476,21 @@ PACKETS: dict[str, PacketSpec] = {
         vllm_max_model_len=_packet_b_vllm_max_model_len(),
         lmcache_log_level=_packet_b_lmcache_log_level(),
         strict_inferguard_gate=False,
+        sdlc_row_id="C1",
+        benchmark_id="LC1",
+        workload_profile="long_context_agent_kv_offload",
+        trace_source=PACKET_B_TRACE_SOURCE,
+        trace_workload_classes=PACKET_B_TRACE_CLASSES,
+        requires_l0_block_metrics=True,
         extra_required_artifacts=(
             WORKLOAD_MANIFEST_FILE,
             PACKET_B_LIFECYCLE_EVIDENCE_FILE,
+            AGENT_KV_OFFLOAD_REPORT_FILE,
             "traffic.log",
         ),
         notes=(
-            "Metrics sample rate is pinned to 1.0; workload warms a repeated prefix, "
-            "pressures unique prefixes, then retests the warm prefix for lifecycle/reuse/eviction proof.",
+            "Metrics sample rate is pinned to 1.0; LC1/C1 workload warms long-context agent prefixes, "
+            "pressures unique agent contexts, then retests warm contexts for lifecycle/reuse/eviction proof.",
             "Packet B constrains vLLM GPU KV capacity by default; override with "
             f"`{PACKET_B_VLLM_GPU_MEMORY_UTILIZATION_ENV}` and `{PACKET_B_VLLM_MAX_MODEL_LEN_ENV}`.",
         ),
@@ -930,8 +954,36 @@ def _run_trace_replay(run_dir: Path, spec: PacketSpec | None = None) -> None:
     _run_required(_build_trace_replay_command(run_dir, spec), log_path, timeout=10 * 60)
 
 
+def _packet_b_phase_plan(requests: int, spec: PacketSpec) -> list[dict[str, object]]:
+    return [
+        {
+            "phase": "warm",
+            "request_count": min(requests, 12),
+            "prefix_pattern": "shared-agent-session-prefix",
+            "trace_classes": ["coding-long", "prefix-reuse", "session-resume"],
+            "intent": "populate reusable long-context agent KV state",
+        },
+        {
+            "phase": "pressure",
+            "request_count": max(min(requests, 40) - 12, 0),
+            "prefix_pattern": "unique-agent-pressure-window",
+            "trace_classes": ["kv-pressure", "tool-heavy", "multi-agent-coding"],
+            "intent": "force unique-prefix KV writes and L1 eviction pressure",
+        },
+        {
+            "phase": "retest",
+            "request_count": max(requests - 40, 0),
+            "prefix_pattern": "shared-agent-session-prefix",
+            "trace_classes": ["coding-long", "prefix-reuse", "session-resume"],
+            "intent": "revisit warm agent context to expose reuse and L0/L1 lifecycle",
+        },
+    ]
+
+
 def _write_workload_manifest(run_dir: Path, spec: PacketSpec, requests: int) -> None:
-    if spec.workload == "reuse_eviction":
+    if spec.packet_id == "b":
+        phases = _packet_b_phase_plan(requests, spec)
+    elif spec.workload == "reuse_eviction":
         phases = [
             {
                 "phase": "warm",
@@ -964,7 +1016,12 @@ def _write_workload_manifest(run_dir: Path, spec: PacketSpec, requests: int) -> 
     payload = {
         "schema_version": "inferguard-lmcache-mp-workload-manifest/v1",
         "packet_id": spec.packet_id,
+        "sdlc_row_id": spec.sdlc_row_id,
+        "benchmark_id": spec.benchmark_id,
         "workload": spec.workload,
+        "workload_profile": spec.workload_profile or spec.workload,
+        "trace_source": spec.trace_source,
+        "trace_workload_classes": list(spec.trace_workload_classes),
         "request_count": requests,
         "metrics_sample_rate": spec.metrics_sample_rate,
         "l1_size_gb": spec.l1_size_gb,
@@ -1047,6 +1104,11 @@ workload = sys.argv[3]
 requests = int(sys.argv[4])
 cache_salt_enabled = sys.argv[5] == "1"
 request_manifest = sys.argv[6]
+sdlc_row_id = sys.argv[7]
+benchmark_id = sys.argv[8]
+workload_profile = sys.argv[9]
+trace_source = sys.argv[10]
+trace_classes = [item for item in sys.argv[11].split(",") if item]
 shared_prefix = "InferGuard LMCache MP shared repeated-prefix validation. " * 220
 eviction_prefix = "InferGuard LMCache MP eviction pressure unique block. " * 260
 for idx in range(requests):
@@ -1063,13 +1125,29 @@ for idx in range(requests):
         prefix = shared_prefix
         prefix_group = "shared-anchor"
     prompt = prefix + f"\nRequest variant {idx % 4}: summarize the observability evidence."
+    if phase == "warm":
+        trace_class = "coding-long"
+    elif phase == "pressure":
+        trace_class = trace_classes[idx % len(trace_classes)] if trace_classes else "kv-pressure"
+    else:
+        trace_class = "session-resume"
+    cache_salt = f"tenant-{idx % 2}" if cache_salt_enabled else None
     row = {
+        "schema_version": "inferguard-lc1-traffic-request/v1",
         "request_index": idx,
+        "trace_id": f"isb1-dsv4-agent/{trace_class}/sanitized-template-{idx:04d}",
+        "trace_source": trace_source or None,
+        "trace_workload_class": trace_class,
         "phase": phase,
         "prefix_group": prefix_group,
         "prompt_chars": len(prompt),
         "workload": workload,
-        "cache_salt": f"tenant-{idx % 2}" if cache_salt_enabled else None,
+        "workload_profile": workload_profile or workload,
+        "sdlc_row_id": sdlc_row_id or None,
+        "benchmark_id": benchmark_id or None,
+        "cache_salt": cache_salt,
+        "synthetic_redaction_status": "raw_prompt_not_recorded",
+        "raw_prompt_recorded": False,
     }
     with open(request_manifest, "a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True) + "\n")
@@ -1090,22 +1168,43 @@ for idx in range(requests):
         print(resp.status, resp.read(512).decode("utf-8", errors="replace"))
     time.sleep(1)
 """
-    _run(
-        [
-            "python3",
-            "-c",
-            script,
-            VLLM_BASE_URL,
-            MODEL,
-            spec.workload,
-            str(requests),
-            "1" if spec.enable_cache_salt else "0",
-            str(run_dir / "traffic_requests.jsonl"),
-        ],
-        run_dir / "traffic.log",
-        timeout=30 * 60,
-        check=True,
-    )
+    script_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            prefix="inferguard_packet_traffic_",
+            suffix=".py",
+            delete=False,
+        ) as handle:
+            handle.write(script)
+            script_path = Path(handle.name)
+        _run(
+            [
+                "python3",
+                str(script_path),
+                VLLM_BASE_URL,
+                MODEL,
+                spec.workload,
+                str(requests),
+                "1" if spec.enable_cache_salt else "0",
+                str(run_dir / "traffic_requests.jsonl"),
+                spec.sdlc_row_id or "",
+                spec.benchmark_id or "",
+                spec.workload_profile or spec.workload,
+                spec.trace_source or "",
+                ",".join(spec.trace_workload_classes),
+            ],
+            run_dir / "traffic.log",
+            timeout=30 * 60,
+            check=True,
+        )
+    finally:
+        if script_path is not None:
+            try:
+                script_path.unlink()
+            except OSError:
+                pass
 
 
 def _maybe_add_existing(cmd: list[str], flag: str, path: Path) -> None:
@@ -1113,8 +1212,8 @@ def _maybe_add_existing(cmd: list[str], flag: str, path: Path) -> None:
         cmd.extend([flag, str(path)])
 
 
-def _positive_metric_names(prom_text: str) -> set[str]:
-    names: set[str] = set()
+def _metric_values_by_name(prom_text: str) -> dict[str, list[float]]:
+    values: dict[str, list[float]] = {}
     for raw_line in prom_text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -1126,14 +1225,31 @@ def _positive_metric_names(prom_text: str) -> set[str]:
             value = float(parts[1])
         except ValueError:
             continue
-        if value <= 0:
-            continue
-        names.add(parts[0].split("{", 1)[0])
-    return names
+        name = parts[0].split("{", 1)[0]
+        values.setdefault(name, []).append(value)
+    return values
 
 
-def _metric_family_hits(metric_names: set[str], prefixes: tuple[str, ...]) -> list[str]:
-    return sorted(name for name in metric_names if name.startswith(prefixes))
+def _metric_family_row(metric_values: dict[str, list[float]], prefixes: tuple[str, ...]) -> dict[str, object]:
+    matched = sorted(name for name in metric_values if name.startswith(prefixes))
+    populated = sorted(
+        name for name in matched if any(value > 0 for value in metric_values.get(name, []))
+    )
+    if populated:
+        status = "populated"
+        claim_status = "measured"
+    elif matched:
+        status = "zero"
+        claim_status = "not_measured"
+    else:
+        status = "missing"
+        claim_status = "not_measured"
+    return {
+        "status": status,
+        "claim_status": claim_status,
+        "matched_metrics": matched,
+        "populated_metrics": populated,
+    }
 
 
 def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
@@ -1141,19 +1257,24 @@ def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
         return
     prom_path = run_dir / "lmcache_metrics_loaded.prom"
     prom_text = prom_path.read_text(encoding="utf-8") if prom_path.exists() else ""
-    metric_names = _positive_metric_names(prom_text)
+    metric_values = _metric_values_by_name(prom_text)
     families = {
-        family: {
-            "status": "populated" if (hits := _metric_family_hits(metric_names, prefixes)) else "missing",
-            "matched_metrics": hits,
-        }
+        family: _metric_family_row(metric_values, prefixes)
         for family, prefixes in PACKET_B_REQUIRED_TELEMETRY.items()
     }
     missing = [family for family, row in families.items() if row["status"] != "populated"]
+    l0_blocked = families.get("l0_lifecycle", {}).get("status") in {"missing", "zero"}
+    claim_status = "measured" if not missing else "not_proven"
     payload = {
         "schema_version": "inferguard-lmcache-mp-packet-b-lifecycle/v1",
         "packet_id": spec.packet_id,
-        "claim_status": "measured" if not missing else "not_proven",
+        "sdlc_row_id": spec.sdlc_row_id,
+        "benchmark_id": spec.benchmark_id,
+        "workload_profile": spec.workload_profile,
+        "trace_source": spec.trace_source,
+        "requires_l0_block_metrics": spec.requires_l0_block_metrics,
+        "claim_status": claim_status,
+        "acceptance_status": "candidate_measured" if claim_status == "measured" else "blocked",
         "metrics_file": str(prom_path),
         "metrics_sample_rate": spec.metrics_sample_rate,
         "l1_size_gb": spec.l1_size_gb,
@@ -1166,7 +1287,91 @@ def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
         "missing_required_families": missing,
         "debug_log_markers": _packet_b_debug_log_markers(run_dir),
     }
+    if l0_blocked:
+        payload.update(
+            {
+                "blocked_reason": "lmcache_mp_l0_block_metrics_absent",
+                "operator_facing_code": "lmcache_mp_l0_lifecycle_missing",
+                "recommendation": (
+                    "C1 cannot be accepted until lmcache_mp_l0_block_* metrics are emitted "
+                    "by the tested LMCache/vLLM ref."
+                ),
+            }
+        )
     (run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
+    if spec.packet_id != "b":
+        return
+    workload = _read_json(run_dir / WORKLOAD_MANIFEST_FILE)
+    evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
+    coverage = _read_json(run_dir / "observability_coverage.json")
+    compat = _read_json(run_dir / "lmcache_compat_report.json")
+    diagnosis = _read_json(run_dir / "diagnose-bottleneck" / "bottleneck_diagnosis.json")
+    evidence = evidence if isinstance(evidence, dict) else {}
+    workload = workload if isinstance(workload, dict) else {}
+    coverage = coverage if isinstance(coverage, dict) else {}
+    compat = compat if isinstance(compat, dict) else {}
+    diagnosis = diagnosis if isinstance(diagnosis, dict) else {}
+    families = evidence.get("required_families") if isinstance(evidence.get("required_families"), dict) else {}
+    l0_row = families.get("l0_lifecycle") if isinstance(families.get("l0_lifecycle"), dict) else {}
+    offload = coverage.get("kv_cache_offload") if isinstance(coverage.get("kv_cache_offload"), dict) else {}
+    payload = {
+        "schema_version": "inferguard-agent-kv-offload-report/v1",
+        "packet_id": spec.packet_id,
+        "sdlc_row_id": spec.sdlc_row_id,
+        "benchmark_id": spec.benchmark_id,
+        "workload": {
+            "profile": spec.workload_profile or spec.workload,
+            "legacy_workload": spec.workload,
+            "trace_source": spec.trace_source,
+            "trace_workload_classes": list(spec.trace_workload_classes),
+            "raw_prompts_recorded": workload.get("raw_prompts_recorded", False),
+            "request_count": workload.get("request_count", spec.request_count),
+            "phases": workload.get("phases") or _packet_b_phase_plan(spec.request_count or 48, spec),
+        },
+        "vllm": {
+            "native_cpu_offload": offload.get("vllm_native_cpu_offload"),
+            "external_prefix_cache": offload.get("vllm_external_prefix_cache"),
+        },
+        "lmcache_mp": {
+            "lookup_requested_tokens": families.get("lookup_reuse"),
+            "lookup_hit_tokens": families.get("lookup_hits"),
+            "l0_l1_store_load_throughput": families.get("l0_l1_throughput"),
+            "l1_lifecycle_and_real_reuse": {
+                "l1_lifecycle": families.get("l1_lifecycle"),
+                "real_reuse": families.get("real_reuse"),
+            },
+            "l0_lifecycle": {
+                "status": l0_row.get("status", "missing"),
+                "required_for_c1_acceptance": True,
+                "matched_metrics": l0_row.get("matched_metrics", []),
+            },
+        },
+        "diagnosis": {
+            "claim_status": evidence.get("claim_status", "not_proven"),
+            "acceptance_status": evidence.get("acceptance_status", "blocked"),
+            "missing_telemetry": evidence.get("missing_required_families", []),
+            "blocked_reason": evidence.get("blocked_reason"),
+            "operator_facing_code": evidence.get("operator_facing_code"),
+            "diagnose_bottleneck_rule": diagnosis.get("rule_fired"),
+            "compat_failure_reasons": compat.get("failure_reasons", []),
+            "compat_diagnostic_findings": compat.get("diagnostic_findings", []),
+            "concrete_remediation": evidence.get("recommendation"),
+        },
+        "artifacts": {
+            "workload_manifest": WORKLOAD_MANIFEST_FILE,
+            "packet_b_lifecycle_evidence": PACKET_B_LIFECYCLE_EVIDENCE_FILE,
+            "lmcache_compat_report": "lmcache_compat_report.json",
+            "observability_coverage": "observability_coverage.json",
+            "bottleneck_diagnosis": "diagnose-bottleneck/bottleneck_diagnosis.json",
+        },
+    }
+    (run_dir / AGENT_KV_OFFLOAD_REPORT_FILE).write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
@@ -1612,6 +1817,7 @@ def _run_packet(spec: PacketSpec) -> str:
         _capture_safe_http(run_dir)
         _run_trace_replay(run_dir, spec)
         _run_inferguard_packet(run_dir, spec)
+        _write_agent_kv_offload_report(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
     finally:
         _terminate(vllm_proc)

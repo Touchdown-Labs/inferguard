@@ -297,6 +297,20 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
 
     assert spec.workload == "reuse_eviction"
     assert spec.output_slug == "packet-b-lifecycle-reuse-eviction"
+    assert spec.sdlc_row_id == "C1"
+    assert spec.benchmark_id == "LC1"
+    assert spec.workload_profile == "long_context_agent_kv_offload"
+    assert spec.trace_source == "traces/isb1-dsv4-agent"
+    assert spec.trace_workload_classes == (
+        "coding-long",
+        "kv-pressure",
+        "multi-agent-coding",
+        "prefix-reuse",
+        "session-resume",
+        "tool-heavy",
+    )
+    assert spec.requires_l0_block_metrics is True
+    assert spec.request_count == 48
     assert lab._run_dir_for_packet(spec, "20260101T000000Z") == (
         lab.OUT_ROOT / "packet-b-lifecycle-reuse-eviction" / "20260101T000000Z"
     )
@@ -311,6 +325,7 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     assert spec.strict_inferguard_gate is False
     assert "workload_manifest.json" in lab._required_artifacts(spec)
     assert "packet-b-lifecycle-evidence.json" in lab._required_artifacts(spec)
+    assert "agent_kv_offload_report.json" in lab._required_artifacts(spec)
     assert "traffic.log" in lab._required_artifacts(spec)
     assert "traffic_requests.jsonl" in lab._optional_artifacts(spec)
 
@@ -368,6 +383,32 @@ def test_packet_b_accepts_env_driven_vllm_pressure_and_lmcache_debug(tmp_path: P
     assert lmcache_env["LMCACHE_LOG_LEVEL"] == "DEBUG"
 
 
+def test_packet_b_drive_traffic_logs_temp_script_path_not_inline_prompt_payload(
+    tmp_path: Path,
+) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    captured: dict[str, object] = {}
+
+    def fake_run(cmd, log_path, *, timeout, check=False, cwd=None):
+        captured["cmd"] = cmd
+        log_path.write_text("$ " + " ".join(cmd) + "\nexit_code=0\n", encoding="utf-8")
+
+    lab._run = fake_run
+
+    lab._drive_traffic(tmp_path, spec)
+
+    cmd = captured["cmd"]
+    assert isinstance(cmd, list)
+    assert cmd[0] == "python3"
+    assert cmd[1] != "-c"
+    assert Path(cmd[1]).name.startswith("inferguard_packet_traffic_")
+    assert not Path(cmd[1]).exists()
+    traffic_log = (tmp_path / "traffic.log").read_text(encoding="utf-8")
+    assert '"prompt"' not in traffic_log
+    assert '"messages"' not in traffic_log
+
+
 def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]
@@ -376,14 +417,21 @@ def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path)
 
     manifest = json.loads((tmp_path / "workload_manifest.json").read_text(encoding="utf-8"))
     assert manifest["packet_id"] == "b"
+    assert manifest["sdlc_row_id"] == "C1"
+    assert manifest["benchmark_id"] == "LC1"
     assert manifest["workload"] == "reuse_eviction"
+    assert manifest["workload_profile"] == "long_context_agent_kv_offload"
+    assert manifest["trace_source"] == "traces/isb1-dsv4-agent"
+    assert manifest["trace_workload_classes"] == list(spec.trace_workload_classes)
     assert manifest["metrics_sample_rate"] == 1.0
     assert manifest["l1_size_gb"] == "1"
     assert manifest["vllm_gpu_memory_utilization"] == "0.65"
     assert manifest["vllm_max_model_len"] == 8192
     assert manifest["lmcache_log_level"] is None
     assert manifest["raw_prompts_recorded"] is False
+    assert manifest["request_count"] == 48
     assert [phase["phase"] for phase in manifest["phases"]] == ["warm", "pressure", "retest"]
+    assert all(phase.get("trace_classes") for phase in manifest["phases"])
     assert [phase["request_count"] for phase in manifest["phases"]] == [12, 28, 8]
     assert set(manifest["required_packet_b_telemetry"]) == set(lab.PACKET_B_REQUIRED_TELEMETRY)
 
@@ -438,12 +486,85 @@ def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
     lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
 
     evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    assert evidence["sdlc_row_id"] == "C1"
+    assert evidence["benchmark_id"] == "LC1"
+    assert evidence["workload_profile"] == "long_context_agent_kv_offload"
+    assert evidence["trace_source"] == "traces/isb1-dsv4-agent"
+    assert evidence["requires_l0_block_metrics"] is True
     assert evidence["claim_status"] == "measured"
+    assert evidence["acceptance_status"] == "candidate_measured"
     assert evidence["metrics_sample_rate"] == 1.0
     assert evidence["vllm_gpu_memory_utilization"] == "0.65"
     assert evidence["vllm_max_model_len"] == 8192
     assert evidence["missing_required_families"] == []
     assert evidence["required_families"]["l1_eviction"]["status"] == "populated"
+    assert evidence["required_families"]["l0_lifecycle"]["claim_status"] == "measured"
+
+
+def test_packet_b_lifecycle_evidence_blocks_missing_or_zero_l0_lifecycle(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "lmcache_metrics_loaded.prom").write_text(
+        "\n".join(
+            [
+                "lmcache_mp_lookup_requested_tokens_total 100",
+                "lmcache_mp_lookup_hit_tokens_total 70",
+                "lmcache_mp_l1_chunk_reuse_gap_seconds_count 4",
+                "lmcache_mp_l0_block_lifetime_seconds_count 0",
+                "lmcache_mp_real_reuse_gap_seconds_count 2",
+                "lmcache_mp_l1_evicted_keys_total 3",
+                "lmcache_mp_l0_l1_store_throughput_gbs_count 2",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
+
+    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    assert evidence["claim_status"] == "not_proven"
+    assert evidence["acceptance_status"] == "blocked"
+    assert evidence["blocked_reason"] == "lmcache_mp_l0_block_metrics_absent"
+    assert evidence["operator_facing_code"] == "lmcache_mp_l0_lifecycle_missing"
+    assert evidence["required_families"]["l0_lifecycle"]["status"] == "zero"
+    assert evidence["required_families"]["l0_lifecycle"]["claim_status"] == "not_measured"
+    assert "l0_lifecycle" in evidence["missing_required_families"]
+
+
+def test_packet_b_agent_kv_offload_report_records_blocked_l0_gap(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "workload_manifest.json").write_text(
+        json.dumps({"packet_id": "b", "raw_prompts_recorded": False}),
+        encoding="utf-8",
+    )
+    (tmp_path / "packet-b-lifecycle-evidence.json").write_text(
+        json.dumps(
+            {
+                "claim_status": "not_proven",
+                "acceptance_status": "blocked",
+                "missing_required_families": ["l0_lifecycle"],
+                "required_families": {"l0_lifecycle": {"status": "missing"}},
+                "blocked_reason": "lmcache_mp_l0_block_metrics_absent",
+                "operator_facing_code": "lmcache_mp_l0_lifecycle_missing",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    lab._write_agent_kv_offload_report(tmp_path, spec)
+
+    report = json.loads((tmp_path / "agent_kv_offload_report.json").read_text(encoding="utf-8"))
+    assert report["schema_version"] == "inferguard-agent-kv-offload-report/v1"
+    assert report["packet_id"] == "b"
+    assert report["sdlc_row_id"] == "C1"
+    assert report["benchmark_id"] == "LC1"
+    assert report["workload"]["profile"] == "long_context_agent_kv_offload"
+    assert report["workload"]["raw_prompts_recorded"] is False
+    assert report["lmcache_mp"]["l0_lifecycle"]["status"] == "missing"
+    assert report["diagnosis"]["claim_status"] == "not_proven"
+    assert report["diagnosis"]["operator_facing_code"] == "lmcache_mp_l0_lifecycle_missing"
 
 
 def test_packet_b_lifecycle_evidence_records_debug_log_markers(tmp_path: Path) -> None:

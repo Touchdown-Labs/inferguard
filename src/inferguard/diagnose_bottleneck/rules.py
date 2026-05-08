@@ -78,6 +78,7 @@ LMCACHE_COMPAT_PRIORITY: tuple[str, ...] = (
     "lmcache_mp_l2_throughput_low",
     "lmcache_mp_l2_prefetch_memory_crowding",
     "lmcache_mp_l0_l1_throughput_low",
+    "lmcache_mp_l0_lifecycle_missing",
     "lmcache_mp_l0_l1_throughput_missing",
     "lmcache_mp_l1_eviction_pressure",
     "lmcache_mp_l1_saturation",

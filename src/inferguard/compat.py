@@ -966,6 +966,16 @@ def _upstream_questions(
                 "owner_question": "This MP scrape has counters but sparse sampled lifecycle/throughput histograms; should this lab raise --metrics-sample-rate for validation runs?",
             }
         )
+    if (
+        by_key.get(("lmcache_mp", "storage_manager"), {}).get("status") == "populated"
+        and by_key.get(("lmcache_mp", "l0_lifecycle"), {}).get("status") in {"missing", "zero"}
+    ):
+        questions.append(
+            {
+                "code": "lmcache_mp_l0_lifecycle_missing",
+                "owner_question": "Which LMCache/vLLM ref emits lmcache_mp_l0_block_* for LMCacheMPConnector runs, and what launch/runtime condition enables it?",
+            }
+        )
     empty_salt = any(
         sample.name.startswith(("lmcache_mp_lookup_", "lmcache_mp.lookup_"))
         and "cache_salt" in sample.labels
@@ -1103,6 +1113,24 @@ def _diagnostic_findings(
     l0_l1_store_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
     l0_l1_load_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
     lmcache_mp_present = any(sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples)
+    l0_lifecycle_present = any(
+        sample.name.startswith(("lmcache_mp_l0_block_", "lmcache_mp.l0_block_"))
+        for sample in samples
+    )
+    if lmcache_mp_present and not l0_lifecycle_present:
+        findings.append(
+            {
+                "code": "lmcache_mp_l0_lifecycle_missing",
+                "severity": "info",
+                "message": "LMCache MP is present, but L0 block lifecycle histograms are missing.",
+                "metrics": {
+                    "lmcache_mp_l0_block_lifetime_seconds": None,
+                    "lmcache_mp_l0_block_idle_before_evict_seconds": None,
+                    "lmcache_mp_l0_block_reuse_gap_seconds": None,
+                },
+                "recommendation": "C1 cannot be accepted until lmcache_mp_l0_block_* metrics are emitted by the tested LMCache/vLLM ref.",
+            }
+        )
     l0_l1_present = any(sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples)
     if lmcache_mp_present and not l0_l1_present:
         findings.append(

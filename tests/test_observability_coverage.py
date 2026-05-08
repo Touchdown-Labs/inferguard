@@ -457,6 +457,60 @@ def test_sglang_hicache_only_fixture_does_not_claim_lmcache() -> None:
     assert "sglang_hicache_not_lmcache" in codes
 
 
+def test_lmcache_mp_l0_lifecycle_populated_when_block_metrics_present() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_chunk_lifetime_seconds_count 2
+lmcache_mp_l0_block_lifetime_seconds_count 3
+lmcache_mp_l0_block_idle_before_evict_seconds_count 3
+lmcache_mp_l0_block_reuse_gap_seconds_count 3
+lmcache_mp_l0_l1_store_throughput_gbs_count 2
+lmcache_mp_l0_l1_load_throughput_gbs_count 2
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    compat = report["lmcache_compat"]
+    families = {(row["surface"], row["family"]): row for row in compat["families"]}
+    assert families[("lmcache_mp", "l0_lifecycle")]["status"] == "populated"
+    assert families[("lmcache_mp", "l0_l1_throughput")]["status"] == "populated"
+    assert not any(
+        gap["surface"] == "lmcache_mp" and gap["family"] == "l0_lifecycle"
+        for gap in report["coverage_gaps"]
+    )
+
+
+def test_lmcache_mp_l0_lifecycle_missing_emits_gap_and_diagnostic() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_chunk_lifetime_seconds_count 2
+lmcache_mp_real_reuse_gap_seconds_count 2
+lmcache_mp_l0_l1_store_throughput_gbs_count 2
+lmcache_mp_l0_l1_load_throughput_gbs_count 2
+""",
+        expect_lmcache_mode="mp",
+        mp_observability={"metrics_sample_rate": 1.0},
+    )
+
+    compat = report["lmcache_compat"]
+    families = {(row["surface"], row["family"]): row for row in compat["families"]}
+    assert families[("lmcache_mp", "l0_lifecycle")]["status"] == "missing"
+    assert any(
+        gap["surface"] == "lmcache_mp" and gap["family"] == "l0_lifecycle"
+        for gap in report["coverage_gaps"]
+    )
+    diagnostic_codes = {item["code"] for item in compat["diagnostic_findings"]}
+    upstream_codes = {item["code"] for item in compat["upstream_questions"]}
+    assert "lmcache_mp_l0_lifecycle_missing" in diagnostic_codes
+    assert "lmcache_mp_l0_lifecycle_missing" in upstream_codes
+
+
 def test_lmcache_compat_promotes_trace_and_otel_missing_evidence() -> None:
     report = build_observability_coverage_report(
         lmcache_text="""
