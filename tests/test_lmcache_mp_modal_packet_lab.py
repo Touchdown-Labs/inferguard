@@ -20,6 +20,8 @@ _LMCACHE_SOURCE_ENV_KEYS = (
     "INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN",
     "INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL",
     "INFERGUARD_VLLM_LOCAL_SOURCE",
+    "INFERGUARD_VLLM_SOURCE_KIND",
+    "INFERGUARD_VLLM_SOURCE_REF",
 )
 
 
@@ -161,14 +163,20 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
     assert add_local_dirs == [
         {
+            "local_path": str(lab.DEFAULT_VLLM_LOCAL_SOURCE / "vllm"),
+            "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
+            "copy": True,
+        },
+        {
             "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
             "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
             "copy": True,
-        }
+        },
     ]
-    assert add_local_dirs[0]["local_path"] != str(lab.REPO_ROOT)
+    assert add_local_dirs[1]["local_path"] != str(lab.REPO_ROOT)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
+    assert run_commands_args[-1] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
+    assert "lmcache_mp_connector.py" in run_commands_args[-2]
     runtime_env = calls[-1][1][0]
     assert runtime_env["INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION"] == "0.65"
     assert runtime_env["INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN"] == "8192"
@@ -176,7 +184,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
 
     call_names = [name for name, _args, _kwargs in calls]
     assert call_names.index("add_local_file") > call_names.index("pip_install")
-    assert call_names.index("add_local_dir") > call_names.index("add_local_file")
+    assert call_names.index("add_local_dir") > call_names.index("pip_install")
     assert call_names.index("run_commands") > call_names.index("add_local_dir")
 
 
@@ -210,7 +218,12 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
         "remote_path": lab.MODAL_LMCACHE_SOURCE,
         "copy": True,
     }
-    assert add_local_dirs[1]["remote_path"] == (
+    assert add_local_dirs[1] == {
+        "local_path": str(lab.DEFAULT_VLLM_LOCAL_SOURCE / "vllm"),
+        "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
+        "copy": True,
+    }
+    assert add_local_dirs[2]["remote_path"] == (
         f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}"
     )
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
@@ -221,10 +234,9 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND"] == "local"
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF"] == str(tmp_path)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (
-        "python -m pip install -e /opt/lmcache --no-build-isolation",
-        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
-    )
+    assert run_commands_args[0] == "python -m pip install -e /opt/lmcache --no-build-isolation"
+    assert "lmcache_mp_connector.py" in run_commands_args[1]
+    assert run_commands_args[2] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
 
 
 def test_modal_image_can_install_lmcache_from_git_ref() -> None:
@@ -249,10 +261,11 @@ def test_modal_image_can_install_lmcache_from_git_ref() -> None:
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
         assert dep in pip_install_args
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (
-        "python -m pip install git+https://github.com/LMCache/LMCache.git@b1-metrics-ref --no-build-isolation",
-        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
+    assert run_commands_args[0] == (
+        "python -m pip install git+https://github.com/LMCache/LMCache.git@b1-metrics-ref --no-build-isolation"
     )
+    assert "lmcache_mp_connector.py" in run_commands_args[1]
+    assert run_commands_args[2] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
 
 
 def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) -> None:
@@ -436,14 +449,32 @@ def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path)
     assert set(manifest["required_packet_b_telemetry"]) == set(lab.PACKET_B_REQUIRED_TELEMETRY)
 
 
-def test_vllm_overlay_plan_defaults_to_pypi() -> None:
+def test_vllm_overlay_plan_defaults_to_sibling_private_fork() -> None:
     lab = _load_lab_module()
 
     plan = lab._select_vllm_overlay_plan({})
 
-    assert plan.source_kind == "pypi"
-    assert plan.run_commands == ()
-    assert plan.local_source is None
+    assert plan.source_kind == "local_connector_overlay"
+    assert plan.local_source == lab.DEFAULT_VLLM_LOCAL_SOURCE
+    assert plan.source_ref == str(lab.DEFAULT_VLLM_LOCAL_SOURCE)
+    assert len(plan.run_commands) == 1
+    assert "/opt/vllm/vllm" in plan.run_commands[0]
+    assert "lmcache_mp_connector.py" in plan.run_commands[0]
+
+
+def test_runtime_vllm_overlay_plan_preserves_image_build_env(monkeypatch) -> None:
+    lab = _load_lab_module()
+    monkeypatch.setenv("INFERGUARD_VLLM_SOURCE_KIND", "local_connector_overlay")
+    monkeypatch.setenv("INFERGUARD_VLLM_SOURCE_REF", "/Users/chen/Projects/vllm")
+    lab.VLLM_OVERLAY_PLAN = lab.VllmOverlayPlan(source_kind="pypi")
+
+    plan = lab._runtime_vllm_overlay_plan_dict()
+
+    assert plan["source_kind"] == "local_connector_overlay"
+    assert plan["source_ref"] == "/Users/chen/Projects/vllm"
+    assert plan["local_source"] == "/Users/chen/Projects/vllm"
+    assert plan["overlaid_file"] == str(lab.VLLM_CONNECTOR_RELATIVE_PATH)
+
 
 
 def test_vllm_overlay_plan_copies_local_connector(tmp_path: Path) -> None:

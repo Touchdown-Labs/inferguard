@@ -78,6 +78,7 @@ LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
 LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
 LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
 VLLM_LOCAL_SOURCE_ENV = "INFERGUARD_VLLM_LOCAL_SOURCE"
+DEFAULT_VLLM_LOCAL_SOURCE = REPO_ROOT.parent / "vllm"
 VLLM_CONNECTOR_RELATIVE_PATH = Path("distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py")
 LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
 LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
@@ -228,6 +229,21 @@ class VllmOverlayPlan:
         }
 
 
+def _runtime_vllm_overlay_plan_dict() -> dict[str, object]:
+    """Return the vLLM overlay plan, preserving image-build runtime evidence."""
+    source_kind = os.environ.get("INFERGUARD_VLLM_SOURCE_KIND", "").strip()
+    source_ref = os.environ.get("INFERGUARD_VLLM_SOURCE_REF", "").strip()
+    if source_kind and source_kind != VLLM_OVERLAY_PLAN.source_kind:
+        return {
+            "source_kind": source_kind,
+            "run_commands": list(VLLM_OVERLAY_PLAN.run_commands),
+            "local_source": source_ref or None,
+            "source_ref": source_ref or None,
+            "overlaid_file": str(VLLM_CONNECTOR_RELATIVE_PATH) if source_ref else None,
+        }
+    return VLLM_OVERLAY_PLAN.as_dict()
+
+
 BASE_MODAL_PIP_PACKAGES = (
     "vllm",
     "hf-transfer",
@@ -308,10 +324,13 @@ LMCACHE_INSTALL_PLAN = _select_lmcache_install_plan()
 def _select_vllm_overlay_plan(env: Mapping[str, str] | None = None) -> VllmOverlayPlan:
     env = env or os.environ
     local_source_raw = env.get(VLLM_LOCAL_SOURCE_ENV, "").strip()
-    if not local_source_raw:
+    if local_source_raw:
+        local_source = Path(local_source_raw).expanduser()
+    elif DEFAULT_VLLM_LOCAL_SOURCE.exists():
+        local_source = DEFAULT_VLLM_LOCAL_SOURCE
+        local_source_raw = str(DEFAULT_VLLM_LOCAL_SOURCE)
+    else:
         return VllmOverlayPlan(source_kind="pypi")
-
-    local_source = Path(local_source_raw).expanduser()
     connector_source = local_source / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH
     if not connector_source.exists():
         raise FileNotFoundError(
@@ -694,7 +713,7 @@ def _write_env_snapshot(run_dir: Path) -> None:
         encoding="utf-8",
     )
     (run_dir / "vllm_overlay_plan.json").write_text(
-        json.dumps(VLLM_OVERLAY_PLAN.as_dict(), indent=2, sort_keys=True) + "\n",
+        json.dumps(_runtime_vllm_overlay_plan_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
