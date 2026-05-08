@@ -1616,7 +1616,15 @@ def _required_prometheus_blocker_findings(
     log_counts = (lmcache_log_evidence or {}).get("event_counts") or {}
     prefetch_events = _coerce_float(log_counts.get("prefetch_complete"))
     lookup_rows, lookup_seq_len_total = _lookup_hash_totals(lmcache_lookup_hash_evidence)
-    if lookup_missing and (prefetch_events > 0 or lookup_rows > 0):
+    lookup_alternate_present = bool(lmcache_lookup_hash_evidence) and (
+        (lmcache_lookup_hash_evidence or {}).get("present") is not False
+    )
+    log_alternate_present = bool(lmcache_log_evidence) and (
+        (lmcache_log_evidence or {}).get("present") is not False
+    )
+    if lookup_missing and (
+        prefetch_events > 0 or lookup_rows > 0 or lookup_alternate_present or log_alternate_present
+    ):
         findings.append(
             {
                 "code": "lmcache_mp_lookup_tokens_prometheus_missing_with_live_lookup_evidence",
