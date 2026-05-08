@@ -57,6 +57,11 @@ LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
 TRACE_REPLAY_DIR = "trace-replay"
 LOOKUP_HASH_DIR = "lookup_hashes"
 L2_CONFIG_FILE = "lmcache_l2_config.json"
+PACKET_B_VLLM_GPU_MEMORY_UTILIZATION_ENV = "INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION"
+PACKET_B_VLLM_MAX_MODEL_LEN_ENV = "INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN"
+PACKET_B_LMCACHE_LOG_LEVEL_ENV = "INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL"
+PACKET_B_DEFAULT_VLLM_GPU_MEMORY_UTILIZATION = "0.65"
+PACKET_B_DEFAULT_VLLM_MAX_MODEL_LEN = 8192
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
@@ -107,6 +112,70 @@ def _first_env(env: Mapping[str, str], *keys: str, default: str = "") -> str:
         if value:
             return value
     return default
+
+
+def _env_float_string(
+    env: Mapping[str, str],
+    key: str,
+    *,
+    default: str,
+    minimum: float,
+    maximum: float,
+) -> str:
+    value = env.get(key, "").strip() or default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{key} must be a float in [{minimum}, {maximum}], got {value!r}") from exc
+    if not minimum <= parsed <= maximum:
+        raise ValueError(f"{key} must be in [{minimum}, {maximum}], got {value!r}")
+    return value
+
+
+def _env_int(
+    env: Mapping[str, str],
+    key: str,
+    *,
+    default: int,
+    minimum: int,
+) -> int:
+    value = env.get(key, "").strip()
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{key} must be an integer >= {minimum}, got {value!r}") from exc
+    if parsed < minimum:
+        raise ValueError(f"{key} must be >= {minimum}, got {value!r}")
+    return parsed
+
+
+def _packet_b_lmcache_log_level(env: Mapping[str, str] | None = None) -> str | None:
+    env = env or os.environ
+    value = env.get(PACKET_B_LMCACHE_LOG_LEVEL_ENV, "").strip().upper()
+    return value or None
+
+
+def _packet_b_vllm_gpu_memory_utilization(env: Mapping[str, str] | None = None) -> str:
+    env = env or os.environ
+    return _env_float_string(
+        env,
+        PACKET_B_VLLM_GPU_MEMORY_UTILIZATION_ENV,
+        default=PACKET_B_DEFAULT_VLLM_GPU_MEMORY_UTILIZATION,
+        minimum=0.1,
+        maximum=1.0,
+    )
+
+
+def _packet_b_vllm_max_model_len(env: Mapping[str, str] | None = None) -> int:
+    env = env or os.environ
+    return _env_int(
+        env,
+        PACKET_B_VLLM_MAX_MODEL_LEN_ENV,
+        default=PACKET_B_DEFAULT_VLLM_MAX_MODEL_LEN,
+        minimum=1024,
+    )
 
 
 @dataclass(frozen=True)
@@ -328,6 +397,9 @@ def _build_modal_image() -> modal.Image:
                 LEGACY_LMCACHE_SOURCE_REF_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_ref or "",
                 "INFERGUARD_VLLM_SOURCE_KIND": VLLM_OVERLAY_PLAN.source_kind,
                 "INFERGUARD_VLLM_SOURCE_REF": VLLM_OVERLAY_PLAN.source_ref or "",
+                PACKET_B_VLLM_GPU_MEMORY_UTILIZATION_ENV: _packet_b_vllm_gpu_memory_utilization(),
+                PACKET_B_VLLM_MAX_MODEL_LEN_ENV: str(_packet_b_vllm_max_model_len()),
+                PACKET_B_LMCACHE_LOG_LEVEL_ENV: _packet_b_lmcache_log_level() or "",
                 "LD_LIBRARY_PATH": (
                     CUDA_SOURCE_BUILD_ENV["LD_LIBRARY_PATH"]
                     if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}
@@ -358,6 +430,9 @@ class PacketSpec:
     enable_otel: bool = False
     enable_cache_salt: bool = False
     eviction_policy: str = "LRU"
+    vllm_gpu_memory_utilization: str = "0.80"
+    vllm_max_model_len: int = MODEL_MAX_LEN
+    lmcache_log_level: str | None = None
     extra_required_artifacts: tuple[str, ...] = ()
     extra_optional_artifacts: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
@@ -378,6 +453,9 @@ PACKETS: dict[str, PacketSpec] = {
         l1_size_gb="1",
         metrics_sample_rate=1.0,
         request_count=48,
+        vllm_gpu_memory_utilization=_packet_b_vllm_gpu_memory_utilization(),
+        vllm_max_model_len=_packet_b_vllm_max_model_len(),
+        lmcache_log_level=_packet_b_lmcache_log_level(),
         extra_required_artifacts=(
             WORKLOAD_MANIFEST_FILE,
             PACKET_B_LIFECYCLE_EVIDENCE_FILE,
@@ -386,6 +464,8 @@ PACKETS: dict[str, PacketSpec] = {
         notes=(
             "Metrics sample rate is pinned to 1.0; workload warms a repeated prefix, "
             "pressures unique prefixes, then retests the warm prefix for lifecycle/reuse/eviction proof.",
+            "Packet B constrains vLLM GPU KV capacity by default; override with "
+            f"`{PACKET_B_VLLM_GPU_MEMORY_UTILIZATION_ENV}` and `{PACKET_B_VLLM_MAX_MODEL_LEN_ENV}`.",
         ),
     ),
     "c": PacketSpec(
@@ -667,6 +747,8 @@ def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[st
                 "OTEL_SERVICE_NAME": f"lmcache-mp-packet-{spec.packet_id}",
             }
         )
+    if spec.lmcache_log_level:
+        env["LMCACHE_LOG_LEVEL"] = spec.lmcache_log_level
     return env
 
 
@@ -690,7 +772,8 @@ def _launch_lmcache(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subp
     return proc, log_handle
 
 
-def _build_vllm_command() -> list[str]:
+def _build_vllm_command(spec: PacketSpec | None = None) -> list[str]:
+    spec = spec or PACKETS["a"]
     kv_transfer_config = {
         "kv_connector": "LMCacheMPConnector",
         "kv_role": "kv_both",
@@ -709,17 +792,18 @@ def _build_vllm_command() -> list[str]:
         json.dumps(kv_transfer_config, separators=(",", ":")),
         "--disable-hybrid-kv-cache-manager",
         "--max-model-len",
-        str(MODEL_MAX_LEN),
+        str(spec.vllm_max_model_len),
         "--gpu-memory-utilization",
-        "0.80",
+        spec.vllm_gpu_memory_utilization,
         "--port",
         str(VLLM_PORT),
     ]
 
 
-def _launch_vllm(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
+def _launch_vllm(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subprocess.Popen[str], object]:
+    spec = spec or PACKETS["a"]
     log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
-    cmd = _build_vllm_command()
+    cmd = _build_vllm_command(spec)
     (run_dir / "vllm_command.json").write_text(json.dumps(cmd, indent=2) + "\n", encoding="utf-8")
     proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
     return proc, log_handle
@@ -861,6 +945,9 @@ def _write_workload_manifest(run_dir: Path, spec: PacketSpec, requests: int) -> 
         "metrics_sample_rate": spec.metrics_sample_rate,
         "l1_size_gb": spec.l1_size_gb,
         "eviction_policy": spec.eviction_policy,
+        "vllm_gpu_memory_utilization": spec.vllm_gpu_memory_utilization,
+        "vllm_max_model_len": spec.vllm_max_model_len,
+        "lmcache_log_level": spec.lmcache_log_level,
         "raw_prompts_recorded": False,
         "request_log": "traffic_requests.jsonl",
         "phases": phases,
@@ -1047,14 +1134,48 @@ def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
         "metrics_sample_rate": spec.metrics_sample_rate,
         "l1_size_gb": spec.l1_size_gb,
         "eviction_policy": spec.eviction_policy,
+        "vllm_gpu_memory_utilization": spec.vllm_gpu_memory_utilization,
+        "vllm_max_model_len": spec.vllm_max_model_len,
+        "lmcache_log_level": spec.lmcache_log_level,
         "workload_manifest": str(run_dir / WORKLOAD_MANIFEST_FILE),
         "required_families": families,
         "missing_required_families": missing,
+        "debug_log_markers": _packet_b_debug_log_markers(run_dir),
     }
     (run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE).write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _packet_b_debug_log_markers(run_dir: Path) -> dict[str, dict[str, object]]:
+    markers = {
+        "vllm_gpu_block_allocation": ("gpu block", "gpu blocks", "block allocation", "allocate blocks"),
+        "lmcache_l0_block": ("l0 block", "lmcache_mp_l0_block"),
+    }
+    logs = {
+        "vllm.log": run_dir / "vllm.log",
+        "lmcache.log": run_dir / "lmcache.log",
+    }
+    results: dict[str, dict[str, object]] = {}
+    for name, needles in markers.items():
+        hits: list[str] = []
+        for log_name, path in logs.items():
+            if not path.exists():
+                continue
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+                lower = line.lower()
+                if any(needle in lower for needle in needles):
+                    hits.append(f"{log_name}: {line[:500]}")
+                    if len(hits) >= 20:
+                        break
+            if len(hits) >= 20:
+                break
+        results[name] = {
+            "status": "found" if hits else "missing",
+            "matched_lines": hits,
+        }
+    return results
 
 
 def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) -> list[str]:
@@ -1338,6 +1459,9 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
         f"- Workload: `{spec.workload}`",
         f"- Metrics sample rate: `{spec.metrics_sample_rate}`",
         f"- L1 size GB: `{spec.l1_size_gb}`",
+        f"- vLLM GPU memory utilization: `{spec.vllm_gpu_memory_utilization}`",
+        f"- vLLM max model len: `{spec.vllm_max_model_len}`",
+        f"- LMCache log level: `{spec.lmcache_log_level or 'default'}`",
         f"- L2 configured: `{spec.l2_configured}`",
         f"- OTel enabled: `{spec.enable_otel}`",
         f"- Eviction policy: `{spec.eviction_policy}`",
@@ -1440,7 +1564,7 @@ def _run_packet(spec: PacketSpec) -> str:
         )
         _capture_safe_http(run_dir)
 
-        vllm_proc, vllm_handle = _launch_vllm(run_dir)
+        vllm_proc, vllm_handle = _launch_vllm(run_dir, spec)
         handles.append(vllm_handle)
         _wait_for_http(
             VLLM_HEALTH_URL,

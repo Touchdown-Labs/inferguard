@@ -16,6 +16,10 @@ _LMCACHE_SOURCE_ENV_KEYS = (
     "INFERGUARD_PACKET_A_LMCACHE_GIT_REF",
     "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO",
     "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC",
+    "INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION",
+    "INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN",
+    "INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL",
+    "INFERGUARD_VLLM_LOCAL_SOURCE",
 )
 
 
@@ -165,6 +169,10 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     assert add_local_dirs[0]["local_path"] != str(lab.REPO_ROOT)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
     assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
+    runtime_env = calls[-1][1][0]
+    assert runtime_env["INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION"] == "0.65"
+    assert runtime_env["INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN"] == "8192"
+    assert runtime_env["INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL"] == ""
 
     call_names = [name for name, _args, _kwargs in calls]
     assert call_names.index("add_local_file") > call_names.index("pip_install")
@@ -283,6 +291,8 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     spec = lab.PACKETS["b"]
 
     cmd = lab._build_lmcache_command(tmp_path, spec)
+    env = lab._build_lmcache_env(tmp_path, spec)
+    vllm = lab._build_vllm_command(spec)
     replay = lab._build_trace_replay_command(tmp_path, spec)
 
     assert spec.workload == "reuse_eviction"
@@ -295,10 +305,34 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     assert replay[replay.index("--l1-size-gb") + 1] == "1"
     assert cmd[cmd.index("--event-bus-queue-size") + 1] == "10000"
     assert cmd[cmd.index("--eviction-policy") + 1] == "LRU"
+    assert vllm[vllm.index("--gpu-memory-utilization") + 1] == "0.65"
+    assert vllm[vllm.index("--max-model-len") + 1] == "8192"
+    assert "LMCACHE_LOG_LEVEL" not in env
     assert "workload_manifest.json" in lab._required_artifacts(spec)
     assert "packet-b-lifecycle-evidence.json" in lab._required_artifacts(spec)
     assert "traffic.log" in lab._required_artifacts(spec)
     assert "traffic_requests.jsonl" in lab._optional_artifacts(spec)
+
+
+def test_packet_b_accepts_env_driven_vllm_pressure_and_lmcache_debug(tmp_path: Path) -> None:
+    lab = _load_lab_module(
+        {
+            "INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION": "0.55",
+            "INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN": "6144",
+            "INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL": "debug",
+        }
+    )
+    spec = lab.PACKETS["b"]
+
+    vllm = lab._build_vllm_command(spec)
+    lmcache_env = lab._build_lmcache_env(tmp_path, spec)
+
+    assert spec.vllm_gpu_memory_utilization == "0.55"
+    assert spec.vllm_max_model_len == 6144
+    assert spec.lmcache_log_level == "DEBUG"
+    assert vllm[vllm.index("--gpu-memory-utilization") + 1] == "0.55"
+    assert vllm[vllm.index("--max-model-len") + 1] == "6144"
+    assert lmcache_env["LMCACHE_LOG_LEVEL"] == "DEBUG"
 
 
 def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path) -> None:
@@ -312,6 +346,9 @@ def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path)
     assert manifest["workload"] == "reuse_eviction"
     assert manifest["metrics_sample_rate"] == 1.0
     assert manifest["l1_size_gb"] == "1"
+    assert manifest["vllm_gpu_memory_utilization"] == "0.65"
+    assert manifest["vllm_max_model_len"] == 8192
+    assert manifest["lmcache_log_level"] is None
     assert manifest["raw_prompts_recorded"] is False
     assert [phase["phase"] for phase in manifest["phases"]] == ["warm", "pressure", "retest"]
     assert [phase["request_count"] for phase in manifest["phases"]] == [12, 28, 8]
@@ -370,8 +407,33 @@ def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
     evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
     assert evidence["claim_status"] == "measured"
     assert evidence["metrics_sample_rate"] == 1.0
+    assert evidence["vllm_gpu_memory_utilization"] == "0.65"
+    assert evidence["vllm_max_model_len"] == 8192
     assert evidence["missing_required_families"] == []
     assert evidence["required_families"]["l1_eviction"]["status"] == "populated"
+
+
+def test_packet_b_lifecycle_evidence_records_debug_log_markers(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "lmcache_metrics_loaded.prom").write_text(
+        "lmcache_mp_lookup_requested_tokens_total 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "vllm.log").write_text(
+        "INFO GPU blocks: 12 free blocks after block allocation\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "lmcache.log").write_text(
+        "DEBUG lmcache_mp_l0_block_lifetime_seconds observed\n",
+        encoding="utf-8",
+    )
+
+    lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
+
+    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    assert evidence["debug_log_markers"]["vllm_gpu_block_allocation"]["status"] == "found"
+    assert evidence["debug_log_markers"]["lmcache_l0_block"]["status"] == "found"
 
 
 def test_packet_b_validation_records_warning_when_lifecycle_evidence_not_measured(tmp_path: Path) -> None:
