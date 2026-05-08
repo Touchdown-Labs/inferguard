@@ -1,3 +1,3 @@
 """InferGuard — read-only disaggregated-serving diagnostics."""
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"

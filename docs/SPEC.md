@@ -4,11 +4,11 @@
 **Date:** 2026-05-03
 **Owner:** Touchdown Labs
 **Canonical path:** `oss/inferguard/docs/SPEC.md`
-**Repo scope:** `oss/inferguard/` OSS package plus referenced Touchdown planning docs
+**Repo scope:** `inferguard/` source-available package plus referenced Touchdown planning docs
 **Supersedes:** architectural authority of `oss/inferguard/docs/ARCHITECTURE.md` and scattered InferGuard Bench + Analyze SDLC / research / runbook notes.
 **Does not delete:** SDLC, changelog, research, and runbook docs remain the audit trail.
 
-This document is the single source of truth for **InferGuard Bench + Analyze** in the OSS package. It consolidates the current implementation, schemas, engine surfaces, workload pack, artifact contracts, run topology, and claim boundaries.
+This document is the single source of truth for **InferGuard Bench + Analyze** in the source-available package. It consolidates the current implementation, schemas, engine surfaces, workload pack, artifact contracts, run topology, and claim boundaries.
 
 Every claim in this spec is grounded in the actual code in `oss/inferguard/src/inferguard/**`. Where the code emits less than a sibling doc claims, this spec records the **emitted-today** behavior and marks the rest as planned.
 
@@ -234,7 +234,7 @@ All artifacts
 
 ### 2.4 OSS layer rule
 
-The OSS package must not import private / pro-tier modules.
+The source-available package must not import private / pro-tier modules.
 
 Forbidden import names:
 

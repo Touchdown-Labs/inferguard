@@ -15,7 +15,7 @@ It is an operator guide, not the architecture authority.
 The canonical design is `docs/designs/2026-04-30-inferguard-harness-architecture.md`.
 The production-readiness investigation is `docs/investigations/2026-04-30-v0.5-harness-production-readiness.md`.
 The public-source research note is `docs/research/38-2026-04-30-industry-harness-research.md`.
-The existing OSS CLI contract remains `oss/inferguard/docs/SPEC.md`.
+The existing CLI contract remains `oss/inferguard/docs/SPEC.md`.
 The zero-telemetry posture is published in `oss/inferguard/docs/telemetry/v0/POSTURE.md`.
 The opt-in telemetry schema is published in `oss/inferguard/docs/telemetry/v1/SPEC.md`.
 The agent trace schema is published in `oss/inferguard/docs/schemas/agent-trace-v1.md`.
@@ -23,7 +23,7 @@ The DCGM correlation schema is published in `oss/inferguard/docs/schemas/dcgm-co
 
 ## 2. What the harness is
 
-The harness is the v0.5 layer around the existing InferGuard OSS CLI.
+The harness is the v0.5 layer around the existing InferGuard CLI.
 It does not replace `bench`, `analyze`, `disagg status`, or MCP.
 It adds production-ready environment detection, LangGraph tracing, multi-node daemon fan-in, DCGM × vLLM correlation, and auditable telemetry tooling.
 It is built for operators running real inference systems, not synthetic demos.
@@ -43,7 +43,7 @@ Each lower layer remains useful without the higher layer.
 
 | Layer | Name | Trust requirement | Network behavior | Account requirement |
 |---|---|---:|---|---|
-| 1 | OSS CLI | None beyond running local code | User-supplied endpoints only | None |
+| 1 | CLI package | None beyond running local code | User-supplied endpoints only | None |
 | 2 | Harness | Local package install and optional sidecar | Same as CLI unless telemetry is explicitly enabled | None unless uploading |
 | 3 | Hosted | Account, token, terms, and retention policy | `api.touchdown.ai` or enterprise endpoint | Required |
 
@@ -61,7 +61,7 @@ It can watch an endpoint continuously.
 It can fan in multi-node follower snapshots to a leader.
 It can align per-GPU DCGM samples with vLLM aggregate metrics.
 It can render a telemetry payload before any upload exists.
-It is Apache-2.0 OSS.
+It is source-available under `BUSL-1.1`.
 It keeps state locally.
 It remains optional.
 
@@ -93,7 +93,7 @@ CrewAI, AutoGen, Claude Code, and Cursor SDK framework hooks remain explicit stu
 
 ## 5. Installation
 
-Install the normal OSS CLI when you only need local diagnostics.
+Install the normal CLI package when you only need local diagnostics.
 
 ```bash
 python -m pip install inferguard

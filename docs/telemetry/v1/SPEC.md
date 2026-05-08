@@ -317,7 +317,7 @@ Consent state SHOULD live under the InferGuard config directory.
 Pending upload payloads SHOULD live under `~/.config/inferguard/uploads-pending/` in v0.5.
 The exact config root MAY follow platform conventions.
 Pending payloads MUST be JSON files or JSONL files that users can inspect.
-Pending payloads MUST be deletable without breaking the OSS CLI.
+Pending payloads MUST be deletable without breaking the CLI package.
 Pending payloads MUST NOT be required for `inferguard analyze`.
 Pending payloads MUST NOT be required for `inferguard bench`.
 Pending payloads MUST NOT be required for `inferguard agent trace`.

@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   current CLI flags, and clarified that local-source Modal packaging addressed
   the previous pinned-package blocker while B1 still needs live proof.
 
+## [0.7.3] - 2026-05-08
+
+### Changed
+
+- Relicensed InferGuard from Apache-2.0 to Business Source License 1.1 (`BUSL-1.1`) with Apache-2.0 as the Change License.
+- Added a BSL Additional Use Grant that permits use in a team's own repos, CI/CD, staging, internal tools, and internal production inference-diagnostics workflows, while reserving paid/hosted competing commercial offerings for separate commercial licensing.
+- Updated PyPI package metadata, license classifier, README badge, NOTICE, and active CLI documentation to stop advertising Apache-2.0/OSS for the current release line.
+- Bumped package metadata and runtime `inferguard.__version__` to `0.7.3`.
+
 ## [0.7.1] - 2026-05-04
 
 ### Fixed
@@ -160,7 +169,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.0] - 2026-04-30 (production-grade)
 
 ### Added
-- Production-grade v0.5 harness layer wired into the OSS CLI, following the canonical design doc at `docs/designs/2026-04-30-inferguard-harness-architecture.md`.
+- Production-grade v0.5 harness layer wired into the CLI package, following the canonical design doc at `docs/designs/2026-04-30-inferguard-harness-architecture.md`.
 - NeoCloud environment detection in `inferguard.harness.env` for Modal, Crusoe Slinky/CMK, CoreWeave CKS/SUNK, Lambda 1-Click signals, Fireworks target metadata, RadixArk/SGLang, and GMI deployment modes.
 - Multi-node daemon fan-in in `inferguard.harness.cluster_daemon` with leader/follower modes, rank labels, shared bearer-token auth, heartbeat/stale tracking, five-minute follower buffering, replay on reconnect, and merged Prometheus metrics.
 - `inferguard daemon start --leader` and `inferguard daemon start --follower <leader-url>` CLI flags for cluster fan-in deployments.

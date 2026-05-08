@@ -30,13 +30,13 @@ InferGuard does not check for updates by default.
 InferGuard does not upload benchmark artifacts by default.
 InferGuard does not upload agent traces by default.
 InferGuard does not upload machine fingerprints by default.
-InferGuard does not require a Touchdown account for OSS CLI use.
+InferGuard does not require a Touchdown account for CLI use.
 InferGuard network calls are limited to endpoints the operator passes by flag.
 Examples include an inference endpoint, a metrics endpoint, or a localhost daemon endpoint.
 
 ## 3. Version-specific posture
 
-v0.4.x ships the current OSS CLI surface.
+v0.4.x shipped the then-current CLI surface.
 v0.4.x has no hosted telemetry path.
 v0.4.x should make no outbound calls except to user-supplied endpoints.
 v0.5.x adds harness commands.
@@ -77,7 +77,7 @@ Candidate telemetry payloads are written separately under:
 ```
 
 Pending payload files are local audit artifacts only in v0.5.
-They are not uploaded by the OSS package.
+They are not uploaded by the CLI package.
 They should be treated as sensitive operational records even after redaction.
 
 ## 6. Runtime privacy fixture coverage
