@@ -508,7 +508,7 @@ def _detected_engines(observed_names: set[str]) -> list[str]:
 def _read_url(url: str | None, timeout_seconds: float) -> str:
     if not url:
         return ""
-    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310 - operator-supplied metrics URL
+    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310  # nosec B310 - operator-supplied metrics URL.
         return response.read().decode("utf-8", errors="replace")
 
 

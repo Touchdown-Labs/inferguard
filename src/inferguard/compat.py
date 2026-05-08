@@ -1542,7 +1542,7 @@ def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
 
 
 def _read_url(url: str, timeout_seconds: float) -> str:
-    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310  # nosec B310 - operator-supplied metrics URL.
         return response.read().decode("utf-8", errors="replace")
 
 

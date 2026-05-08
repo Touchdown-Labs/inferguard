@@ -500,7 +500,7 @@ def _capture_url(
     if not url:
         return ""
     try:
-        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310 - operator-supplied local URL
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310  # nosec B310 - operator-supplied local URL.
             text = response.read().decode("utf-8", errors="replace")
     except (OSError, urllib.error.URLError, TimeoutError) as exc:
         _record_error(errors, source_name, url, exc)

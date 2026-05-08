@@ -2458,7 +2458,7 @@ def launch_engine_cmd(
         raise typer.BadParameter("--healthcheck-timeout-seconds must be non-negative")
     if canary_completion_tokens <= 0:
         raise typer.BadParameter("--canary-completion-tokens must be positive")
-    host_value = host or "0.0.0.0"
+    host_value = host or "0.0.0.0"  # nosec B104 - engine launch defaults to externally reachable serving.
     selected_port = port
     if selected_port is None and not external_launch:
         selected_port = 8000 if engine in {"vllm", "lmcache"} else 30000
@@ -3107,7 +3107,7 @@ def daemon_start_cmd(
         raise typer.BadParameter("--leader and --follower are mutually exclusive")
     if leader and not prometheus:
         raise typer.BadParameter("--leader requires --prometheus so followers can register")
-    bind_host = host or ("0.0.0.0" if leader else "127.0.0.1")
+    bind_host = host or ("0.0.0.0" if leader else "127.0.0.1")  # nosec B104 - leader must accept follower nodes.
     daemon = Daemon()
     cluster: ClusterDaemon | None = None
     seen: set[Path] = set()
