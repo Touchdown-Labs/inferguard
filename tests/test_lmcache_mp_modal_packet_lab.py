@@ -314,6 +314,38 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     assert "traffic_requests.jsonl" in lab._optional_artifacts(spec)
 
 
+def test_capture_metrics_uses_lmcache_prometheus_fallback(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    attempted: list[str] = []
+
+    def fake_curl_to_file(url, path, log_path, *, timeout=30):
+        attempted.append(url)
+        if url == lab.VLLM_METRICS_URL:
+            path.write_text("vllm 1\n", encoding="utf-8")
+            return True
+        if url == lab.LMCACHE_STANDALONE_METRICS_URL:
+            path.write_text("lmcache_mp_l1_memory_usage_bytes 1\n", encoding="utf-8")
+            return True
+        return False
+
+    lab._curl_to_file = fake_curl_to_file
+
+    lab._capture_metrics(tmp_path, "loaded")
+
+    assert (tmp_path / "vllm_metrics_loaded.prom").read_text(encoding="utf-8") == "vllm 1\n"
+    assert (tmp_path / "lmcache_metrics_loaded.prom").read_text(encoding="utf-8") == (
+        "lmcache_mp_l1_memory_usage_bytes 1\n"
+    )
+    assert (tmp_path / lab.LMCACHE_METRICS_URL_FILE).read_text(encoding="utf-8").strip() == (
+        lab.LMCACHE_STANDALONE_METRICS_URL
+    )
+    assert attempted == [
+        lab.VLLM_METRICS_URL,
+        lab.LMCACHE_HTTP_METRICS_URL,
+        lab.LMCACHE_STANDALONE_METRICS_URL,
+    ]
+
+
 def test_packet_b_accepts_env_driven_vllm_pressure_and_lmcache_debug(tmp_path: Path) -> None:
     lab = _load_lab_module(
         {

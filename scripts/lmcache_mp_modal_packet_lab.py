@@ -52,6 +52,7 @@ LMCACHE_HTTP_METRICS_URL = f"{LMCACHE_HTTP_BASE_URL}/metrics"
 LMCACHE_STANDALONE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
 LMCACHE_METRICS_URLS = (LMCACHE_HTTP_METRICS_URL, LMCACHE_STANDALONE_METRICS_URL)
 LMCACHE_METRICS_URL = LMCACHE_HTTP_METRICS_URL
+LMCACHE_METRICS_URL_FILE = "lmcache_metrics_url.txt"
 LMCACHE_TRACE_FILE = "lmcache_trace.lct"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
 TRACE_REPLAY_DIR = "trace-replay"
@@ -580,6 +581,19 @@ def _curl_to_file(url: str, path: Path, log_path: Path, *, timeout: int = 30) ->
     return result == 0
 
 
+def _write_lmcache_metrics_url(run_dir: Path, url: str) -> None:
+    (run_dir / LMCACHE_METRICS_URL_FILE).write_text(f"{url}\n", encoding="utf-8")
+
+
+def _selected_lmcache_metrics_url(run_dir: Path) -> str:
+    path = run_dir / LMCACHE_METRICS_URL_FILE
+    if path.exists():
+        selected = path.read_text(encoding="utf-8").strip()
+        if selected:
+            return selected
+    return LMCACHE_METRICS_URL
+
+
 def _read_json(path: Path) -> Any | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -865,7 +879,15 @@ def _discover_periodic_thread_name(path: Path) -> str | None:
 def _capture_metrics(run_dir: Path, suffix: str) -> None:
     log_path = run_dir / "capture.log"
     _curl_to_file(VLLM_METRICS_URL, run_dir / f"vllm_metrics_{suffix}.prom", log_path)
-    _curl_to_file(LMCACHE_METRICS_URL, run_dir / f"lmcache_metrics_{suffix}.prom", log_path)
+    target = run_dir / f"lmcache_metrics_{suffix}.prom"
+    selected = _selected_lmcache_metrics_url(run_dir)
+    urls = (selected,) + tuple(url for url in LMCACHE_METRICS_URLS if url != selected)
+    for url in urls:
+        if _curl_to_file(url, target, log_path):
+            _write_lmcache_metrics_url(run_dir, url)
+            _append(log_path, f"LMCache metrics {suffix} captured from {url}\n")
+            return
+    _append(log_path, f"ERROR: LMCache metrics {suffix} failed for {', '.join(urls)}\n")
 
 
 def _build_trace_replay_command(run_dir: Path, spec: PacketSpec | None = None) -> list[str]:
@@ -1332,7 +1354,7 @@ def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> Non
         "--engine-metrics-url",
         VLLM_METRICS_URL,
         "--lmcache-metrics-url",
-        LMCACHE_METRICS_URL,
+        _selected_lmcache_metrics_url(run_dir),
         "--duration-seconds",
         "30",
         "--interval-seconds",
@@ -1361,6 +1383,7 @@ REQUIRED_ARTIFACTS = [
     "lmcache.log",
     "lmcache_command.json",
     "vllm_command.json",
+    LMCACHE_METRICS_URL_FILE,
     "http/capture_manifest.json",
     "vllm_metrics_empty.prom",
     "lmcache_metrics_empty.prom",
@@ -1555,13 +1578,14 @@ def _run_packet(spec: PacketSpec) -> str:
             max_wait_seconds=180,
             proc=lmcache_proc,
         )
-        _wait_for_any_http(
+        lmcache_metrics_url = _wait_for_any_http(
             LMCACHE_METRICS_URLS,
             run_dir / "health.log",
             label="LMCache Prometheus",
             max_wait_seconds=180,
             proc=lmcache_proc,
         )
+        _write_lmcache_metrics_url(run_dir, lmcache_metrics_url)
         _capture_safe_http(run_dir)
 
         vllm_proc, vllm_handle = _launch_vllm(run_dir, spec)
