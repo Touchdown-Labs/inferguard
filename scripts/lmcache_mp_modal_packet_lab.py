@@ -65,10 +65,13 @@ MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
 MODAL_LMCACHE_SOURCE = "/opt/lmcache"
+MODAL_VLLM_SOURCE = "/opt/vllm"
 LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_LMCACHE_LOCAL_SOURCE"
 LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
 LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
 LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
+VLLM_LOCAL_SOURCE_ENV = "INFERGUARD_VLLM_LOCAL_SOURCE"
+VLLM_CONNECTOR_RELATIVE_PATH = Path("distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py")
 LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
 LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
 LEGACY_LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
@@ -124,6 +127,23 @@ class LmcacheInstallPlan:
             "remote_source": self.remote_source,
             "source_ref": self.source_ref,
             "required_mp_prometheus_families": list(UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES),
+        }
+
+
+@dataclass(frozen=True)
+class VllmOverlayPlan:
+    source_kind: str
+    run_commands: tuple[str, ...] = ()
+    local_source: Path | None = None
+    source_ref: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "source_kind": self.source_kind,
+            "run_commands": list(self.run_commands),
+            "local_source": str(self.local_source) if self.local_source else None,
+            "source_ref": self.source_ref,
+            "overlaid_file": str(VLLM_CONNECTOR_RELATIVE_PATH) if self.local_source else None,
         }
 
 
@@ -204,6 +224,40 @@ def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> Lmcach
 LMCACHE_INSTALL_PLAN = _select_lmcache_install_plan()
 
 
+def _select_vllm_overlay_plan(env: Mapping[str, str] | None = None) -> VllmOverlayPlan:
+    env = env or os.environ
+    local_source_raw = env.get(VLLM_LOCAL_SOURCE_ENV, "").strip()
+    if not local_source_raw:
+        return VllmOverlayPlan(source_kind="pypi")
+
+    local_source = Path(local_source_raw).expanduser()
+    connector_source = local_source / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH
+    if not connector_source.exists():
+        raise FileNotFoundError(
+            f"{VLLM_LOCAL_SOURCE_ENV} must point to a vLLM checkout containing {connector_source}"
+        )
+
+    overlay_command = "python -c " + shlex.quote(
+        "from pathlib import Path; "
+        "import shutil, vllm; "
+        f"rel = Path({str(VLLM_CONNECTOR_RELATIVE_PATH)!r}); "
+        f"src = Path({(MODAL_VLLM_SOURCE + '/vllm')!r}) / rel; "
+        "dst = Path(vllm.__file__).parent / rel; "
+        "dst.parent.mkdir(parents=True, exist_ok=True); "
+        "shutil.copy2(src, dst); "
+        "print(f'Overlayed vLLM connector {src} -> {dst}')"
+    )
+    return VllmOverlayPlan(
+        source_kind="local_connector_overlay",
+        run_commands=(overlay_command,),
+        local_source=local_source,
+        source_ref=local_source_raw,
+    )
+
+
+VLLM_OVERLAY_PLAN = _select_vllm_overlay_plan()
+
+
 def _build_modal_image() -> modal.Image:
     if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}:
         built_image = modal.Image.from_registry(CUDA_DEVEL_IMAGE, add_python="3.11").apt_install(
@@ -220,6 +274,12 @@ def _build_modal_image() -> modal.Image:
         built_image = built_image.add_local_dir(
             local_path=str(LMCACHE_INSTALL_PLAN.local_source),
             remote_path=MODAL_LMCACHE_SOURCE,
+            copy=True,
+        )
+    if VLLM_OVERLAY_PLAN.local_source is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(VLLM_OVERLAY_PLAN.local_source / "vllm"),
+            remote_path=f"{MODAL_VLLM_SOURCE}/vllm",
             copy=True,
         )
     built_image = (
@@ -243,7 +303,11 @@ def _build_modal_image() -> modal.Image:
             remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
             copy=True,
         )
-        .run_commands(*LMCACHE_INSTALL_PLAN.run_commands, INFERGUARD_LOCAL_INSTALL_COMMAND)
+        .run_commands(
+            *LMCACHE_INSTALL_PLAN.run_commands,
+            *VLLM_OVERLAY_PLAN.run_commands,
+            INFERGUARD_LOCAL_INSTALL_COMMAND,
+        )
         .env(
             {
                 "HF_HUB_ENABLE_HF_TRANSFER": "1",
@@ -262,6 +326,8 @@ def _build_modal_image() -> modal.Image:
                 LMCACHE_SOURCE_REF_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_ref or "",
                 LEGACY_LMCACHE_SOURCE_KIND_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_kind,
                 LEGACY_LMCACHE_SOURCE_REF_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_ref or "",
+                "INFERGUARD_VLLM_SOURCE_KIND": VLLM_OVERLAY_PLAN.source_kind,
+                "INFERGUARD_VLLM_SOURCE_REF": VLLM_OVERLAY_PLAN.source_ref or "",
                 "LD_LIBRARY_PATH": (
                     CUDA_SOURCE_BUILD_ENV["LD_LIBRARY_PATH"]
                     if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}
@@ -505,6 +571,10 @@ def _write_env_snapshot(run_dir: Path) -> None:
     )
     (run_dir / "lmcache_install_plan.json").write_text(
         json.dumps(LMCACHE_INSTALL_PLAN.as_dict(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "vllm_overlay_plan.json").write_text(
+        json.dumps(VLLM_OVERLAY_PLAN.as_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 

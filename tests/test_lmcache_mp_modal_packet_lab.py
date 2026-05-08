@@ -318,6 +318,32 @@ def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path)
     assert set(manifest["required_packet_b_telemetry"]) == set(lab.PACKET_B_REQUIRED_TELEMETRY)
 
 
+def test_vllm_overlay_plan_defaults_to_pypi() -> None:
+    lab = _load_lab_module()
+
+    plan = lab._select_vllm_overlay_plan({})
+
+    assert plan.source_kind == "pypi"
+    assert plan.run_commands == ()
+    assert plan.local_source is None
+
+
+def test_vllm_overlay_plan_copies_local_connector(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    connector = tmp_path / "vllm" / lab.VLLM_CONNECTOR_RELATIVE_PATH
+    connector.parent.mkdir(parents=True)
+    connector.write_text("# local connector\n", encoding="utf-8")
+
+    plan = lab._select_vllm_overlay_plan({lab.VLLM_LOCAL_SOURCE_ENV: str(tmp_path)})
+
+    assert plan.source_kind == "local_connector_overlay"
+    assert plan.local_source == tmp_path
+    assert plan.source_ref == str(tmp_path)
+    assert len(plan.run_commands) == 1
+    assert "/opt/vllm/vllm" in plan.run_commands[0]
+    assert "lmcache_mp_connector.py" in plan.run_commands[0]
+
+
 def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
     tmp_path: Path,
 ) -> None:
