@@ -1,0 +1,140 @@
+{
+  "acceptance_status": "candidate_measured",
+  "benchmark_id": "LC1",
+  "claim_status": "measured",
+  "debug_log_markers": {
+    "lmcache_l0_block": {
+      "matched_lines": [],
+      "status": "missing"
+    },
+    "vllm_gpu_block_allocation": {
+      "matched_lines": [],
+      "status": "missing"
+    }
+  },
+  "eviction_policy": "LRU",
+  "l1_size_gb": "1",
+  "lmcache_log_level": null,
+  "metrics_file": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache_metrics_loaded.prom",
+  "metrics_sample_rate": 1.0,
+  "missing_required_families": [],
+  "packet_id": "b",
+  "required_families": {
+    "l0_l1_throughput": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_bucket",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_count",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_sum"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_bucket",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_count",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_sum"
+      ],
+      "status": "populated"
+    },
+    "l0_lifecycle": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_l0_block_allocated_blocks_total",
+        "lmcache_mp_l0_block_allocation_records_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_l0_block_allocated_blocks_total",
+        "lmcache_mp_l0_block_allocation_records_total"
+      ],
+      "status": "populated"
+    },
+    "l1_eviction": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_l1_evicted_keys_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_l1_evicted_keys_total"
+      ],
+      "status": "populated"
+    },
+    "l1_lifecycle": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_bucket",
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_count",
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_sum",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_bucket",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_count",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_sum",
+        "lmcache_mp_l1_chunk_lifetime_seconds_bucket",
+        "lmcache_mp_l1_chunk_lifetime_seconds_count",
+        "lmcache_mp_l1_chunk_lifetime_seconds_sum",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_bucket",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_count",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_sum"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_bucket",
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_count",
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_sum",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_bucket",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_count",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds_sum",
+        "lmcache_mp_l1_chunk_lifetime_seconds_bucket",
+        "lmcache_mp_l1_chunk_lifetime_seconds_count",
+        "lmcache_mp_l1_chunk_lifetime_seconds_sum",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_bucket",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_count",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds_sum"
+      ],
+      "status": "populated"
+    },
+    "lookup_hits": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_lookup_hit_tokens_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_lookup_hit_tokens_total"
+      ],
+      "status": "populated"
+    },
+    "lookup_reuse": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_lookup_requested_tokens_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_lookup_requested_tokens_total"
+      ],
+      "status": "populated"
+    },
+    "real_reuse": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_real_reuse_gap_chunks_bucket",
+        "lmcache_mp_real_reuse_gap_chunks_count",
+        "lmcache_mp_real_reuse_gap_chunks_sum",
+        "lmcache_mp_real_reuse_gap_seconds_bucket",
+        "lmcache_mp_real_reuse_gap_seconds_count",
+        "lmcache_mp_real_reuse_gap_seconds_sum"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_real_reuse_gap_chunks_bucket",
+        "lmcache_mp_real_reuse_gap_chunks_count",
+        "lmcache_mp_real_reuse_gap_chunks_sum",
+        "lmcache_mp_real_reuse_gap_seconds_bucket",
+        "lmcache_mp_real_reuse_gap_seconds_count",
+        "lmcache_mp_real_reuse_gap_seconds_sum"
+      ],
+      "status": "populated"
+    }
+  },
+  "requires_l0_block_metrics": true,
+  "schema_version": "inferguard-lmcache-mp-packet-b-lifecycle/v1",
+  "sdlc_row_id": "C1",
+  "trace_source": "traces/isb1-dsv4-agent",
+  "vllm_gpu_memory_utilization": "0.65",
+  "vllm_max_model_len": 8192,
+  "workload_manifest": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/workload_manifest.json",
+  "workload_profile": "long_context_agent_kv_offload"
+}

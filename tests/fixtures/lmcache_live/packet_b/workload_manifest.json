@@ -1,0 +1,70 @@
+{
+  "benchmark_id": "LC1",
+  "eviction_policy": "LRU",
+  "l1_size_gb": "1",
+  "lmcache_log_level": null,
+  "metrics_sample_rate": 1.0,
+  "packet_id": "b",
+  "phases": [
+    {
+      "intent": "populate reusable long-context agent KV state",
+      "phase": "warm",
+      "prefix_pattern": "shared-agent-session-prefix",
+      "request_count": 12,
+      "trace_classes": [
+        "coding-long",
+        "prefix-reuse",
+        "session-resume"
+      ]
+    },
+    {
+      "intent": "force unique-prefix KV writes and L1 eviction pressure",
+      "phase": "pressure",
+      "prefix_pattern": "unique-agent-pressure-window",
+      "request_count": 28,
+      "trace_classes": [
+        "kv-pressure",
+        "tool-heavy",
+        "multi-agent-coding"
+      ]
+    },
+    {
+      "intent": "revisit warm agent context to expose reuse and L0/L1 lifecycle",
+      "phase": "retest",
+      "prefix_pattern": "shared-agent-session-prefix",
+      "request_count": 8,
+      "trace_classes": [
+        "coding-long",
+        "prefix-reuse",
+        "session-resume"
+      ]
+    }
+  ],
+  "raw_prompts_recorded": false,
+  "request_count": 48,
+  "request_log": "traffic_requests.jsonl",
+  "required_packet_b_telemetry": [
+    "l0_l1_throughput",
+    "l0_lifecycle",
+    "l1_eviction",
+    "l1_lifecycle",
+    "lookup_hits",
+    "lookup_reuse",
+    "real_reuse"
+  ],
+  "schema_version": "inferguard-lmcache-mp-workload-manifest/v1",
+  "sdlc_row_id": "C1",
+  "trace_source": "traces/isb1-dsv4-agent",
+  "trace_workload_classes": [
+    "coding-long",
+    "kv-pressure",
+    "multi-agent-coding",
+    "prefix-reuse",
+    "session-resume",
+    "tool-heavy"
+  ],
+  "vllm_gpu_memory_utilization": "0.65",
+  "vllm_max_model_len": 8192,
+  "workload": "reuse_eviction",
+  "workload_profile": "long_context_agent_kv_offload"
+}

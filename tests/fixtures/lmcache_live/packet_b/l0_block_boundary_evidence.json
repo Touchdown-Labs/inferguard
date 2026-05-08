@@ -1,0 +1,167 @@
+{
+  "benchmark_id": "LC1",
+  "boundary_event_file": "l0_block_boundary_events.jsonl",
+  "diagnostic_interpretation": {
+    "lmcache_received": true,
+    "lmcache_subscriber_processed": true,
+    "vllm_attempted": true
+  },
+  "packet_b_lifecycle_status": {
+    "acceptance_status": "candidate_measured",
+    "blocked_reason": null,
+    "claim_status": "measured",
+    "missing_required_families": []
+  },
+  "packet_id": "b",
+  "raw_prompts_recorded": false,
+  "schema_version": "inferguard-l0-block-boundary-evidence/v1",
+  "sdlc_row_id": "C1",
+  "summary": {
+    "event_count": 1680,
+    "request_samples": [
+      {
+        "block_count": 139,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_attempt"
+      },
+      {
+        "block_count": 139,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_vllm_multi_process_adapter",
+        "stage": "report_block_allocation_mq_submit"
+      },
+      {
+        "block_count": 139,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_sent"
+      },
+      {
+        "block_count": 139,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_mp_server",
+        "stage": "report_block_allocation_received"
+      },
+      {
+        "block_count": 139,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_l0_lifecycle_subscriber",
+        "stage": "l0_lifecycle_subscriber_processed"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_attempt"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_vllm_multi_process_adapter",
+        "stage": "report_block_allocation_mq_submit"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_sent"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_mp_server",
+        "stage": "report_block_allocation_received"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_l0_lifecycle_subscriber",
+        "stage": "l0_lifecycle_subscriber_processed"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_attempt"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_vllm_multi_process_adapter",
+        "stage": "report_block_allocation_mq_submit"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_sent"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_mp_server",
+        "stage": "report_block_allocation_received"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_l0_lifecycle_subscriber",
+        "stage": "l0_lifecycle_subscriber_processed"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_attempt"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_vllm_multi_process_adapter",
+        "stage": "report_block_allocation_mq_submit"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "vllm_lmcache_mp_connector",
+        "stage": "report_block_allocation_sent"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_mp_server",
+        "stage": "report_block_allocation_received"
+      },
+      {
+        "block_count": 1,
+        "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "source": "lmcache_l0_lifecycle_subscriber",
+        "stage": "l0_lifecycle_subscriber_processed"
+      }
+    ],
+    "source_counts": {
+      "lmcache_l0_lifecycle_subscriber": 336,
+      "lmcache_mp_server": 336,
+      "lmcache_vllm_multi_process_adapter": 336,
+      "vllm_lmcache_mp_connector": 672
+    },
+    "stage_counts": {
+      "l0_lifecycle_subscriber_processed": 336,
+      "report_block_allocation_attempt": 336,
+      "report_block_allocation_mq_submit": 336,
+      "report_block_allocation_received": 336,
+      "report_block_allocation_sent": 336
+    },
+    "total_reported_blocks": 58460
+  },
+  "vllm_overlay": {
+    "installed_connector_path": "/usr/local/lib/python3.11/site-packages/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py",
+    "installed_connector_sha256": "1ee8e98f47e15b4d04c1aa89e74cd51c17ce5f6cf63d9652759ffd093dcedac6",
+    "overlaid_file": "distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py",
+    "source_connector_sha256": null,
+    "source_git_head": null,
+    "source_kind": "local_connector_overlay",
+    "source_ref": "/Users/chen/Projects/vllm"
+  }
+}

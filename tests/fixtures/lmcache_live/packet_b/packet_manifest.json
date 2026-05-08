@@ -1,0 +1,1811 @@
+{
+  "artifacts": {
+    "engine_log": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/engine.log",
+    "engine_metrics": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/engine_metrics.prom",
+    "lmcache_commit_id": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_commit_id.txt",
+    "lmcache_compat_report": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_compat_report.json",
+    "lmcache_conf": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_conf.txt",
+    "lmcache_health": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_health.txt",
+    "lmcache_http_evidence": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_http_evidence.json",
+    "lmcache_lmc_version": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_lmc_version.txt",
+    "lmcache_log": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache.log",
+    "lmcache_log_evidence": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_log_evidence.json",
+    "lmcache_lookup_hash_artifact": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lookup_hashes",
+    "lmcache_lookup_hash_evidence": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_lookup_hash_evidence.json",
+    "lmcache_metrics": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_metrics.prom",
+    "lmcache_periodic_threads": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_periodic_threads.txt",
+    "lmcache_periodic_threads_health": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_periodic_threads_health.txt",
+    "lmcache_quota": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_quota.txt",
+    "lmcache_root": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_root.txt",
+    "lmcache_status": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_status.txt",
+    "lmcache_threads": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_threads.txt",
+    "lmcache_trace": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_trace.lct",
+    "lmcache_trace_evidence": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_trace_evidence.json",
+    "lmcache_trace_replay_artifact": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/trace-replay",
+    "lmcache_trace_replay_evidence": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_trace_replay_evidence.json",
+    "lmcache_version": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache-packet/lmcache_version.txt"
+  },
+  "claim_status": "measured",
+  "compat_summary": {
+    "failure_reasons": [],
+    "surfaces": {
+      "lmcache_cacheblend": {
+        "family_count": 9,
+        "missing": 0,
+        "not_applicable": 9,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_embedded": {
+        "family_count": 20,
+        "missing": 0,
+        "not_applicable": 20,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_http": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_logs": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_lookup_hash": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_mp": {
+        "family_count": 16,
+        "missing": 3,
+        "not_applicable": 3,
+        "populated": 8,
+        "status": "partial",
+        "zero": 2
+      },
+      "lmcache_otel": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_trace_recording": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_trace_replay": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "vllm_prefix_cache": {
+        "family_count": 4,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 4,
+        "status": "complete",
+        "zero": 0
+      },
+      "vllm_simple_cpu_offload": {
+        "family_count": 2,
+        "missing": 2,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      }
+    },
+    "upstream_questions": [
+      {
+        "code": "lmcache_mp_l0_lifecycle_missing",
+        "owner_question": "Which LMCache/vLLM ref emits lmcache_mp_l0_block_* for LMCacheMPConnector runs, and what launch/runtime condition enables it?"
+      },
+      {
+        "code": "lmcache_mp_empty_cache_salt",
+        "owner_question": "Should the vLLM LMCacheMPConnector propagate cache_salt for this workload, or is an empty cache_salt expected for single-tenant runs?"
+      },
+      {
+        "code": "vllm_external_prefix_no_hits",
+        "owner_question": "Should this vLLM connector path report external prefix hits or external_kv_transfer tokens when LMCache L1 activity is present?"
+      }
+    ]
+  },
+  "detected_mode": "mp",
+  "expect_mode": "mp",
+  "generated_at": "2026-05-08T17:37:06Z",
+  "http_evidence": {
+    "booleans": {
+      "has_commit_id": true,
+      "has_conf": true,
+      "has_health": true,
+      "has_lmc_version": true,
+      "has_metrics": false,
+      "has_periodic_thread": false,
+      "has_periodic_threads": true,
+      "has_periodic_threads_health": true,
+      "has_quota": true,
+      "has_root": true,
+      "has_status": true,
+      "has_threads": true,
+      "has_version": true,
+      "is_healthy": true
+    },
+    "endpoints": {
+      "commit_id": {
+        "content_type": "json",
+        "fields": {},
+        "json_type": "str",
+        "present": true,
+        "raw_length": 11,
+        "status": "unknown"
+      },
+      "conf": {
+        "content_type": "json",
+        "fields": {
+          "storage_manager": {
+            "eviction_config": {
+              "eviction_policy": "LRU",
+              "eviction_ratio": 0.2,
+              "trigger_watermark": 0.8
+            },
+            "l1_manager_config": {
+              "memory_config": {
+                "align_bytes": 4096,
+                "init_size_in_bytes": 1073741824,
+                "size_in_bytes": 1073741824,
+                "use_lazy": true
+              },
+              "read_ttl_seconds": 300,
+              "write_ttl_seconds": 600
+            },
+            "l2_adapter_config": {
+              "adapters": []
+            },
+            "prefetch_max_in_flight": 8,
+            "prefetch_policy": "default",
+            "store_policy": "default"
+          }
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 1572,
+        "status": "unknown"
+      },
+      "health": {
+        "content_type": "json",
+        "fields": {
+          "status": "healthy"
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 20,
+        "status": "healthy"
+      },
+      "lmc_version": {
+        "content_type": "json",
+        "fields": {},
+        "json_type": "str",
+        "present": true,
+        "raw_length": 13,
+        "status": "unknown"
+      },
+      "periodic_threads": {
+        "content_type": "json",
+        "fields": {
+          "threads": []
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 263,
+        "status": "unknown"
+      },
+      "periodic_threads_health": {
+        "content_type": "json",
+        "fields": {
+          "healthy": true
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 59,
+        "status": "healthy"
+      },
+      "quota": {
+        "content_type": "json",
+        "fields": {},
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 12,
+        "status": "unknown"
+      },
+      "root": {
+        "content_type": "json",
+        "fields": {
+          "status": "ok"
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 44,
+        "status": "healthy"
+      },
+      "status": {
+        "content_type": "json",
+        "fields": {
+          "active_prefetch_jobs": 0,
+          "active_sessions": 0,
+          "chunk_size": 256,
+          "engine_type": "MPCacheEngine",
+          "is_healthy": true,
+          "registered_gpu_ids": [
+            84
+          ],
+          "storage_manager": {
+            "is_healthy": true,
+            "l1_eviction_controller": {
+              "eviction_policy": "LRU",
+              "eviction_ratio": 0.2,
+              "is_healthy": true,
+              "thread_alive": true,
+              "trigger_watermark": 0.8
+            },
+            "l1_manager": {
+              "is_healthy": true,
+              "memory_total_bytes": 1073741824,
+              "memory_usage_ratio": 0.73828125,
+              "memory_used_bytes": 792723456,
+              "read_locked_count": 0,
+              "read_ttl_seconds": 300,
+              "temporary_count": 0,
+              "total_object_count": 21,
+              "write_locked_count": 0,
+              "write_ttl_seconds": 600
+            },
+            "l2_adapters": [],
+            "l2_eviction_controller": {
+              "adapters": [],
+              "is_healthy": true,
+              "thread_alive": true
+            },
+            "num_l2_adapters": 0,
+            "prefetch_controller": {
+              "completed_results_count": 0,
+              "in_flight_request_count": 0,
+              "is_healthy": true,
+              "load_phase_count": 0,
+              "lookup_phase_count": 0,
+              "max_in_flight": 8,
+              "num_l2_adapters": 0,
+              "pending_queue_size": 0,
+              "submission_queue_size": 0,
+              "thread_alive": true
+            },
+            "store_controller": {
+              "in_flight_task_count": 0,
+              "is_healthy": true,
+              "num_l2_adapters": 0,
+              "pending_keys_count": 0,
+              "thread_alive": true
+            }
+          }
+        },
+        "json_type": "dict",
+        "present": true,
+        "raw_length": 1517,
+        "status": "healthy"
+      },
+      "threads": {
+        "content_type": "text",
+        "present": true,
+        "raw_length": 8231,
+        "status": "unknown",
+        "summary": "Thread: <_MainThread(MainThread, started 47406399404928)>\nStack trace:\n  File \"/usr/local/bin/lmcache\", line 6, in <module>\n    sys.exit(main())\n  File \"/opt/lmcache/lmcache/cli/main.py\", line 37, in main\n    args.func(args)\n  File \"/opt..."
+      },
+      "version": {
+        "content_type": "json",
+        "fields": {},
+        "json_type": "str",
+        "present": true,
+        "raw_length": 23,
+        "status": "unknown"
+      }
+    },
+    "failure_reasons": [],
+    "schema_version": "inferguard-lmcache-http-evidence/v1",
+    "skipped_endpoints": [
+      {
+        "endpoint": "GET /env",
+        "reason": "sensitive environment disclosure; collect-lmcache does not fetch it by default",
+        "status": "sensitive_skipped"
+      },
+      {
+        "endpoint": "POST /api/clear-cache",
+        "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
+        "status": "destructive_skipped"
+      },
+      {
+        "endpoint": "POST /metrics/reset",
+        "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
+        "status": "destructive_skipped"
+      },
+      {
+        "endpoint": "quota mutation endpoints",
+        "reason": "mutating quota routes are excluded; collect-lmcache only fetches safe GET /api/quota",
+        "status": "destructive_skipped"
+      }
+    ]
+  },
+  "l2_configured": false,
+  "log_evidence": {
+    "booleans": {
+      "has_config_hints": true,
+      "has_health_startup": true,
+      "has_nixl_proxy": false,
+      "has_nixl_request": false,
+      "has_p2p_peer": false,
+      "has_p2p_transfer": false,
+      "has_p2p_transfer_failure": false,
+      "has_p2p_transfer_speed": false,
+      "has_pd_receiver": false,
+      "has_pd_role_mismatch": false,
+      "has_pd_sender": false,
+      "has_pd_stall": false,
+      "has_prefetch_complete": true,
+      "has_retrieve": false,
+      "has_stale_lmcache_connector": false,
+      "has_store": true
+    },
+    "config": {
+      "connectors": [
+        "LMCacheMPConnector"
+      ],
+      "enable_async_loading": null,
+      "enable_p2p": null,
+      "enable_pd": null,
+      "pythonhashseed_seen": false,
+      "pythonhashseed_values": [],
+      "stale_lmcache_connector_seen": false
+    },
+    "event_counts": {
+      "health_startup": 12,
+      "nixl_proxy": 0,
+      "nixl_request": 0,
+      "p2p_peer": 0,
+      "p2p_transfer": 0,
+      "p2p_transfer_failure": 0,
+      "p2p_transfer_speed": 0,
+      "pd_receiver": 0,
+      "pd_role_mismatch": 0,
+      "pd_sender": 0,
+      "pd_stall": 0,
+      "prefetch_complete": 45,
+      "retrieve": 0,
+      "store": 11
+    },
+    "findings": [],
+    "line_count": 437,
+    "mode_candidates": [
+      "mp"
+    ],
+    "numeric_hints": {
+      "p2p_transfer_speed": []
+    },
+    "schema_version": "inferguard-lmcache-logs/v1",
+    "snippets": {
+      "health_startup": [
+        "(APIServer pid=71) INFO 05-08 17:32:30 [api_server.py:602] Starting vLLM server on http://0.0.0.0:8000",
+        "(EngineCore pid=84) \u001b[32;20m[2026-05-08 17:32:34,398] LMCache INFO:\u001b[0m Started PeriodicThread: lmcache-heartbeat (level=critical, interval=10.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v1.periodic_thread...",
+        "(EngineCore pid=84) \u001b[32;20m[2026-05-08 17:32:34,816] LMCache INFO:\u001b[0m Started PeriodicThread: lmcache-heartbeat (level=critical, interval=10.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v1.periodic_thread...",
+        "\u001b[32;20m[2026-05-08 17:31:02,911] LMCache INFO:\u001b[0m Starting LMCache HTTP server on http://0.0.0.0:8080 \u001b[3m(http_server.py:154:lmcache.v1.multiprocess.http_server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:31:02,969] LMCache INFO:\u001b[0m Starting LMCache HTTP server... (CUDA available: True) \u001b[3m(http_server.py:59:lmcache.v1.multiprocess.http_server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:31:03,827] LMCache INFO:\u001b[0m LookupHashLoggingSubscriber started: output_dir=/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lookup_hashes, rotation_interval=21600s, rotation_max_size=10..."
+      ],
+      "nixl_proxy": [],
+      "nixl_request": [],
+      "p2p_peer": [],
+      "p2p_transfer": [],
+      "p2p_transfer_failure": [],
+      "p2p_transfer_speed": [],
+      "pd_receiver": [],
+      "pd_role_mismatch": [],
+      "pd_sender": [],
+      "pd_stall": [],
+      "prefetch_complete": [
+        "\u001b[32;20m[2026-05-08 17:32:36,857] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 2.2 ms (external_request_id=cmpl-86e9e36ac2235e63-0-a3793816, prefetch_request_id=-1) \u001b[3m(storag...",
+        "\u001b[32;20m[2026-05-08 17:32:38,530] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.8 ms (external_request_id=cmpl-8ab3a7f05f56b47f-0-b80fa20e, prefetch_request_id=-1) \u001b[3m(storag...",
+        "\u001b[32;20m[2026-05-08 17:32:40,203] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.7 ms (external_request_id=cmpl-bd5c0abffb0c5975-0-a930a83d, prefetch_request_id=-1) \u001b[3m(storag...",
+        "\u001b[32;20m[2026-05-08 17:32:41,874] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.4 ms (external_request_id=cmpl-a41c66ae303c106b-0-96a785c0, prefetch_request_id=-1) \u001b[3m(storag...",
+        "\u001b[32;20m[2026-05-08 17:32:43,544] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.2 ms (external_request_id=cmpl-849d016e638497a8-0-8d35b0f3, prefetch_request_id=-1) \u001b[3m(storag...",
+        "\u001b[32;20m[2026-05-08 17:32:45,215] LMCache INFO:\u001b[0m Prefetch request completed (L1+L2): 8/8 prefix hits (8 L1, 0 L2) in 1.5 ms (external_request_id=cmpl-986d72cc1e5c6b4d-0-84b3288d, prefetch_request_id=-1) \u001b[3m(storag..."
+      ],
+      "retrieve": [],
+      "store": [
+        "\u001b[32;20m[2026-05-08 17:31:05,153] LMCache INFO:\u001b[0m Starting StoreController... \u001b[3m(store_controller.py:271:lmcache.v1.distributed.storage_controllers.store_controller)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:32:34,838] LMCache INFO:\u001b[0m Stored 2048 tokens in 0.018 seconds \u001b[3m(server.py:462:lmcache.v1.multiprocess.server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:32:35,806] LMCache INFO:\u001b[0m Stored 256 tokens in 0.002 seconds \u001b[3m(server.py:462:lmcache.v1.multiprocess.server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:32:37,478] LMCache INFO:\u001b[0m Stored 256 tokens in 0.002 seconds \u001b[3m(server.py:462:lmcache.v1.multiprocess.server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:32:39,152] LMCache INFO:\u001b[0m Stored 256 tokens in 0.002 seconds \u001b[3m(server.py:462:lmcache.v1.multiprocess.server)\u001b[0m",
+        "\u001b[32;20m[2026-05-08 17:32:40,825] LMCache INFO:\u001b[0m Stored 256 tokens in 0.002 seconds \u001b[3m(server.py:462:lmcache.v1.multiprocess.server)\u001b[0m"
+      ]
+    }
+  },
+  "lookup_hash_evidence": {
+    "claim_status": "measured",
+    "file_count": 1,
+    "files": [
+      {
+        "chunk_hash_count": {
+          "count": 48,
+          "max": 19,
+          "min": 8,
+          "total": 692
+        },
+        "chunk_sizes": [
+          256
+        ],
+        "claim_status": "measured",
+        "config_evidence": {},
+        "dtypes": [
+          [
+            "torch.bfloat16"
+          ]
+        ],
+        "file_size_bytes": 59518,
+        "malformed_rows": 0,
+        "models": [
+          "Qwen/Qwen3-8B"
+        ],
+        "parse_errors": [],
+        "present": true,
+        "row_count": 48,
+        "rows": [
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261554.4014416
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-86e9e36ac2235e63-0-a3793816",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261556.8551016
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8ab3a7f05f56b47f-0-b80fa20e",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261558.5286808
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-bd5c0abffb0c5975-0-a930a83d",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261560.2020383
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a41c66ae303c106b-0-96a785c0",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261561.872721
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-849d016e638497a8-0-8d35b0f3",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261563.5429738
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-986d72cc1e5c6b4d-0-84b3288d",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261565.2136502
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-837f5a9729e679f8-0-97c3eab1",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261566.8837316
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-baf9484b024160f7-0-b5b0ef04",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261568.5537574
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-82d0ab1c3f823bc1-0-9f7c73db",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261570.2230997
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b85fe7c4a2742354-0-8404bddf",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261571.8928485
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a98dcc77b5352a38-0-b5e950f5",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261573.5662017
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-899ce631bd85daff-0-b038147b",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261575.2447636
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-86918d874ef108b2-0-9c070650",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261577.0430984
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8ffec45981b95323-0-ab015d06",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261578.7972946
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8b5bb1f3087442e7-0-82b12e8a",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261580.5358496
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-ba90ed8f21d59085-0-91c2c719",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261582.279615
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-94307a37fe44d3ef-0-8e65f7d3",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261584.0194063
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-99d044c53b235906-0-983a9efc",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261585.7566745
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8f5a153e1984b2fd-0-8648b8bb",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261587.496429
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8ebe4af699b23b6a-0-88fe843c",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261589.2355666
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8bcc37101bc35fec-0-83a33537",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261590.9777343
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a65af63a2dbdec7d-0-ae3dc310",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261592.7156048
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-9545c991a37e6060-0-a79f06a6",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261594.4552307
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b1d66d66625c1fe7-0-94ba9342",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261596.1929026
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a398ca2629665675-0-89fc0db5",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261597.9306183
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-89c161cd48feb14f-0-8ac0583b",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261599.6690154
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-bd3722eea78d19b2-0-9c3eb8a9",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261601.408577
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b61ab0378a6d9b49-0-9d1ee9e5",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261603.145861
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b6e2660577972e56-0-8ce60fcc",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261604.884784
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-87c662846984b59f-0-b7c6ea97",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261606.6230369
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-93811119099e6651-0-9d46aeea",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261608.3619635
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a5e1f002f5c4c7ac-0-af5d84f3",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261610.1010206
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-861f646aa6b49075-0-a1ebf345",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261611.8389926
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-aa550600f1c6a22b-0-b335aff3",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261613.579093
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-960ea47ea0dff3b2-0-ac4b3a3b",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261615.3182142
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8de6bda547cddc90-0-a1fe797a",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261617.0569122
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-84427261e748b858-0-ada2de61",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261618.7955399
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-9bacb6fa4835c010-0-b9c552dd",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261620.5354512
+          },
+          {
+            "chunk_hashes": {
+              "count": 19,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-8bbe477b7215698a-0-afdbd40d",
+            "seq_len": 4917,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261622.2734804
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b55e90a81ddd487d-0-b6e2a1c1",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261624.0072517
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-bef42f959a96947e-0-b84a1302",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261625.675532
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-b5bb835d4c773f02-0-be3d6239",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261627.3431368
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-9dff9033715244db-0-a82580c7",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261629.011332
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-a282a9956c80b3d7-0-9f3e7ba5",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261630.6792445
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-bcbe70fc0fbaa68d-0-88a1e13b",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261632.3461266
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-9abecfd1443f55a3-0-bd90d8c5",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261634.0130634
+          },
+          {
+            "chunk_hashes": {
+              "count": 8,
+              "redacted": true
+            },
+            "chunk_size": 256,
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "model_name": "Qwen/Qwen3-8B",
+            "request_id": "cmpl-9bc13b4dac39722a-0-a36ff6bb",
+            "seq_len": 2213,
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ],
+            "timestamp": 1778261635.680463
+          }
+        ],
+        "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1",
+        "seq_len": {
+          "count": 48,
+          "max": 4917,
+          "min": 2213,
+          "total": 181936
+        },
+        "shapes": [
+          [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ]
+        ],
+        "truncated": false
+      }
+    ],
+    "malformed_rows": 0,
+    "present": true,
+    "row_count": 48,
+    "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1",
+    "source_type": "directory"
+  },
+  "otel_evidence": null,
+  "schema_version": "inferguard-lmcache-packet/v1",
+  "scrape_errors": [],
+  "skipped_endpoints": [
+    {
+      "endpoint": "GET /env",
+      "reason": "sensitive environment disclosure; collect-lmcache does not fetch it by default",
+      "status": "sensitive_skipped"
+    },
+    {
+      "endpoint": "POST /api/clear-cache",
+      "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
+      "status": "destructive_skipped"
+    },
+    {
+      "endpoint": "POST /metrics/reset",
+      "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
+      "status": "destructive_skipped"
+    },
+    {
+      "endpoint": "quota mutation endpoints",
+      "reason": "mutating quota routes are excluded; collect-lmcache only fetches safe GET /api/quota",
+      "status": "destructive_skipped"
+    }
+  ],
+  "sources": {
+    "engine_log": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/vllm.log",
+    "engine_metrics": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/vllm_metrics_loaded.prom",
+    "lmcache_commit_id": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/commit_id.txt",
+    "lmcache_conf": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/conf.json",
+    "lmcache_health": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/healthcheck.json",
+    "lmcache_lmc_version": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/lmc_version.txt",
+    "lmcache_log": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache.log",
+    "lmcache_lookup_hash_artifact": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lookup_hashes",
+    "lmcache_metrics": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache_metrics_loaded.prom",
+    "lmcache_periodic_threads": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/periodic_threads.json",
+    "lmcache_periodic_threads_health": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/periodic_threads_health.json",
+    "lmcache_quota": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/quota.json",
+    "lmcache_root": "http://127.0.0.1:8080",
+    "lmcache_status": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/status.json",
+    "lmcache_threads": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/threads.json",
+    "lmcache_trace": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/lmcache_trace.lct",
+    "lmcache_trace_replay_artifact": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/trace-replay",
+    "lmcache_version": "/out/packet-b-lifecycle-reuse-eviction/20260508T173047Z/http/version.txt"
+  },
+  "trace_evidence": {
+    "claim_status": "measured",
+    "file_size_bytes": 180621,
+    "first_record": {
+      "args": {
+        "external_request_id": "cmpl-a3714db4ec99cda5-0-92c5421d",
+        "extra_count": 0,
+        "keys": [
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          },
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          }
+        ],
+        "layout_desc": {
+          "__t__": "MemoryLayoutDesc",
+          "v": {
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ]
+          }
+        }
+      },
+      "qualname": "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task"
+    },
+    "header": {
+      "format_version": 1,
+      "level": "storage",
+      "magic": "<bytes:4>",
+      "sm_config_digest": "ad94701427c47af933c4dea664419984752b96438d013bb4fd4939abbf67d5b0",
+      "sm_config_json": "{\"eviction_config\": {\"eviction_policy\": \"LRU\", \"eviction_ratio\": 0.2, \"trigger_watermark\": 0.8}, \"l1_manager_config\": {\"memory_config\": {\"align_bytes\": 4096, \"init_size_in_bytes\": 1073741824, \"size_in_bytes\": 1073741824, \"use_lazy\": true}, \"read_ttl_seconds\": 300, \"write_ttl_seconds\": 600}, \"l2_adapter_config\": {\"adapters\": []}, \"prefetch_max_in_flight\": 8, \"prefetch_policy\": \"default\", \"store_policy\": \"default\"}",
+      "t_mono_start": 17.508994948,
+      "t_wall_start": 1778261463.8292346,
+      "trace_schema_version": 1,
+      "type": "header"
+    },
+    "last_record": {
+      "args": {
+        "keys": [
+          {
+            "__t__": "ObjectKey",
+            "v": {
+              "chunk_hash": "<bytes:32>",
+              "kv_rank": 16777472,
+              "model_name": "Qwen/Qwen3-8B"
+            }
+          }
+        ],
+        "layout_desc": {
+          "__t__": "MemoryLayoutDesc",
+          "v": {
+            "dtypes": [
+              "torch.bfloat16"
+            ],
+            "shapes": [
+              [
+                2,
+                36,
+                256,
+                1024
+              ]
+            ]
+          }
+        },
+        "mode": "new"
+      },
+      "qualname": "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write"
+    },
+    "parse_error": "",
+    "present": true,
+    "record_count": 152,
+    "schema_version": "inferguard-lmcache-trace-evidence/v1",
+    "sha256": "648a62132584421948bb6ff542ee9061980cd69477ac13064d92c1e9456c6fa3",
+    "storage_calls": {
+      "finish_read_prefetched": 45,
+      "finish_write": 10,
+      "reserve_write": 49,
+      "submit_prefetch_task": 48
+    },
+    "truncated": false
+  },
+  "trace_replay_evidence": {
+    "claim_status": "measured",
+    "duration_s": 172.47317814826965,
+    "failed_rows": 0,
+    "file_size_bytes": 24227,
+    "latency_ms": {
+      "lmcache.v1.distributed.storage_manager.StorageManager.finish_read_prefetched": {
+        "avg": 0.1362893442598701,
+        "count": 57.0,
+        "max": 0.20260700000562792,
+        "min": 0.095517
+      },
+      "lmcache.v1.distributed.storage_manager.StorageManager.finish_write": {
+        "avg": 0.1343035272631999,
+        "count": 22.0,
+        "max": 0.180938,
+        "min": 0.09678999998641302
+      },
+      "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write": {
+        "avg": 0.29535033054232107,
+        "count": 61.0,
+        "max": 0.565884,
+        "min": 0.08155099999385129
+      },
+      "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task": {
+        "avg": 0.14877385728984904,
+        "count": 60.0,
+        "max": 0.171403,
+        "min": 0.10614299998223942
+      }
+    },
+    "op_counts": {
+      "lmcache.v1.distributed.storage_manager.StorageManager.finish_read_prefetched": 180,
+      "lmcache.v1.distributed.storage_manager.StorageManager.finish_write": 40,
+      "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write": 196,
+      "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task": 192
+    },
+    "op_errors": {},
+    "parse_errors": [],
+    "present": true,
+    "replay_info": {
+      "duration_s": "172.472s",
+      "format_version": 1,
+      "level": "storage",
+      "sm_config_digest": "ad94701427c47af933c4dea664419984752b96438d013bb4fd4939abbf67d5b0",
+      "total_records": 152,
+      "trace_schema_version": 1
+    },
+    "rows_seen": 156,
+    "schema_version": "inferguard-lmcache-trace-replay-evidence/v1",
+    "source_kind": "directory"
+  }
+}
