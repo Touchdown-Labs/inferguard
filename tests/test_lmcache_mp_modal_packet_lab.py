@@ -598,6 +598,86 @@ def test_packet_b_agent_kv_offload_report_records_blocked_l0_gap(tmp_path: Path)
     assert report["diagnosis"]["operator_facing_code"] == "lmcache_mp_l0_lifecycle_missing"
 
 
+def test_packet_b_l0_boundary_evidence_summarizes_redacted_events(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "vllm_overlay_plan.json").write_text(
+        json.dumps(
+            {
+                "source_kind": "local_connector_overlay",
+                "source_ref": "/Users/chen/Projects/vllm",
+                "overlaid_file": "distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py",
+                "source_git_head": "abc123",
+                "source_connector_sha256": "source-sha",
+                "installed_connector_path": "/site-packages/vllm/lmcache_mp_connector.py",
+                "installed_connector_sha256": "installed-sha",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "packet-b-lifecycle-evidence.json").write_text(
+        json.dumps(
+            {
+                "claim_status": "not_proven",
+                "acceptance_status": "blocked",
+                "blocked_reason": "lmcache_mp_l0_block_metrics_absent",
+                "missing_required_families": ["l0_lifecycle"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "l0_block_boundary_events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "source": "vllm_lmcache_mp_connector",
+                        "stage": "report_block_allocation_attempt",
+                        "records": [{"request_id": "req-1", "block_count": 2}],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "source": "lmcache_mp_server",
+                        "stage": "report_block_allocation_received",
+                        "records": [{"request_id": "req-1", "block_count": 2}],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    lab._write_l0_block_boundary_evidence(tmp_path, spec)
+
+    proof = json.loads((tmp_path / "l0_block_boundary_evidence.json").read_text(encoding="utf-8"))
+    assert proof["schema_version"] == "inferguard-l0-block-boundary-evidence/v1"
+    assert proof["raw_prompts_recorded"] is False
+    assert proof["summary"]["stage_counts"]["report_block_allocation_attempt"] == 1
+    assert proof["summary"]["stage_counts"]["report_block_allocation_received"] == 1
+    assert proof["summary"]["request_samples"] == [
+        {
+            "stage": "report_block_allocation_attempt",
+            "source": "vllm_lmcache_mp_connector",
+            "request_id": "req-1",
+            "block_count": 2,
+        },
+        {
+            "stage": "report_block_allocation_received",
+            "source": "lmcache_mp_server",
+            "request_id": "req-1",
+            "block_count": 2,
+        },
+    ]
+    assert proof["diagnostic_interpretation"]["vllm_attempted"] is True
+    assert proof["diagnostic_interpretation"]["lmcache_received"] is True
+    assert proof["diagnostic_interpretation"]["lmcache_subscriber_processed"] is False
+    assert proof["vllm_overlay"]["source_git_head"] == "abc123"
+    assert proof["raw_prompts_recorded"] is False
+    assert "new_token_ids" not in json.dumps(proof)
+
+
 def test_packet_b_lifecycle_evidence_records_debug_log_markers(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]

@@ -11,6 +11,7 @@ Outputs are written to the persistent Modal volume mounted at /out, under
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shlex
@@ -98,6 +99,9 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
 )
 PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
 AGENT_KV_OFFLOAD_REPORT_FILE = "agent_kv_offload_report.json"
+L0_BLOCK_BOUNDARY_EVENTS_FILE = "l0_block_boundary_events.jsonl"
+L0_BLOCK_BOUNDARY_EVIDENCE_FILE = "l0_block_boundary_evidence.json"
+L0_BLOCK_BOUNDARY_EVIDENCE_ENV = "INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"
 WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
 PACKET_B_TRACE_SOURCE = "traces/isb1-dsv4-agent"
 PACKET_B_TRACE_CLASSES = (
@@ -229,19 +233,75 @@ class VllmOverlayPlan:
         }
 
 
+def _sha256_file(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _git_head(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _installed_vllm_connector_path() -> Path | None:
+    try:
+        import vllm
+    except ImportError:
+        return None
+    return Path(vllm.__file__).parent / VLLM_CONNECTOR_RELATIVE_PATH
+
+
+def _augment_vllm_overlay_plan(plan: dict[str, object]) -> dict[str, object]:
+    local_source = plan.get("local_source")
+    local_root = Path(str(local_source)).expanduser() if local_source else None
+    source_connector = local_root / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH if local_root else None
+    installed_connector = _installed_vllm_connector_path()
+    plan.update(
+        {
+            "source_git_head": _git_head(local_root) if local_root else None,
+            "source_connector_sha256": _sha256_file(source_connector) if source_connector else None,
+            "installed_connector_path": str(installed_connector) if installed_connector else None,
+            "installed_connector_sha256": (
+                _sha256_file(installed_connector) if installed_connector else None
+            ),
+        }
+    )
+    return plan
+
+
 def _runtime_vllm_overlay_plan_dict() -> dict[str, object]:
     """Return the vLLM overlay plan, preserving image-build runtime evidence."""
     source_kind = os.environ.get("INFERGUARD_VLLM_SOURCE_KIND", "").strip()
     source_ref = os.environ.get("INFERGUARD_VLLM_SOURCE_REF", "").strip()
     if source_kind and source_kind != VLLM_OVERLAY_PLAN.source_kind:
-        return {
-            "source_kind": source_kind,
-            "run_commands": list(VLLM_OVERLAY_PLAN.run_commands),
-            "local_source": source_ref or None,
-            "source_ref": source_ref or None,
-            "overlaid_file": str(VLLM_CONNECTOR_RELATIVE_PATH) if source_ref else None,
-        }
-    return VLLM_OVERLAY_PLAN.as_dict()
+        return _augment_vllm_overlay_plan(
+            {
+                "source_kind": source_kind,
+                "run_commands": list(VLLM_OVERLAY_PLAN.run_commands),
+                "local_source": source_ref or None,
+                "source_ref": source_ref or None,
+                "overlaid_file": str(VLLM_CONNECTOR_RELATIVE_PATH) if source_ref else None,
+            }
+        )
+    return _augment_vllm_overlay_plan(VLLM_OVERLAY_PLAN.as_dict())
 
 
 BASE_MODAL_PIP_PACKAGES = (
@@ -505,6 +565,7 @@ PACKETS: dict[str, PacketSpec] = {
             WORKLOAD_MANIFEST_FILE,
             PACKET_B_LIFECYCLE_EVIDENCE_FILE,
             AGENT_KV_OFFLOAD_REPORT_FILE,
+            L0_BLOCK_BOUNDARY_EVIDENCE_FILE,
             "traffic.log",
         ),
         notes=(
@@ -827,6 +888,8 @@ def _launch_lmcache(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subp
     )
     env = os.environ.copy()
     env.update(env_update)
+    if spec.packet_id == "b":
+        env[L0_BLOCK_BOUNDARY_EVIDENCE_ENV] = str(run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
 
@@ -864,7 +927,10 @@ def _launch_vllm(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subproc
     log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
     cmd = _build_vllm_command(spec)
     (run_dir / "vllm_command.json").write_text(json.dumps(cmd, indent=2) + "\n", encoding="utf-8")
-    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
+    env = os.environ.copy()
+    if spec.packet_id == "b":
+        env[L0_BLOCK_BOUNDARY_EVIDENCE_ENV] = str(run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
+    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
 
 
@@ -1323,6 +1389,105 @@ def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
     )
 
 
+def _read_l0_block_boundary_events(run_dir: Path) -> list[dict[str, object]]:
+    path = run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE
+    events: list[dict[str, object]] = []
+    if not path.exists():
+        return events
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            events.append(payload)
+    return events
+
+
+def _summarize_l0_block_boundary_events(events: list[dict[str, object]]) -> dict[str, object]:
+    stage_counts: dict[str, int] = {}
+    source_counts: dict[str, int] = {}
+    request_samples: list[dict[str, object]] = []
+    total_blocks = 0
+    for event in events:
+        stage = str(event.get("stage", "unknown"))
+        source = str(event.get("source", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        source_counts[source] = source_counts.get(source, 0) + 1
+        records = event.get("records")
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            block_count = int(record.get("block_count", 0) or 0)
+            total_blocks += block_count
+            if len(request_samples) < 20:
+                request_samples.append(
+                    {
+                        "stage": stage,
+                        "source": source,
+                        "request_id": str(record.get("request_id", "")),
+                        "block_count": block_count,
+                    }
+                )
+    return {
+        "event_count": len(events),
+        "stage_counts": stage_counts,
+        "source_counts": source_counts,
+        "total_reported_blocks": total_blocks,
+        "request_samples": request_samples,
+    }
+
+
+def _write_l0_block_boundary_evidence(run_dir: Path, spec: PacketSpec) -> None:
+    if spec.packet_id != "b":
+        return
+    events = _read_l0_block_boundary_events(run_dir)
+    summary = _summarize_l0_block_boundary_events(events)
+    overlay = _read_json(run_dir / "vllm_overlay_plan.json")
+    evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
+    overlay = overlay if isinstance(overlay, dict) else {}
+    evidence = evidence if isinstance(evidence, dict) else {}
+    payload = {
+        "schema_version": "inferguard-l0-block-boundary-evidence/v1",
+        "packet_id": spec.packet_id,
+        "sdlc_row_id": spec.sdlc_row_id,
+        "benchmark_id": spec.benchmark_id,
+        "raw_prompts_recorded": False,
+        "boundary_event_file": L0_BLOCK_BOUNDARY_EVENTS_FILE,
+        "summary": summary,
+        "vllm_overlay": {
+            "source_kind": overlay.get("source_kind"),
+            "source_ref": overlay.get("source_ref"),
+            "overlaid_file": overlay.get("overlaid_file"),
+            "source_git_head": overlay.get("source_git_head"),
+            "source_connector_sha256": overlay.get("source_connector_sha256"),
+            "installed_connector_path": overlay.get("installed_connector_path"),
+            "installed_connector_sha256": overlay.get("installed_connector_sha256"),
+        },
+        "packet_b_lifecycle_status": {
+            "claim_status": evidence.get("claim_status"),
+            "acceptance_status": evidence.get("acceptance_status"),
+            "blocked_reason": evidence.get("blocked_reason"),
+            "missing_required_families": evidence.get("missing_required_families", []),
+        },
+        "diagnostic_interpretation": {
+            "vllm_attempted": summary["stage_counts"].get("report_block_allocation_attempt", 0) > 0,
+            "lmcache_received": summary["stage_counts"].get("report_block_allocation_received", 0) > 0,
+            "lmcache_subscriber_processed": (
+                summary["stage_counts"].get("l0_lifecycle_subscriber_processed", 0) > 0
+            ),
+        },
+    }
+    (run_dir / L0_BLOCK_BOUNDARY_EVIDENCE_FILE).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
     if spec.packet_id != "b":
         return
@@ -1385,6 +1550,7 @@ def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
         "artifacts": {
             "workload_manifest": WORKLOAD_MANIFEST_FILE,
             "packet_b_lifecycle_evidence": PACKET_B_LIFECYCLE_EVIDENCE_FILE,
+            "l0_block_boundary_evidence": L0_BLOCK_BOUNDARY_EVIDENCE_FILE,
             "lmcache_compat_report": "lmcache_compat_report.json",
             "observability_coverage": "observability_coverage.json",
             "bottleneck_diagnosis": "diagnose-bottleneck/bottleneck_diagnosis.json",
@@ -1837,6 +2003,7 @@ def _run_packet(spec: PacketSpec) -> str:
         _run_trace_replay(run_dir, spec)
         _run_inferguard_packet(run_dir, spec)
         _write_agent_kv_offload_report(run_dir, spec)
+        _write_l0_block_boundary_evidence(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
     finally:
         _terminate(vllm_proc)
