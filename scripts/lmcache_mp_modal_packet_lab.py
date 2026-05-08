@@ -64,10 +64,18 @@ MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
 MODAL_LMCACHE_SOURCE = "/opt/lmcache"
-LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
-LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
-LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
-LMCACHE_PIP_SPEC_ENV = "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC"
+LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_LMCACHE_LOCAL_SOURCE"
+LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
+LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
+LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
+LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
+LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
+LEGACY_LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
+LEGACY_LMCACHE_PIP_SPEC_ENV = "INFERGUARD_PACKET_A_LMCACHE_PIP_SPEC"
+LMCACHE_SOURCE_KIND_RUNTIME_ENV = "INFERGUARD_LMCACHE_SOURCE_KIND"
+LMCACHE_SOURCE_REF_RUNTIME_ENV = "INFERGUARD_LMCACHE_SOURCE_REF"
+LEGACY_LMCACHE_SOURCE_KIND_RUNTIME_ENV = "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND"
+LEGACY_LMCACHE_SOURCE_REF_RUNTIME_ENV = "INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF"
 DEFAULT_LMCACHE_PIP_SPEC = "lmcache"
 DEFAULT_LMCACHE_GIT_REPO = "https://github.com/LMCache/LMCache.git"
 CUDA_DEVEL_IMAGE = "nvidia/cuda:13.0.2-devel-ubuntu22.04"
@@ -76,6 +84,25 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
     "lmcache_mp_lookup_hit_tokens_total",
     "lmcache_mp_l1_memory_usage_bytes",
 )
+PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
+WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
+PACKET_B_REQUIRED_TELEMETRY = {
+    "lookup_reuse": ("lmcache_mp_lookup_requested_tokens", "lmcache_mp.lookup_requested_tokens"),
+    "lookup_hits": ("lmcache_mp_lookup_hit_tokens", "lmcache_mp.lookup_hit_tokens"),
+    "l1_lifecycle": ("lmcache_mp_l1_chunk_", "lmcache_mp.l1_chunk_"),
+    "l0_lifecycle": ("lmcache_mp_l0_block_", "lmcache_mp.l0_block_"),
+    "real_reuse": ("lmcache_mp_real_reuse_gap_", "lmcache_mp.real_reuse_gap_"),
+    "l1_eviction": ("lmcache_mp_l1_evicted_keys", "lmcache_mp.l1_evicted_keys"),
+    "l0_l1_throughput": ("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_"),
+}
+
+
+def _first_env(env: Mapping[str, str], *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = env.get(key, "").strip()
+        if value:
+            return value
+    return default
 
 
 @dataclass(frozen=True)
@@ -127,15 +154,19 @@ CUDA_SOURCE_BUILD_ENV = {
 
 def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> LmcacheInstallPlan:
     env = env or os.environ
-    local_source = env.get(LMCACHE_LOCAL_SOURCE_ENV, "").strip()
-    git_ref = env.get(LMCACHE_GIT_REF_ENV, "").strip()
-    git_repo = (
-        env.get(LMCACHE_GIT_REPO_ENV, DEFAULT_LMCACHE_GIT_REPO).strip()
-        or DEFAULT_LMCACHE_GIT_REPO
+    local_source = _first_env(env, LMCACHE_LOCAL_SOURCE_ENV, LEGACY_LMCACHE_LOCAL_SOURCE_ENV)
+    git_ref = _first_env(env, LMCACHE_GIT_REF_ENV, LEGACY_LMCACHE_GIT_REF_ENV)
+    git_repo = _first_env(
+        env,
+        LMCACHE_GIT_REPO_ENV,
+        LEGACY_LMCACHE_GIT_REPO_ENV,
+        default=DEFAULT_LMCACHE_GIT_REPO,
     )
-    pip_spec = (
-        env.get(LMCACHE_PIP_SPEC_ENV, DEFAULT_LMCACHE_PIP_SPEC).strip()
-        or DEFAULT_LMCACHE_PIP_SPEC
+    pip_spec = _first_env(
+        env,
+        LMCACHE_PIP_SPEC_ENV,
+        LEGACY_LMCACHE_PIP_SPEC_ENV,
+        default=DEFAULT_LMCACHE_PIP_SPEC,
     )
 
     if local_source:
@@ -226,8 +257,10 @@ def _build_modal_image() -> modal.Image:
                 "VLLM_USE_DEEP_GEMM": "0",
                 "VLLM_DEEP_GEMM_WARMUP": "skip",
                 "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
-                "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND": LMCACHE_INSTALL_PLAN.source_kind,
-                "INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF": LMCACHE_INSTALL_PLAN.source_ref or "",
+                LMCACHE_SOURCE_KIND_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_kind,
+                LMCACHE_SOURCE_REF_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_ref or "",
+                LEGACY_LMCACHE_SOURCE_KIND_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_kind,
+                LEGACY_LMCACHE_SOURCE_REF_RUNTIME_ENV: LMCACHE_INSTALL_PLAN.source_ref or "",
                 "LD_LIBRARY_PATH": (
                     CUDA_SOURCE_BUILD_ENV["LD_LIBRARY_PATH"]
                     if LMCACHE_INSTALL_PLAN.source_kind in {"local", "git"}
@@ -249,6 +282,10 @@ class PacketSpec:
     packet_id: str
     name: str
     workload: str
+    output_slug: str | None = None
+    l1_size_gb: str = LMCACHE_L1_SIZE_GB
+    metrics_sample_rate: float = MP_METRICS_SAMPLE_RATE
+    request_count: int | None = None
     l2_configured: bool = False
     l2_adapter: str | None = None
     enable_otel: bool = False
@@ -270,7 +307,19 @@ PACKETS: dict[str, PacketSpec] = {
         packet_id="b",
         name="Packet B MP sampled lifecycle",
         workload="reuse_eviction",
-        notes=("Metrics sample rate is pinned to 1.0; workload mixes repeated prefixes and eviction pressure.",),
+        output_slug="packet-b-lifecycle-reuse-eviction",
+        l1_size_gb="1",
+        metrics_sample_rate=1.0,
+        request_count=48,
+        extra_required_artifacts=(
+            WORKLOAD_MANIFEST_FILE,
+            PACKET_B_LIFECYCLE_EVIDENCE_FILE,
+            "traffic.log",
+        ),
+        notes=(
+            "Metrics sample rate is pinned to 1.0; workload warms a repeated prefix, "
+            "pressures unique prefixes, then retests the warm prefix for lifecycle/reuse/eviction proof.",
+        ),
     ),
     "c": PacketSpec(
         packet_id="c",
@@ -318,11 +367,17 @@ def _append(path: Path, text: str) -> None:
 
 
 def _runtime_lmcache_install_source() -> tuple[str, str]:
-    source_kind = os.environ.get(
-        "INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND", LMCACHE_INSTALL_PLAN.source_kind
+    source_kind = _first_env(
+        os.environ,
+        LMCACHE_SOURCE_KIND_RUNTIME_ENV,
+        LEGACY_LMCACHE_SOURCE_KIND_RUNTIME_ENV,
+        default=LMCACHE_INSTALL_PLAN.source_kind,
     )
-    source_ref = os.environ.get(
-        "INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF", LMCACHE_INSTALL_PLAN.source_ref or ""
+    source_ref = _first_env(
+        os.environ,
+        LMCACHE_SOURCE_REF_RUNTIME_ENV,
+        LEGACY_LMCACHE_SOURCE_REF_RUNTIME_ENV,
+        default=LMCACHE_INSTALL_PLAN.source_ref or "",
     )
     return source_kind, source_ref or source_kind
 
@@ -472,7 +527,7 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--http-port",
         str(LMCACHE_HTTP_PORT),
         "--l1-size-gb",
-        LMCACHE_L1_SIZE_GB,
+        spec.l1_size_gb,
         "--eviction-policy",
         spec.eviction_policy,
         "--prometheus-port",
@@ -480,7 +535,7 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--event-bus-queue-size",
         str(MP_EVENT_BUS_QUEUE_SIZE),
         "--metrics-sample-rate",
-        str(MP_METRICS_SAMPLE_RATE),
+        str(spec.metrics_sample_rate),
         "--trace-level",
         "storage",
         "--trace-output",
@@ -672,7 +727,7 @@ def _build_trace_replay_command(run_dir: Path, spec: PacketSpec | None = None) -
         "--jsonl-out",
         str(replay_dir / "trace_replay.jsonl"),
         "--l1-size-gb",
-        LMCACHE_L1_SIZE_GB,
+        spec.l1_size_gb,
         "--eviction-policy",
         spec.eviction_policy,
         "--disable-metrics",
@@ -694,6 +749,58 @@ def _run_trace_replay(run_dir: Path, spec: PacketSpec | None = None) -> None:
         timeout=120,
     )
     _run_required(_build_trace_replay_command(run_dir, spec), log_path, timeout=10 * 60)
+
+
+def _write_workload_manifest(run_dir: Path, spec: PacketSpec, requests: int) -> None:
+    if spec.workload == "reuse_eviction":
+        phases = [
+            {
+                "phase": "warm",
+                "request_count": min(requests, 12),
+                "prefix_pattern": "shared-anchor",
+                "intent": "populate L0/L1 and create baseline prefix reuse candidates",
+            },
+            {
+                "phase": "pressure",
+                "request_count": max(min(requests, 40) - 12, 0),
+                "prefix_pattern": "unique-pressure-window",
+                "intent": "force unique-prefix writes and L1 eviction pressure",
+            },
+            {
+                "phase": "retest",
+                "request_count": max(requests - 40, 0),
+                "prefix_pattern": "shared-anchor",
+                "intent": "revisit the warm prefix to expose real reuse and evict-reuse gaps",
+            },
+        ]
+    else:
+        phases = [
+            {
+                "phase": "steady",
+                "request_count": requests,
+                "prefix_pattern": spec.workload,
+                "intent": "drive packet workload traffic",
+            }
+        ]
+    payload = {
+        "schema_version": "inferguard-lmcache-mp-workload-manifest/v1",
+        "packet_id": spec.packet_id,
+        "workload": spec.workload,
+        "request_count": requests,
+        "metrics_sample_rate": spec.metrics_sample_rate,
+        "l1_size_gb": spec.l1_size_gb,
+        "eviction_policy": spec.eviction_policy,
+        "raw_prompts_recorded": False,
+        "request_log": "traffic_requests.jsonl",
+        "phases": phases,
+        "required_packet_b_telemetry": sorted(PACKET_B_REQUIRED_TELEMETRY)
+        if spec.packet_id == "b"
+        else [],
+    }
+    (run_dir / WORKLOAD_MANIFEST_FILE).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
@@ -737,7 +844,7 @@ ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 def _drive_traffic(run_dir: Path, spec: PacketSpec | None = None) -> None:
     spec = spec or PACKETS["a"]
-    requests = {
+    requests = spec.request_count or {
         "smoke": 10,
         "reuse_eviction": 36,
         "l2_reuse": 24,
@@ -745,6 +852,7 @@ def _drive_traffic(run_dir: Path, spec: PacketSpec | None = None) -> None:
         "trace_replay": 20,
         "cache_salt_isolated_lru": 24,
     }.get(spec.workload, 10)
+    _write_workload_manifest(run_dir, spec, requests)
     script = r"""
 import json
 import sys
@@ -756,14 +864,33 @@ model = sys.argv[2]
 workload = sys.argv[3]
 requests = int(sys.argv[4])
 cache_salt_enabled = sys.argv[5] == "1"
+request_manifest = sys.argv[6]
 shared_prefix = "InferGuard LMCache MP shared repeated-prefix validation. " * 220
-eviction_prefix = "InferGuard LMCache MP eviction pressure unique block. " * 180
+eviction_prefix = "InferGuard LMCache MP eviction pressure unique block. " * 260
 for idx in range(requests):
-    if workload in {"reuse_eviction", "cache_salt_isolated_lru"} and idx % 3 == 2:
-        prefix = eviction_prefix + (f" unique-window-{idx} " * 256)
+    if workload == "reuse_eviction":
+        phase = ("warm" if idx < 12 else "pressure" if idx < 40 else "retest")
+    elif workload == "cache_salt_isolated_lru":
+        phase = ("warm" if idx % 6 in {0, 1} else "pressure" if idx % 6 in {2, 3, 4} else "retest")
+    else:
+        phase = "steady"
+    if phase == "pressure":
+        prefix = eviction_prefix + (f" unique-window-{idx} " * 384)
+        prefix_group = f"pressure-{idx}"
     else:
         prefix = shared_prefix
+        prefix_group = "shared-anchor"
     prompt = prefix + f"\nRequest variant {idx % 4}: summarize the observability evidence."
+    row = {
+        "request_index": idx,
+        "phase": phase,
+        "prefix_group": prefix_group,
+        "prompt_chars": len(prompt),
+        "workload": workload,
+        "cache_salt": f"tenant-{idx % 2}" if cache_salt_enabled else None,
+    }
+    with open(request_manifest, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, sort_keys=True) + "\n")
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
@@ -791,6 +918,7 @@ for idx in range(requests):
             spec.workload,
             str(requests),
             "1" if spec.enable_cache_salt else "0",
+            str(run_dir / "traffic_requests.jsonl"),
         ],
         run_dir / "traffic.log",
         timeout=30 * 60,
@@ -801,6 +929,61 @@ for idx in range(requests):
 def _maybe_add_existing(cmd: list[str], flag: str, path: Path) -> None:
     if path.exists():
         cmd.extend([flag, str(path)])
+
+
+def _positive_metric_names(prom_text: str) -> set[str]:
+    names: set[str] = set()
+    for raw_line in prom_text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        try:
+            value = float(parts[1])
+        except ValueError:
+            continue
+        if value <= 0:
+            continue
+        names.add(parts[0].split("{", 1)[0])
+    return names
+
+
+def _metric_family_hits(metric_names: set[str], prefixes: tuple[str, ...]) -> list[str]:
+    return sorted(name for name in metric_names if name.startswith(prefixes))
+
+
+def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
+    if spec.packet_id != "b":
+        return
+    prom_path = run_dir / "lmcache_metrics_loaded.prom"
+    prom_text = prom_path.read_text(encoding="utf-8") if prom_path.exists() else ""
+    metric_names = _positive_metric_names(prom_text)
+    families = {
+        family: {
+            "status": "populated" if (hits := _metric_family_hits(metric_names, prefixes)) else "missing",
+            "matched_metrics": hits,
+        }
+        for family, prefixes in PACKET_B_REQUIRED_TELEMETRY.items()
+    }
+    missing = [family for family, row in families.items() if row["status"] != "populated"]
+    payload = {
+        "schema_version": "inferguard-lmcache-mp-packet-b-lifecycle/v1",
+        "packet_id": spec.packet_id,
+        "claim_status": "measured" if not missing else "not_proven",
+        "metrics_file": str(prom_path),
+        "metrics_sample_rate": spec.metrics_sample_rate,
+        "l1_size_gb": spec.l1_size_gb,
+        "eviction_policy": spec.eviction_policy,
+        "workload_manifest": str(run_dir / WORKLOAD_MANIFEST_FILE),
+        "required_families": families,
+        "missing_required_families": missing,
+    }
+    (run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) -> list[str]:
@@ -850,7 +1033,7 @@ def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) ->
         "--mp-event-bus-queue-size",
         str(MP_EVENT_BUS_QUEUE_SIZE),
         "--mp-metrics-sample-rate",
-        str(MP_METRICS_SAMPLE_RATE),
+        str(spec.metrics_sample_rate),
         "--mp-trace-recording-enabled",
         "--json",
     ]
@@ -888,7 +1071,7 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
         "--mp-event-bus-queue-size",
         str(MP_EVENT_BUS_QUEUE_SIZE),
         "--mp-metrics-sample-rate",
-        str(MP_METRICS_SAMPLE_RATE),
+        str(spec.metrics_sample_rate),
         "--mp-trace-recording-enabled",
         "--output",
         str(run_dir / "lmcache_compat_report.json"),
@@ -1006,6 +1189,7 @@ REQUIRED_ARTIFACTS = [
 OPTIONAL_ARTIFACTS = [
     "lmcache_env.json",
     "http/periodic_thread.json",
+    "traffic_requests.jsonl",
     L2_CONFIG_FILE,
     LMCACHE_OTEL_FILE,
     "lmcache-packet/lmcache_otel_evidence.json",
@@ -1038,10 +1222,18 @@ def _optional_artifacts(spec: PacketSpec | None = None) -> list[str]:
 
 def _validate_required_artifacts(run_dir: Path, spec: PacketSpec | None = None) -> None:
     spec = spec or PACKETS["a"]
-    _write_summary_and_index(run_dir)
+    _write_summary_and_index(run_dir, spec)
     missing = _missing_artifacts(run_dir, _required_artifacts(spec), require_nonempty=True)
     if missing:
         raise RuntimeError(f"Packet {spec.packet_id.upper()} missing required artifacts: " + ", ".join(missing))
+    if spec.packet_id == "b":
+        evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
+        missing_families = evidence.get("missing_required_families") if isinstance(evidence, dict) else None
+        if not isinstance(evidence, dict) or evidence.get("claim_status") != "measured":
+            raise RuntimeError(
+                "Packet B lifecycle evidence is not measured; missing required families: "
+                + ", ".join(str(item) for item in (missing_families or []))
+            )
 
 
 def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> None:
@@ -1071,6 +1263,8 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
         f"- Model: `{MODEL}`",
         "- Architecture: standalone `lmcache server` plus vLLM `LMCacheMPConnector`.",
         f"- Workload: `{spec.workload}`",
+        f"- Metrics sample rate: `{spec.metrics_sample_rate}`",
+        f"- L1 size GB: `{spec.l1_size_gb}`",
         f"- L2 configured: `{spec.l2_configured}`",
         f"- OTel enabled: `{spec.enable_otel}`",
         f"- Eviction policy: `{spec.eviction_policy}`",
@@ -1118,6 +1312,10 @@ def _artifact_checkbox(run_dir: Path, rel: str) -> str:
     return f"- [{marker}] `{rel}`"
 
 
+def _run_dir_for_packet(spec: PacketSpec, timestamp: str) -> Path:
+    return OUT_ROOT / (spec.output_slug or f"packet-{spec.packet_id}") / timestamp
+
+
 def _terminate(proc: subprocess.Popen[str] | None) -> None:
     if proc is None or proc.poll() is not None:
         return
@@ -1140,7 +1338,7 @@ def _close_handles(handles: list[object]) -> None:
 
 def _run_packet(spec: PacketSpec) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = OUT_ROOT / f"packet-{spec.packet_id}" / timestamp
+    run_dir = _run_dir_for_packet(spec, timestamp)
     run_dir.mkdir(parents=True, exist_ok=True)
     lmcache_proc: subprocess.Popen[str] | None = None
     vllm_proc: subprocess.Popen[str] | None = None
@@ -1181,6 +1379,7 @@ def _run_packet(spec: PacketSpec) -> str:
         _capture_metrics(run_dir, "empty")
         _drive_traffic(run_dir, spec)
         _capture_metrics(run_dir, "loaded")
+        _write_packet_b_lifecycle_evidence(run_dir, spec)
         _capture_safe_http(run_dir)
         _run_trace_replay(run_dir, spec)
         _run_inferguard_packet(run_dir, spec)

@@ -31,6 +31,21 @@ PACKET_A_REQUIRED_FILES = (
     "lmcache_trace_evidence.json",
     "lmcache_trace_replay_evidence.json",
 )
+PACKET_B_REQUIRED_FILES = (
+    *PACKET_A_REQUIRED_FILES,
+    "workload_manifest.json",
+    "traffic_requests.jsonl",
+    "packet-b-lifecycle-evidence.json",
+)
+PACKET_B_REQUIRED_FAMILIES = (
+    "lookup_reuse",
+    "lookup_hits",
+    "l1_lifecycle",
+    "l0_lifecycle",
+    "real_reuse",
+    "l1_eviction",
+    "l0_l1_throughput",
+)
 
 _SECRET_PATTERN = re.compile(
     r"(HF_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|PASSWORD|SECRET|CREDENTIAL|AUTH_TOKEN)",
@@ -52,6 +67,8 @@ def test_landed_live_fixtures_are_sanitized_and_pass_acceptance_contract() -> No
     for fixture_dir in _accepted_live_fixture_dirs():
         if fixture_dir.name == "packet_a":
             _assert_packet_a_b1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_b":
+            _assert_packet_b_c1_acceptance(fixture_dir)
         else:
             raise AssertionError(f"unknown accepted LMCache live fixture: {fixture_dir}")
 
@@ -82,6 +99,27 @@ def test_packet_a_acceptance_contract_rejects_non_live_or_incomplete_fixture(tmp
 
     with pytest.raises(AssertionError, match="missing required B1 fixture artifact"):
         _assert_packet_a_b1_acceptance(fixture_dir)
+
+
+def test_packet_b_acceptance_contract_rejects_incomplete_lifecycle_fixture(tmp_path: Path) -> None:
+    fixture_dir = tmp_path / "packet_b"
+    fixture_dir.mkdir()
+    _write_json(
+        fixture_dir / "fixture_manifest.json",
+        {
+            "row_id": "C1",
+            "packet_id": "b",
+            "source": "live_modal_h100",
+            "score_points": 6,
+            "redacted": True,
+            "raw_hashes_removed": True,
+            "raw_prompts_removed": True,
+            "acceptance_status": "accepted",
+        },
+    )
+
+    with pytest.raises(AssertionError, match="missing required C1 fixture artifact"):
+        _assert_packet_b_c1_acceptance(fixture_dir)
 
 
 def _accepted_live_fixture_dirs() -> list[Path]:
@@ -160,6 +198,52 @@ def _assert_packet_a_b1_acceptance(fixture_dir: Path) -> None:
     )
 
 
+def _assert_packet_b_c1_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    _assert_packet_b_manifest(manifest)
+    _assert_required_files(fixture_dir, PACKET_B_REQUIRED_FILES, row_id="C1")
+    _assert_fixture_sanitized(fixture_dir)
+
+    _assert_packet_a_b1_acceptance(fixture_dir)
+    workload = _read_json(fixture_dir / "workload_manifest.json")
+    evidence = _read_json(fixture_dir / "packet-b-lifecycle-evidence.json")
+    lmcache_command = _read_json_list(fixture_dir / "lmcache_command.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+
+    assert workload.get("packet_id") == "b"
+    assert workload.get("workload") == "reuse_eviction"
+    assert workload.get("metrics_sample_rate") == 1.0
+    assert workload.get("raw_prompts_recorded") is False
+    assert [phase.get("phase") for phase in workload.get("phases", [])] == [
+        "warm",
+        "pressure",
+        "retest",
+    ]
+    assert _cmd_value(lmcache_command, "--metrics-sample-rate") == "1.0"
+    assert _cmd_value(lmcache_command, "--l1-size-gb") == str(workload.get("l1_size_gb"))
+
+    assert evidence.get("schema_version") == "inferguard-lmcache-mp-packet-b-lifecycle/v1"
+    assert evidence.get("claim_status") == "measured"
+    assert evidence.get("metrics_sample_rate") == 1.0
+    assert evidence.get("missing_required_families") == []
+    families = evidence.get("required_families")
+    assert isinstance(families, dict)
+    for family in PACKET_B_REQUIRED_FAMILIES:
+        row = families.get(family)
+        assert isinstance(row, dict), f"missing Packet B family row: {family}"
+        assert row.get("status") == "populated", f"Packet B family not populated: {family}"
+        assert row.get("matched_metrics"), f"Packet B family has no matched metric: {family}"
+
+    family_rows = {
+        (row.get("surface"), row.get("family")): row
+        for row in compat.get("families", [])
+        if isinstance(row, dict)
+    }
+    for family in ("l1_lifecycle", "real_reuse", "l0_l1_throughput"):
+        row = family_rows.get(("lmcache_mp", family))
+        assert row and row.get("status") == "populated", f"compat report missing Packet B {family}"
+
+
 def _assert_packet_a_launch_proof(
     *,
     lmcache_command: list[Any],
@@ -203,11 +287,24 @@ def _assert_packet_a_manifest(manifest: dict[str, Any]) -> None:
     assert manifest.get("acceptance_status") == "accepted"
 
 
-def _assert_required_files(fixture_dir: Path, rel_paths: tuple[str, ...]) -> None:
+def _assert_packet_b_manifest(manifest: dict[str, Any]) -> None:
+    assert manifest.get("row_id") == "C1"
+    assert manifest.get("packet_id") == "b"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 6
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    assert manifest.get("acceptance_status") == "accepted"
+
+
+def _assert_required_files(
+    fixture_dir: Path, rel_paths: tuple[str, ...], *, row_id: str = "B1"
+) -> None:
     for rel_path in rel_paths:
         path = fixture_dir / rel_path
-        assert path.exists(), f"missing required B1 fixture artifact: {rel_path}"
-        assert path.stat().st_size > 0, f"empty required B1 fixture artifact: {rel_path}"
+        assert path.exists(), f"missing required {row_id} fixture artifact: {rel_path}"
+        assert path.stat().st_size > 0, f"empty required {row_id} fixture artifact: {rel_path}"
 
 
 def _assert_fixture_sanitized(fixture_dir: Path) -> None:

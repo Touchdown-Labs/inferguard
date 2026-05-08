@@ -8,6 +8,10 @@ import types
 from pathlib import Path
 
 _LMCACHE_SOURCE_ENV_KEYS = (
+    "INFERGUARD_LMCACHE_LOCAL_SOURCE",
+    "INFERGUARD_LMCACHE_GIT_REF",
+    "INFERGUARD_LMCACHE_GIT_REPO",
+    "INFERGUARD_LMCACHE_PIP_SPEC",
     "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE",
     "INFERGUARD_PACKET_A_LMCACHE_GIT_REF",
     "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO",
@@ -169,7 +173,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
 
 
 def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> None:
-    lab = _load_lab_module({"INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE": str(tmp_path)})
+    lab = _load_lab_module({"INFERGUARD_LMCACHE_LOCAL_SOURCE": str(tmp_path)})
 
     assert lab.LMCACHE_INSTALL_PLAN.source_kind == "local"
     assert lab.LMCACHE_INSTALL_PLAN.local_source == tmp_path
@@ -204,6 +208,8 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
         assert dep in pip_install_args
     runtime_env = calls[-1][1][0]
+    assert runtime_env["INFERGUARD_LMCACHE_SOURCE_KIND"] == "local"
+    assert runtime_env["INFERGUARD_LMCACHE_SOURCE_REF"] == str(tmp_path)
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND"] == "local"
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF"] == str(tmp_path)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
@@ -216,8 +222,8 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
 def test_modal_image_can_install_lmcache_from_git_ref() -> None:
     lab = _load_lab_module(
         {
-            "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO": "https://github.com/LMCache/LMCache.git",
-            "INFERGUARD_PACKET_A_LMCACHE_GIT_REF": "b1-metrics-ref",
+            "INFERGUARD_LMCACHE_GIT_REPO": "https://github.com/LMCache/LMCache.git",
+            "INFERGUARD_LMCACHE_GIT_REF": "b1-metrics-ref",
         }
     )
 
@@ -277,11 +283,94 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     spec = lab.PACKETS["b"]
 
     cmd = lab._build_lmcache_command(tmp_path, spec)
+    replay = lab._build_trace_replay_command(tmp_path, spec)
 
     assert spec.workload == "reuse_eviction"
+    assert spec.output_slug == "packet-b-lifecycle-reuse-eviction"
+    assert lab._run_dir_for_packet(spec, "20260101T000000Z") == (
+        lab.OUT_ROOT / "packet-b-lifecycle-reuse-eviction" / "20260101T000000Z"
+    )
     assert cmd[cmd.index("--metrics-sample-rate") + 1] == "1.0"
+    assert cmd[cmd.index("--l1-size-gb") + 1] == "1"
+    assert replay[replay.index("--l1-size-gb") + 1] == "1"
     assert cmd[cmd.index("--event-bus-queue-size") + 1] == "10000"
     assert cmd[cmd.index("--eviction-policy") + 1] == "LRU"
+    assert "workload_manifest.json" in lab._required_artifacts(spec)
+    assert "packet-b-lifecycle-evidence.json" in lab._required_artifacts(spec)
+    assert "traffic.log" in lab._required_artifacts(spec)
+    assert "traffic_requests.jsonl" in lab._optional_artifacts(spec)
+
+
+def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+
+    lab._write_workload_manifest(tmp_path, spec, 48)
+
+    manifest = json.loads((tmp_path / "workload_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["packet_id"] == "b"
+    assert manifest["workload"] == "reuse_eviction"
+    assert manifest["metrics_sample_rate"] == 1.0
+    assert manifest["l1_size_gb"] == "1"
+    assert manifest["raw_prompts_recorded"] is False
+    assert [phase["phase"] for phase in manifest["phases"]] == ["warm", "pressure", "retest"]
+    assert [phase["request_count"] for phase in manifest["phases"]] == [12, 28, 8]
+    assert set(manifest["required_packet_b_telemetry"]) == set(lab.PACKET_B_REQUIRED_TELEMETRY)
+
+
+def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
+    tmp_path: Path,
+) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "lmcache_metrics_loaded.prom").write_text(
+        "\n".join(
+            [
+                "lmcache_mp_lookup_requested_tokens_total 100",
+                "lmcache_mp_lookup_hit_tokens_total 70",
+                "lmcache_mp_l1_chunk_reuse_gap_seconds_count 4",
+                "lmcache_mp_l0_block_lifetime_seconds_count 4",
+                "lmcache_mp_real_reuse_gap_seconds_count 2",
+                "lmcache_mp_l1_evicted_keys_total 3",
+                "lmcache_mp_l0_l1_store_throughput_gbs_count 2",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
+
+    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    assert evidence["claim_status"] == "measured"
+    assert evidence["metrics_sample_rate"] == 1.0
+    assert evidence["missing_required_families"] == []
+    assert evidence["required_families"]["l1_eviction"]["status"] == "populated"
+
+
+def test_packet_b_validation_fails_when_lifecycle_evidence_not_measured(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    for rel in lab._required_artifacts(spec):
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+    (tmp_path / "packet-b-lifecycle-evidence.json").write_text(
+        json.dumps(
+            {
+                "claim_status": "not_proven",
+                "missing_required_families": ["l0_lifecycle"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        lab._validate_required_artifacts(tmp_path, spec)
+    except RuntimeError as exc:
+        assert "l0_lifecycle" in str(exc)
+    else:
+        raise AssertionError("Packet B validation should fail when lifecycle evidence is not measured")
 
 
 def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:
@@ -403,8 +492,8 @@ def test_packet_a_summary_marks_missing_required_artifacts(tmp_path: Path) -> No
 
 def test_packet_a_summary_uses_runtime_lmcache_install_source(tmp_path: Path, monkeypatch) -> None:
     lab = _load_lab_module()
-    monkeypatch.setenv("INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND", "local")
-    monkeypatch.setenv("INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF", "/Users/chen/Projects/LMCache")
+    monkeypatch.setenv("INFERGUARD_LMCACHE_SOURCE_KIND", "local")
+    monkeypatch.setenv("INFERGUARD_LMCACHE_SOURCE_REF", "/Users/chen/Projects/LMCache")
 
     lab._write_summary_and_index(tmp_path)
 

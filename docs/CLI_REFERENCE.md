@@ -93,7 +93,7 @@ Touchdown-Labs OSS mirror:
 ```bash
 cd /Users/chen/Projects/inferguard
 python scripts/lmcache_mp_packet_commands.py
-INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
+INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
 modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
 ```
 
@@ -156,7 +156,7 @@ Use these exact next commands when updating endpoint, signal, or rule status:
 | Log, P2P, and PD evidence | partial | Live MP logs plus two-engine P2P and prefiller/decoder packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
 | Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
 | Packet A score gate | live_validated | Accepted live vLLM + standalone LMCache MP fixture imported and pinned. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
-| Packet B lifecycle gate | next | Live sampled lifecycle/L0-L1 proof with compact fixture. | `cd /Users/chen/Projects/inferguard && INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
+| Packet B lifecycle gate | next | Live sampled lifecycle/L0-L1 proof with compact fixture. | `cd /Users/chen/Projects/inferguard && INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
 
 Current source-backed caveats:
 
@@ -202,7 +202,7 @@ Full docs/CLI closeout command set:
 ```bash
 cd /Users/chen/Projects/inferguard
 python scripts/lmcache_mp_packet_commands.py
-INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
+INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
 modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
 
 inferguard collect-lmcache \
@@ -261,7 +261,7 @@ Every 100% checklist update must account for these metric families:
 | --- | --- |
 | LMCache MP | StorageManager counters; L1 counters/memory/failures/lifecycle; StorageManager real reuse; L2 counters/failures/throughput/in-flight gauges; lookup hit rate; L0 lifecycle; L0-L1 throughput; engine counter; active prefetch jobs; EventBus; CacheBlend. |
 | Embedded production LMCache | Core request; token; hit rate; performance and latency; detailed profiling; cache usage and lifecycle; remote backend and network; local CPU backend; memory management; P2P transfer; health/internal; chunk statistics. |
-| Workload packets | MP Packet A; MP L2; embedded vLLM; embedded SGLang; CacheBlend; P2P; PD; trace replay and lookup hash; release readiness. |
+| Workload packets | accepted MP Packet A; Packet B lifecycle; MP L2; embedded vLLM; embedded SGLang; CacheBlend; P2P; PD; trace replay and lookup hash; release readiness. |
 
 ## Exit-code conventions
 
