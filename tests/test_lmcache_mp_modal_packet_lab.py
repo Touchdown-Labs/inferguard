@@ -308,6 +308,7 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     assert vllm[vllm.index("--gpu-memory-utilization") + 1] == "0.65"
     assert vllm[vllm.index("--max-model-len") + 1] == "8192"
     assert "LMCACHE_LOG_LEVEL" not in env
+    assert spec.strict_inferguard_gate is False
     assert "workload_manifest.json" in lab._required_artifacts(spec)
     assert "packet-b-lifecycle-evidence.json" in lab._required_artifacts(spec)
     assert "traffic.log" in lab._required_artifacts(spec)
@@ -489,6 +490,35 @@ def test_packet_b_validation_records_warning_when_lifecycle_evidence_not_measure
 
     warnings = (tmp_path / "validation_warnings.log").read_text(encoding="utf-8")
     assert "l0_lifecycle" in warnings
+
+
+def test_packet_b_inferguard_gate_keeps_blocked_reports(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    calls: list[tuple[str, list[str]]] = []
+
+    def fake_run_required(cmd, log_path, *, timeout):
+        calls.append(("required", cmd))
+
+    def fake_run_best_effort(cmd, log_path, *, timeout):
+        calls.append(("best_effort", cmd))
+        return 1 if "lmcache-compat" in cmd else 0
+
+    lab._run_required = fake_run_required
+    lab._run_best_effort = fake_run_best_effort
+
+    lab._run_inferguard_packet(tmp_path, spec)
+
+    assert calls[0][0] == "required"
+    assert "collect-lmcache" in calls[0][1]
+    assert calls[1][0] == "best_effort"
+    assert "lmcache-compat" in calls[1][1]
+    assert calls[2][0] == "best_effort"
+    assert "observability-coverage" in calls[2][1]
+    assert calls[3][0] == "best_effort"
+    assert "collect-metrics" in calls[3][1]
+    assert calls[4][0] == "best_effort"
+    assert "diagnose-bottleneck" in calls[4][1]
 
 
 def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:

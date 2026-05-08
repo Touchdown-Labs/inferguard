@@ -434,6 +434,7 @@ class PacketSpec:
     vllm_gpu_memory_utilization: str = "0.80"
     vllm_max_model_len: int = MODEL_MAX_LEN
     lmcache_log_level: str | None = None
+    strict_inferguard_gate: bool = True
     extra_required_artifacts: tuple[str, ...] = ()
     extra_optional_artifacts: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
@@ -457,6 +458,7 @@ PACKETS: dict[str, PacketSpec] = {
         vllm_gpu_memory_utilization=_packet_b_vllm_gpu_memory_utilization(),
         vllm_max_model_len=_packet_b_vllm_max_model_len(),
         lmcache_log_level=_packet_b_lmcache_log_level(),
+        strict_inferguard_gate=False,
         extra_required_artifacts=(
             WORKLOAD_MANIFEST_FILE,
             PACKET_B_LIFECYCLE_EVIDENCE_FILE,
@@ -1340,8 +1342,12 @@ def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> Non
     spec = spec or PACKETS["a"]
     commands_log = run_dir / "inferguard_commands.log"
     _run_required(_build_collect_lmcache_cmd(run_dir, spec), commands_log, timeout=180)
-    _run_required(_build_lmcache_compat_cmd(run_dir, spec), commands_log, timeout=180)
-    _run_required(_build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180)
+    if spec.strict_inferguard_gate:
+        _run_required(_build_lmcache_compat_cmd(run_dir, spec), commands_log, timeout=180)
+        _run_required(_build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180)
+    else:
+        _run_best_effort(_build_lmcache_compat_cmd(run_dir, spec), commands_log, timeout=180)
+        _run_best_effort(_build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180)
 
     job_dir = run_dir / "inferguard-job"
     collect_metrics_cmd = [
@@ -1488,6 +1494,7 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
         f"- L2 configured: `{spec.l2_configured}`",
         f"- OTel enabled: `{spec.enable_otel}`",
         f"- Eviction policy: `{spec.eviction_policy}`",
+        f"- Strict InferGuard gate: `{spec.strict_inferguard_gate}`",
         f"- LMCache install source: `{source_kind}` (`{source_ref}`)",
         "- Required upstream MP metrics: "
         + ", ".join(f"`{name}`" for name in UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES),
@@ -1517,7 +1524,8 @@ def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> N
             "## Notes",
             "",
             "- LMCache and vLLM health failures raise immediately before traffic is sent.",
-            "- InferGuard packet, compatibility, and coverage commands are required and fail the run on nonzero exit.",
+            "- Packet A treats InferGuard compatibility and coverage failures as fatal; "
+            "exploratory packets keep blocked reports for diagnosis.",
             "- Safe LMCache HTTP endpoint captures are recorded in `http/capture_manifest.json`; "
             "destructive endpoints are not called.",
         ]
