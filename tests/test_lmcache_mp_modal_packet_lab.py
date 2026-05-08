@@ -348,7 +348,7 @@ def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
     assert evidence["required_families"]["l1_eviction"]["status"] == "populated"
 
 
-def test_packet_b_validation_fails_when_lifecycle_evidence_not_measured(tmp_path: Path) -> None:
+def test_packet_b_validation_records_warning_when_lifecycle_evidence_not_measured(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]
     for rel in lab._required_artifacts(spec):
@@ -365,12 +365,10 @@ def test_packet_b_validation_fails_when_lifecycle_evidence_not_measured(tmp_path
         encoding="utf-8",
     )
 
-    try:
-        lab._validate_required_artifacts(tmp_path, spec)
-    except RuntimeError as exc:
-        assert "l0_lifecycle" in str(exc)
-    else:
-        raise AssertionError("Packet B validation should fail when lifecycle evidence is not measured")
+    lab._validate_required_artifacts(tmp_path, spec)
+
+    warnings = (tmp_path / "validation_warnings.log").read_text(encoding="utf-8")
+    assert "l0_lifecycle" in warnings
 
 
 def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:

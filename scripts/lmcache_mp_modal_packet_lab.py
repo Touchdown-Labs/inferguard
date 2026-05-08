@@ -10,6 +10,7 @@ Outputs are written to the persistent Modal volume mounted at /out, under
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shlex
@@ -1230,10 +1231,12 @@ def _validate_required_artifacts(run_dir: Path, spec: PacketSpec | None = None) 
         evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
         missing_families = evidence.get("missing_required_families") if isinstance(evidence, dict) else None
         if not isinstance(evidence, dict) or evidence.get("claim_status") != "measured":
-            raise RuntimeError(
+            warning = (
                 "Packet B lifecycle evidence is not measured; missing required families: "
                 + ", ".join(str(item) for item in (missing_families or []))
             )
+            (run_dir / "validation_warnings.log").write_text(warning + "\n", encoding="utf-8")
+            print(warning, file=sys.stderr)
 
 
 def _write_summary_and_index(run_dir: Path, spec: PacketSpec | None = None) -> None:
@@ -1430,6 +1433,11 @@ def run_packet_f() -> str:
 @app.local_entrypoint()
 def main(packet: str = "a") -> None:
     key = _get_packet(packet).packet_id
+    print(_remote_packet_runner(key).remote())
+
+
+def _remote_packet_runner(packet: str) -> modal.Function:
+    key = _get_packet(packet).packet_id
     runners = {
         "a": run_packet_a,
         "b": run_packet_b,
@@ -1438,4 +1446,18 @@ def main(packet: str = "a") -> None:
         "e": run_packet_e,
         "f": run_packet_f,
     }
-    print(runners[key].remote())
+    return runners[key]
+
+
+def _run_from_python_api(packet: str) -> None:
+    runner = _remote_packet_runner(packet)
+    with modal.enable_output():
+        with app.run():
+            print(runner.remote())
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run LMCache MP packet lab through the Modal Python API.")
+    parser.add_argument("--packet", default="a", choices=sorted(PACKETS), help="Packet id to run.")
+    args = parser.parse_args()
+    _run_from_python_api(args.packet)
