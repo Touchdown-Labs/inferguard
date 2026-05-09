@@ -158,6 +158,36 @@ def test_packet_b_acceptance_contract_rejects_incomplete_lifecycle_fixture(tmp_p
         _assert_packet_b_c1_acceptance(fixture_dir)
 
 
+def test_g1_diagnostic_calibration_is_pinned_by_accepted_live_packet_diagnoses() -> None:
+    """G1 must be backed by accepted live packet diagnoses, not parser-only docs."""
+
+    expected = {
+        "packet_a": {"row_id": "B1", "rule_fired": "lmcache_mp_empty_cache_salt", "claim_status": "inferred"},
+        "packet_b": {"row_id": "C1", "rule_fired": "lmcache_mp_l1_failures", "claim_status": "measured"},
+        "packet_c": {"row_id": "D1", "rule_fired": "lmcache_mp_l1_eviction_pressure", "claim_status": "measured"},
+        "packet_d": {"row_id": "E1", "rule_fired": "vllm_external_prefix_no_hits", "claim_status": "inferred"},
+        "packet_e": {"row_id": "E2", "rule_fired": "lmcache_mp_empty_cache_salt", "claim_status": "inferred"},
+        "packet_f": {"row_id": "F1", "rule_fired": "vllm_external_prefix_no_hits", "claim_status": "inferred"},
+    }
+
+    for fixture_dir in _accepted_live_fixture_dirs():
+        if fixture_dir.name not in expected:
+            continue
+        manifest = _read_json(fixture_dir / "fixture_manifest.json")
+        diagnosis = _read_json(fixture_dir / "bottleneck_diagnosis.json")
+        expected_row = expected[fixture_dir.name]
+        assert manifest.get("source") == "live_modal_h100"
+        assert manifest.get("row_id") == expected_row["row_id"]
+        assert diagnosis.get("schema_version") == "inferguard-bottleneck-diagnosis/v1"
+        assert diagnosis.get("rule_fired") == expected_row["rule_fired"]
+        assert diagnosis.get("claim_status") == expected_row["claim_status"]
+        assert diagnosis.get("verdict") == "not_enough_evidence"
+        metric_values = diagnosis.get("metric_values", {})
+        assert any(str(key).startswith("lmcache_compat") for key in metric_values), (
+            f"{fixture_dir.name} diagnosis must preserve LMCache compatibility evidence"
+        )
+
+
 def _accepted_live_fixture_dirs() -> list[Path]:
     if not LIVE_FIXTURE_ROOT.exists():
         return []
