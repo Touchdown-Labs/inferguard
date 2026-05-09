@@ -34,7 +34,7 @@ MODEL_MAX_LEN = 8192
 ENGINE_HOST = "127.0.0.1"
 ENGINE_PORT = 8000
 SECONDARY_ENGINE_PORT = 8001
-OTLP_HTTP_PORT = 4318
+OTLP_GRPC_PORT = 4317
 
 ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{ENGINE_PORT}"
 ENGINE_HEALTH_URL = f"{ENGINE_BASE_URL}/health"
@@ -81,6 +81,10 @@ LMCACHE_RUNTIME_DEP_PACKAGES = (
     "msgspec",
     "prometheus-client>=0.18.0,<=0.24.1",
     "psutil",
+    "opentelemetry-api>=1.20.0,<=1.40.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-exporter-prometheus>=0.50b0,<=0.61b0",
     "py-cpuinfo",
     "pyyaml",
     "pyzmq>=25.0.0",
@@ -114,7 +118,7 @@ BASE_MODAL_PIP_PACKAGES = (
 )
 LMCACHE_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation --no-deps"
 SGLANG_LOCAL_INSTALL_COMMAND = (
-    f"python -m pip install -e {MODAL_SGLANG_SOURCE}/python --no-build-isolation"
+    f"python -m pip install -e {MODAL_SGLANG_SOURCE}/python --no-build-isolation --no-deps"
 )
 
 
@@ -132,7 +136,7 @@ SGLANG_LOCAL_SOURCE = _optional_local_source(SGLANG_LOCAL_SOURCE_ENV, DEFAULT_SG
 
 
 def _runtime_env() -> dict[str, str]:
-    return {
+    env = {
         "HF_HUB_ENABLE_HF_TRANSFER": "1",
         "HF_HOME": "/out/hf-cache",
         "VLLM_CACHE_ROOT": "/out/vllm-cache",
@@ -152,6 +156,11 @@ def _runtime_env() -> dict[str, str]:
         "INFERGUARD_H_TRANSFORMERS_PACKAGE": PINNED_TRANSFORMERS_PACKAGE,
         "INFERGUARD_H_TOKENIZERS_PACKAGE": PINNED_TOKENIZERS_PACKAGE,
     }
+    if LMCACHE_LOCAL_SOURCE is not None:
+        env[LMCACHE_LOCAL_SOURCE_ENV] = MODAL_LMCACHE_SOURCE
+    if SGLANG_LOCAL_SOURCE is not None:
+        env[SGLANG_LOCAL_SOURCE_ENV] = MODAL_SGLANG_SOURCE
+    return env
 
 
 def _with_local_runtime_sources(built_image: modal.Image) -> modal.Image:
@@ -174,6 +183,8 @@ def _runtime_install_commands() -> tuple[str, ...]:
     commands = []
     if LMCACHE_LOCAL_SOURCE is not None:
         commands.append(LMCACHE_LOCAL_INSTALL_COMMAND)
+    if SGLANG_LOCAL_SOURCE is not None:
+        commands.append(SGLANG_LOCAL_INSTALL_COMMAND)
     commands.append(INFERGUARD_LOCAL_INSTALL_COMMAND)
     return tuple(commands)
 
@@ -475,6 +486,10 @@ def _write_lmcache_config(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Pa
         "local_cpu": True,
         "max_local_cpu_size": 8.0,
         "chunk_size": 256,
+        "enable_blending": spec.enable_cacheblend,
+        "use_layerwise": spec.enable_cacheblend or spec.engine == "sglang",
+        "blend_check_layers": [1] if spec.enable_cacheblend else None,
+        "blend_recompute_ratios": [0.15] if spec.enable_cacheblend else None,
         "cacheblend": {"enabled": spec.enable_cacheblend},
         "p2p": {
             "enabled": spec.enable_p2p,
@@ -510,12 +525,15 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
     if spec.enable_cacheblend:
         env.update(
             {
-                "LMCACHE_ENABLE_CACHEBLEND": "True",
-                "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
-                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
+                "LMCACHE_ENABLE_BLENDING": "True",
+                "LMCACHE_USE_LAYERWISE": "True",
+                "LMCACHE_BLEND_CHECK_LAYERS": "1",
+                "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
+                "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_GRPC_PORT}",
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_GRPC_PORT}",
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/json",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "grpc",
                 "OTEL_SERVICE_NAME": "inferguard-h3-cacheblend",
             }
         )
@@ -690,37 +708,44 @@ def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]
     script = r'''
 import json
 import sys
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from concurrent import futures
+
+import grpc
+from google.protobuf.json_format import MessageToDict
+from opentelemetry.proto.collector.metrics.v1 import metrics_service_pb2, metrics_service_pb2_grpc
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2, trace_service_pb2_grpc
 
 out = sys.argv[1]
 port = int(sys.argv[2])
 
-class Handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        length = int(self.headers.get("content-length", "0") or "0")
-        body = self.rfile.read(length)
-        with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
-                "path": self.path,
-                "content_type": self.headers.get("content-type"),
-                "body_preview": body.decode("utf-8", errors="replace")[:20000],
-                "body_bytes": len(body),
-            })
-            try:
-                payload = json.loads(body.decode("utf-8"))
-            except Exception:
-                payload = record
-            handle.write(json.dumps(payload) + "\n")
-        self.send_response(200)
-        self.end_headers()
 
-    def log_message(self, fmt, *args):
-        print(fmt % args, flush=True)
+def _append(payload):
+    with open(out, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+
+class TraceService(trace_service_pb2_grpc.TraceServiceServicer):
+    def Export(self, request, context):
+        payload = MessageToDict(request, preserving_proto_field_name=True)
+        _append(payload)
+        return trace_service_pb2.ExportTraceServiceResponse()
+
+
+class MetricsService(metrics_service_pb2_grpc.MetricsServiceServicer):
+    def Export(self, request, context):
+        return metrics_service_pb2.ExportMetricsServiceResponse()
+
+
+server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+trace_service_pb2_grpc.add_TraceServiceServicer_to_server(TraceService(), server)
+metrics_service_pb2_grpc.add_MetricsServiceServicer_to_server(MetricsService(), server)
+server.add_insecure_port(f"127.0.0.1:{port}")
+server.start()
+print(f"OTLP gRPC collector listening on 127.0.0.1:{port}", flush=True)
+server.wait_for_termination()
 '''
     proc = subprocess.Popen(
-        ["python3", "-c", script, str(otel_path), str(OTLP_HTTP_PORT)],
+        ["python3", "-c", script, str(otel_path), str(OTLP_GRPC_PORT)],
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         text=True,

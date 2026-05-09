@@ -144,6 +144,10 @@ def test_h1_image_installs_minimal_lmcache_runtime_deps_without_lifting_tokenize
         "msgspec",
         "prometheus-client>=0.18.0,<=0.24.1",
         "psutil",
+        "opentelemetry-api>=1.20.0,<=1.40.0",
+        "opentelemetry-sdk>=1.20.0",
+        "opentelemetry-exporter-otlp>=1.20.0",
+        "opentelemetry-exporter-prometheus>=0.50b0,<=0.61b0",
         "py-cpuinfo",
         "pyyaml",
         "pyzmq>=25.0.0",
@@ -254,6 +258,21 @@ def test_h1_prepares_shared_prometheus_multiproc_dir_for_embedded_metrics(tmp_pa
     assert list(prepared.iterdir()) == []
 
 
+def test_h2_sglang_source_binding_is_exported_into_modal_runtime() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    env_call = next(args for name, args, _kwargs in calls if name == "env")
+    runtime_env = env_call[0]
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+
+    assert lab.SGLANG_LOCAL_SOURCE is not None
+    assert runtime_env[lab.SGLANG_LOCAL_SOURCE_ENV] == lab.MODAL_SGLANG_SOURCE
+    assert runtime_env["INFERGUARD_H_SGLANG_SOURCE_REF"] == str(lab.SGLANG_LOCAL_SOURCE)
+    assert lab.SGLANG_LOCAL_INSTALL_COMMAND in run_commands_args
+    assert lab.SGLANG_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
+
+
 def test_h2_sglang_command_uses_enable_lmcache_and_layerwise_evidence(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["h2"]
@@ -284,13 +303,14 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     )
 
     env = lab._build_runner_env(tmp_path, spec)
+    lab._write_lmcache_config(tmp_path, spec)
     collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
     compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
-    assert env["LMCACHE_ENABLE_CACHEBLEND"] == "True"
-    assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
-    assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/json"
+    assert env["LMCACHE_ENABLE_BLENDING"] == "True"
+    assert env["LMCACHE_USE_LAYERWISE"] == "True"
+    assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == f"http://127.0.0.1:{lab.OTLP_GRPC_PORT}"
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )
@@ -303,6 +323,9 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
         packet_dir / "lmcache_otel_evidence.json"
     )
     assert "--external-cache-configured" in coverage
+    config = json.loads((tmp_path / lab.LMCACHE_CONFIG_FILE).read_text(encoding="utf-8"))
+    assert config["enable_blending"] is True
+    assert config["use_layerwise"] is True
     assert lab.LMCACHE_OTEL_FILE in lab._required_artifacts(spec)
 
 
