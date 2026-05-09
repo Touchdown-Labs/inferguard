@@ -62,10 +62,29 @@ PINNED_VLLM_PACKAGE = "vllm==0.10.2"
 PINNED_TRANSFORMERS_PACKAGE = "transformers==4.57.6"
 PINNED_TOKENIZERS_PACKAGE = "tokenizers==0.22.2"
 # LMCache requirements/common.txt is the runtime dependency source, but it also
-# declares ``transformers >= 5.4``. H1 installs LMCache editable with --no-deps
-# to preserve the vLLM-compatible transformers/tokenizers pins, so only add the
-# currently required missing runtime import explicitly.
-LMCACHE_RUNTIME_DEP_PACKAGES = ("sortedcontainers",)
+# declares ``transformers >= 5.4``. H runners install LMCache editable with
+# --no-deps to preserve the vLLM-compatible transformers/tokenizers pins, then
+# explicitly install only the runtime imports needed by the embedded connector
+# startup path:
+# - lmcache.v1.storage_backend imports gds_backend eagerly -> aiofile
+# - FS/remote sibling storage surfaces import aiofiles from common.txt
+# - memory_management/cache_policy import sortedcontainers
+# - p2p/offload/rpc transfer surfaces import msgspec + pyzmq
+# - observability/config/system_detection import prometheus_client, pyyaml,
+#   psutil, and py-cpuinfo.
+# Do not install LMCache requirements/common.txt directly here; it would allow
+# pip to lift transformers/tokenizers away from the pinned vLLM-compatible set.
+LMCACHE_RUNTIME_DEP_PACKAGES = (
+    "aiofile",
+    "aiofiles",
+    "msgspec",
+    "prometheus-client>=0.18.0,<=0.24.1",
+    "psutil",
+    "py-cpuinfo",
+    "pyyaml",
+    "pyzmq>=25.0.0",
+    "sortedcontainers==2.4.0",
+)
 CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
 CUDA_SOURCE_BUILD_ENV = {
     "CC": "gcc",

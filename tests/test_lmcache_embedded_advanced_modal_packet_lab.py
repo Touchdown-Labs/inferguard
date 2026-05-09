@@ -138,8 +138,22 @@ def test_h1_image_installs_minimal_lmcache_runtime_deps_without_lifting_tokenize
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
 
     assert lab.LMCACHE_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
-    assert lab.LMCACHE_RUNTIME_DEP_PACKAGES == ("sortedcontainers",)
-    assert "sortedcontainers" in pip_install_args
+    assert lab.LMCACHE_RUNTIME_DEP_PACKAGES == (
+        "aiofile",
+        "aiofiles",
+        "msgspec",
+        "prometheus-client>=0.18.0,<=0.24.1",
+        "psutil",
+        "py-cpuinfo",
+        "pyyaml",
+        "pyzmq>=25.0.0",
+        "sortedcontainers==2.4.0",
+    )
+    for package in lab.LMCACHE_RUNTIME_DEP_PACKAGES:
+        assert package in pip_install_args
+    assert "aiofile" in pip_install_args
+    assert "aiofiles" in pip_install_args
+    assert "sortedcontainers==2.4.0" in pip_install_args
     assert lab.PINNED_TRANSFORMERS_PACKAGE in pip_install_args
     assert lab.PINNED_TOKENIZERS_PACKAGE in pip_install_args
     assert "transformers>=5.4" not in pip_install_args
