@@ -1,0 +1,2 @@
+Kernel_Name,Arithmetic_Intensity,Performance,Bound
+paged_attention_kernel,12.5,155.0,memory

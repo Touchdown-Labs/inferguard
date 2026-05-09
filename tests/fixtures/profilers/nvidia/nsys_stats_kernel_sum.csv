@@ -1,0 +1,3 @@
+Name,Total Time (ns),Instances
+void paged_attention_kernel,12000000,12
+void ncclKernel_AllReduce,8000000,4

@@ -1,0 +1,8 @@
+# HELP vllm:e2e_request_latency_seconds End to end request latency
+# TYPE vllm:e2e_request_latency_seconds summary
+vllm:e2e_request_latency_seconds_sum 12.5
+vllm:time_to_first_token_seconds_sum 1.25
+vllm:inter_token_latency_seconds_sum 0.045
+vllm:generation_tokens_total 4096
+vllm:request_success_total 32
+vllm:num_requests_waiting 2
