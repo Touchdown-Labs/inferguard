@@ -9,7 +9,7 @@ Implementation repo: `/Users/chen/Projects/inferguard`
 
 - Starting SSoT score: 92 / 100.
 - Accepted live fixtures before this pass: Packet A/B/C/D/E/F.
-- Guardrail: do not claim H1/H2/H3 or DLM support without accepted live fixtures.
+- Guardrail: do not claim paused backend expansion lanes as core vLLM/LMCache blockers. H1 is accepted; H2/SGLang, Mooncake, and DLM are paused; H3 CacheBlend/vLLM model-registration timing is the active finish-line blocker.
 
 ## Local gates
 
@@ -44,11 +44,12 @@ Observed result: 4 passed, 28 passed, 21 passed, 10 passed.
 | Lane | State after this pass | Evidence | Score impact |
 | --- | --- | --- | --- |
 | G1 diagnostic calibration | `live_validated` for accepted Packet A-F diagnostic outputs | Added non-skipping test `test_g1_diagnostic_calibration_is_pinned_by_accepted_live_packet_diagnoses` in `tests/test_lmcache_live_fixtures.py`. It pins accepted live Modal/H100 fixture diagnosis outputs: Packet A `lmcache_mp_empty_cache_salt` inferred, Packet B `lmcache_mp_l1_failures` measured, Packet C `lmcache_mp_l1_eviction_pressure` measured, Packet D `vllm_external_prefix_no_hits` inferred, Packet E `lmcache_mp_empty_cache_salt` inferred, Packet F `vllm_external_prefix_no_hits` inferred. | +4, SSoT 92 -> 96 |
-| H1 embedded vLLM | `blocked` after image TDD fix; no accepted fixture | Runner exists: `scripts/lmcache_embedded_advanced_modal_packet_lab.py::run_packet_h1_embedded_vllm`. The original image resolver blocker is fixed by tests and code: the shared image no longer installs unpinned `vllm`, `lmcache`, and `sglang`; it pins `vllm==0.10.2`, uses a CUDA 12.8 devel image, installs local LMCache from `/opt/lmcache`, and applies CUDA build env before image build commands. Cost-gated H1 rerun `https://modal.com/apps/ocwc22/main/ap-nwjSHdGcyYQeSxd2rqIEYL` built successfully and reached runtime, then failed before health because pinned vLLM rejected the runner command: `vllm: error: unrecognized arguments: --kv-offloading-backend lmcache`. Local artifact: `/Users/chen/Projects/inferguard/modal-out/packet-h1-embedded-vllm/20260509T192422Z`. | 0 |
-| H2 SGLang embedded | `runner_scaffold_exists`, not run after H1 runtime command blocker | Runner exists: `run_packet_h2_sglang_embedded`; local contract test passed. Not run because H1 exposed a shared embedded/advanced runtime contract blocker after image build succeeded. | 0 |
-| H3 CacheBlend/P2P/PD | `runner_scaffold_exists` / parser-only surfaces, not run after H1 runtime command blocker | Runners exist: `run_packet_h3_cacheblend`, `run_packet_h3_p2p`, `run_packet_h3_pd`; local contract test passed. No accepted CacheBlend/P2P/PD live fixture exists. | 0 |
-| DLM | `not_started` for DLM-specific support; `llm-d` detection-only exists | Search evidence: no concrete `DLM` packet runner or CLI chain exists. Code has `LLMD_FIELD_MAP: dict[str, str] = {}` and returns `adapter_not_implemented` for `llm-d`; docs say llm-d support is detection-only until `LLMD_FIELD_MAP` is validated. | 0 |
-| I1 release readiness | `blocked` / partial | Docs and CLI references exist, but H1/H2/H3 accepted live fixtures are missing and full release closeout has not run. I1 cannot be marked release-ready while H1 is blocked at the vLLM command contract. | 0 |
+| H1 embedded vLLM | `live_validated` / accepted | Accepted Modal/H100 run `https://modal.com/apps/ocwc22/main/ap-SfIwqyS0PgfNcMtHf1jvM6`; fixture `tests/fixtures/lmcache_live/packet_h1/`; strict compat `detected_mode=embedded`, `failure_reasons=[]`. | 0; advanced rung accounting remains unchanged |
+| H2 SGLang embedded | `paused_backend_expansion` | Source binding and image-build optimization are fixed; cost-gated rerun `https://modal.com/apps/ocwc22/main/ap-uxwSka8BhbIPgBAnG0IC9n` stops at `ModuleNotFoundError: No module named 'sgl_kernel'`. This is not an active core vLLM/LMCache blocker. Resume only after a TDD-backed minimal `sgl_kernel` runtime strategy exists. | 0 |
+| H3 CacheBlend/P2P/PD | `blocked` / active finish-line blocker | CacheBlend rerun `https://modal.com/apps/ocwc22/main/ap-pjSGuideEiSL3gGFgjaXlh` cleared the prior `GPUWorker` import and `py-cpuinfo` blockers, then failed before `/health` on `ValueError: vllm model for vllm-instance not found.` from `VLLMModelTracker.get_model(instance_id)`. | 0 |
+| Mooncake | `paused_backend_expansion` / classification-only | No runnable local Mooncake source/runtime exists; current support is connector-label classification only. Resume only after a runnable Mooncake source/runtime path and packet acceptance contract exist. | 0 |
+| DLM | `paused_backend_expansion` / `detection_only` | `llm-d` prefixes are detected, but `LLMD_FIELD_MAP = {}` and CLI output reports `adapter_not_implemented`; not LMCache MP proof. Resume only after a runtime contract and validated Prometheus field map exist. | 0 |
+| I1 release readiness | `blocked` / partial | Docs and CLI references exist; release closeout waits on active vLLM + LMCache + InferGuard CLI finish line, starting with H3 CacheBlend/vLLM model-registration timing. | 0 |
 
 ## H100 decision log
 
@@ -110,7 +111,11 @@ H2 and H3 were not run. The cost gate permits one H100 run per H lane per fixed 
 
 Exact next code target before any further H100 run: update the H1 vLLM launch command to the current vLLM LMCache connector contract, likely `--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'`, with a focused RED/GREEN test replacing the old `--kv-offloading-backend lmcache` proof.
 
-## DLM future integration spec
+## Paused backend expansion contracts
+
+SGLang/H2, Mooncake, and DLM are paused backend expansion lanes. Do not spend H100 or treat them as active blockers for the core vLLM + LMCache + InferGuard CLI finish line.
+
+### DLM future integration spec
 
 Do not claim DLM support from current code. Future DLM work needs a concrete runtime contract first:
 
@@ -126,12 +131,14 @@ Score after this pass: 96 / 100.
 
 Remaining 4 points:
 
-- H grouped lane: H1/H2/H3 live accepted fixtures remain missing. The original image dependency resolver blocker is fixed, but H1 is now blocked by the pinned vLLM command contract rejecting `--kv-offloading-backend lmcache`.
-- I1 release readiness remains blocked until H lanes close and release docs/build/rollback gates pass.
+- Active finish line: vLLM + LMCache + InferGuard CLI coverage, with A-F, G1, and H1 accepted.
+- Active blocker: H3 CacheBlend/vLLM model-registration timing (`ValueError: vllm model for vllm-instance not found`).
+- Paused backend expansion: H2/SGLang at missing `sgl_kernel`; Mooncake at no runnable local source/runtime; DLM/llm-d at `adapter_not_implemented` with no validated field map.
+- I1 release readiness remains blocked until the active vLLM/LMCache finish line and release docs/build/rollback gates pass.
 
-Exact next command after fixing the H1 vLLM connector launch contract with TDD:
+Exact next command after fixing the H3 CacheBlend/vLLM model-registration timing with TDD:
 
 ```bash
 cd /Users/chen/Projects/inferguard
-modal run scripts/lmcache_embedded_advanced_modal_packet_lab.py::run_packet_h1_embedded_vllm
+modal run scripts/lmcache_embedded_advanced_modal_packet_lab.py::run_packet_h3_cacheblend
 ```

@@ -5,10 +5,10 @@ Scope: WS-Mooncake and WS-DLM from `docs/sdlc/lmcache-sglang-mooncake-all-backen
 
 ## Summary
 
-Mooncake and DLM are **not live-validated** in InferGuard as of this pass.
+Mooncake and DLM are **paused backend expansion** lanes and are **not live-validated** in InferGuard as of this pass. They are not active blockers for the core vLLM + LMCache + InferGuard CLI finish line.
 
-- Mooncake state: `blocked` for runnable packet validation; `fixture_backed` only for SGLang connector-label parsing.
-- DLM / `llm-d` state: `detection_only`; adapter intentionally returns `adapter_not_implemented` because `LLMD_FIELD_MAP = {}`.
+- Mooncake state: `paused_backend_expansion` for runnable packet validation; `fixture_backed` only for SGLang connector-label parsing.
+- DLM / `llm-d` state: `paused_backend_expansion` / `detection_only`; adapter intentionally returns `adapter_not_implemented` because `LLMD_FIELD_MAP = {}`.
 - H100 decision: no Modal/H100 run was performed. There is no runnable local Mooncake or DLM contract that satisfies the integration spec's local/TDD acceptance gate.
 - Score decision: no Touchdown SSoT score increase.
 
@@ -29,7 +29,7 @@ Mooncake is currently represented as a SGLang KV-transfer connector label. That 
 
 ## Mooncake blocked packet contract
 
-A Mooncake packet can be promoted beyond `blocked` only after all prerequisites below exist:
+A Mooncake packet can resume from `paused_backend_expansion` and be promoted beyond blocked/classification-only only after all prerequisites below exist:
 
 1. A local Mooncake source/runtime checkout, or a source-backed SGLang/vLLM integration contract that names the Mooncake connector module and launch flags.
 2. A local command that starts the relevant prefill/decode or transfer endpoint without GPU/H100 spend.
@@ -67,7 +67,7 @@ DLM is therefore `detection_only`, not `supported` and not LMCache MP proof.
 
 ## DLM promotion contract
 
-DLM / `llm-d` can move beyond `detection_only` only after a concrete runtime contract exists:
+DLM / `llm-d` can resume from `paused_backend_expansion` and move beyond `detection_only` only after a concrete runtime contract exists:
 
 1. Decide whether the target is DLM, `llm-d`, or another disaggregated-serving runtime.
 2. Identify stable prefill, decode, transfer, TTFT, TPOT, queue, and KV-transfer metric names from real Prometheus output.

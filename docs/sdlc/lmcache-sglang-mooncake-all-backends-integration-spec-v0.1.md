@@ -1,7 +1,7 @@
 # LMCache + SGLang + Mooncake all-backends integration spec v0.1
 
 ## Objective
-Make InferGuard coverage production-useful across LMCache, vLLM, SGLang, and Mooncake without overclaiming evidence. Extend the existing cost-gated packet validation path rather than creating parallel harnesses.
+Historical backend-expansion plan for LMCache, vLLM, SGLang, and Mooncake. As of the vLLM/LMCache focus decision, the active finish line is vLLM + LMCache + InferGuard CLI coverage. SGLang, Mooncake, and DLM are paused backend expansion lanes and must not block the core finish line.
 
 ## Non-negotiables
 - Do not rerun accepted A-F/G1/H1 lanes.
@@ -11,10 +11,17 @@ Make InferGuard coverage production-useful across LMCache, vLLM, SGLang, and Moo
 - Do not import live fixtures unless the packet acceptance contract passes.
 - If a backend is not locally present, add clear source-binding diagnostics and setup docs instead of silently skipping.
 
+## Current focus decision — 2026-05-09
+
+- Active finish line: vLLM + LMCache + InferGuard CLI coverage.
+- Active blocker: H3 CacheBlend/vLLM model-registration timing (`ValueError: vllm model for vllm-instance not found`).
+- Paused: H2/SGLang at missing `sgl_kernel`; Mooncake at no runnable local source/runtime; DLM/llm-d at `adapter_not_implemented` with no validated field map.
+- Resume paused lanes only after the exact resume blockers in `vllm-lmcache-focus-backend-expansion-paused-spec-v0.1.md` are cleared.
+
 ## Workstreams
 
 ### WS-SGLang
-Goal: make H2 prove LMCache + SGLang integration or produce a precise blocked artifact.
+Status: `paused_backend_expansion`. Earlier goal was to make H2 prove LMCache + SGLang integration or produce a precise blocked artifact; it is now paused so the active vLLM/LMCache finish line can close first.
 
 Steps:
 1. Locate SGLang source checkout in /Users/chen/Projects/sglang or /Users/chen/Projects/SGLang.
@@ -26,7 +33,7 @@ Steps:
 7. If accepted, import sanitized packet_h2 fixture, run fixture tests, and update SSoT.
 
 ### WS-Mooncake
-Goal: add a Mooncake integration lane that complements LMCache/vLLM/SGLang diagnostics.
+Status: `paused_backend_expansion`. Earlier goal was to add a Mooncake integration lane that complements LMCache/vLLM/SGLang diagnostics; it is now paused until a runnable Mooncake source/runtime exists.
 
 Steps:
 1. Discover existing Mooncake references/repos/workspace roots.
@@ -36,13 +43,13 @@ Steps:
 5. If no runnable Mooncake source/runtime exists, save blocked spec and setup contract with exact missing prerequisite.
 
 Status update — 2026-05-09:
-- Mooncake is `blocked` for runnable packet validation because no runnable Mooncake source/runtime exists locally.
+- Mooncake is `paused_backend_expansion` for runnable packet validation because no runnable Mooncake source/runtime exists locally.
 - Current InferGuard support is diagnostic classification only: SGLang `sglang:kv_transfer_*{connector="mooncake"}` labels are parsed and reported, but this is not runtime proof.
 - Report: `docs/sdlc/mooncake-dlm-diagnostic-classification-report-v0.1.md`.
 - No H100 run was performed.
 
 ### WS-DLM
-Goal: ensure DLM is represented as a diagnostic/backend classification lane, not conflated with LMCache MP.
+Status: `paused_backend_expansion` / `detection_only`. Earlier goal was to ensure DLM is represented as a diagnostic/backend classification lane, not conflated with LMCache MP; it is now paused until a runtime contract and validated Prometheus field map exist.
 
 Steps:
 1. Search existing InferGuard docs/tests/CLI for DLM.
@@ -50,13 +57,13 @@ Steps:
 3. No live run unless a runnable DLM backend exists.
 
 Status update — 2026-05-09:
-- DLM / `llm-d` is `detection_only`: metric prefixes are recognized, but `LLMD_FIELD_MAP = {}` and CLI output reports `adapter_not_implemented` when forced to `--engine llm-d`.
+- DLM / `llm-d` is `paused_backend_expansion` / `detection_only`: metric prefixes are recognized, but `LLMD_FIELD_MAP = {}` and CLI output reports `adapter_not_implemented` when forced to `--engine llm-d`.
 - DLM is not supported, not live-validated, and not LMCache MP evidence.
 - Report: `docs/sdlc/mooncake-dlm-diagnostic-classification-report-v0.1.md`.
 - No H100 run was performed.
 
 ## Acceptance
-- H2 accepted only with live SGLang + LMCache evidence and sanitized fixture tests.
+- H2 remains paused until missing `sgl_kernel` has a TDD-backed runtime strategy; accept only with live SGLang + LMCache evidence and sanitized fixture tests.
 - H3 accepted only with CacheBlend/OTel evidence if SSoT requires `cb.*` traces.
 - Mooncake accepted only after a source-backed packet/CLI lane exists with runnable evidence.
 - Score can reach 100 only if SSoT acceptance rows support it; otherwise leave exact blockers and next commands.

@@ -1,11 +1,11 @@
 # Packet H2/H3 Cost-Gated Blocked Report v0.2
 
 Date: 2026-05-09
-Status: blocked; score remains 96/100
+Status: superseded by v0.3; score remains 96/100
 
 ## Scope
 
-This report records the single authorized H2 rerun and single authorized H3 rerun after local gates. No A-F, G1, or H1 reruns were performed.
+This historical report records the single authorized H2 rerun and single authorized H3 rerun after local gates. No A-F, G1, or H1 reruns were performed. Superseding focus decision: H2/SGLang is paused backend expansion; H3 CacheBlend/vLLM model-registration timing is the active vLLM + LMCache finish-line blocker.
 
 ## RED proof
 
@@ -49,4 +49,4 @@ Targeted TDD added:
 
 ## Result
 
-No accepted H2 or H3 fixture was imported. I1 release readiness was not run. Score remains 96/100.
+No accepted H2 or H3 fixture was imported. I1 release readiness was not run. Score remains 96/100. Superseded by v0.3: H2/SGLang is paused backend expansion, while H3 remains active.
