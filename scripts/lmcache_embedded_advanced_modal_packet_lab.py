@@ -61,6 +61,11 @@ DEFAULT_SGLANG_LOCAL_SOURCE = REPO_ROOT.parent / "sglang"
 PINNED_VLLM_PACKAGE = "vllm==0.10.2"
 PINNED_TRANSFORMERS_PACKAGE = "transformers==4.57.6"
 PINNED_TOKENIZERS_PACKAGE = "tokenizers==0.22.2"
+# LMCache requirements/common.txt is the runtime dependency source, but it also
+# declares ``transformers >= 5.4``. H1 installs LMCache editable with --no-deps
+# to preserve the vLLM-compatible transformers/tokenizers pins, so only add the
+# currently required missing runtime import explicitly.
+LMCACHE_RUNTIME_DEP_PACKAGES = ("sortedcontainers",)
 CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
 CUDA_SOURCE_BUILD_ENV = {
     "CC": "gcc",
@@ -77,6 +82,7 @@ BASE_MODAL_PIP_PACKAGES = (
     PINNED_VLLM_PACKAGE,
     PINNED_TRANSFORMERS_PACKAGE,
     PINNED_TOKENIZERS_PACKAGE,
+    *LMCACHE_RUNTIME_DEP_PACKAGES,
     "hf-transfer",
     "huggingface-hub",
     "nvidia-cuda-runtime-cu12",

@@ -130,6 +130,22 @@ def test_h1_uses_tiny_qwen3_tokenizer_with_vllm_compatible_transformers_pin() ->
     assert lab.PINNED_TOKENIZERS_PACKAGE == "tokenizers==0.22.2"
 
 
+def test_h1_image_installs_minimal_lmcache_runtime_deps_without_lifting_tokenizer_pins() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+
+    assert lab.LMCACHE_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
+    assert lab.LMCACHE_RUNTIME_DEP_PACKAGES == ("sortedcontainers",)
+    assert "sortedcontainers" in pip_install_args
+    assert lab.PINNED_TRANSFORMERS_PACKAGE in pip_install_args
+    assert lab.PINNED_TOKENIZERS_PACKAGE in pip_install_args
+    assert "transformers>=5.4" not in pip_install_args
+    assert "python -m pip install -r /opt/lmcache/requirements/common.txt" not in run_commands_args
+
+
 def test_embedded_advanced_image_installs_current_local_inferguard_source() -> None:
     lab = _load_lab_module()
 
