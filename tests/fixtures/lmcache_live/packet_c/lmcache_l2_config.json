@@ -1,0 +1,15 @@
+{
+  "adapter": {
+    "max_size_gb": 80,
+    "mock_bandwidth_gb": 4,
+    "type": "mock"
+  },
+  "claim_status": "runner_configured_unvalidated_until_modal_packet_runs",
+  "l2_prefetch_policy": "default",
+  "l2_store_policy": "skip_l1",
+  "notes": [
+    "This file is the runner-owned L2 evidence contract.",
+    "If the installed LMCache version expects different L2 config keys, update this file before running Packet C."
+  ],
+  "path": "/out/packet-c/20260509T080022Z/l2-fs"
+}

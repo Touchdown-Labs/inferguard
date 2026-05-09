@@ -518,6 +518,8 @@ class PacketSpec:
     request_count: int | None = None
     l2_configured: bool = False
     l2_adapter: str | None = None
+    l2_store_policy: str | None = None
+    l2_prefetch_policy: str | None = None
     enable_otel: bool = False
     enable_cache_salt: bool = False
     eviction_policy: str = "LRU"
@@ -580,9 +582,11 @@ PACKETS: dict[str, PacketSpec] = {
         name="Packet C MP L2 fs adapter",
         workload="l2_reuse",
         l2_configured=True,
-        l2_adapter="fs",
+        l2_adapter="mock",
+        l2_store_policy="skip_l1",
+        l2_prefetch_policy="default",
         extra_required_artifacts=(L2_CONFIG_FILE,),
-        notes=("Local fs L2 config is written into the run directory and reported with --l2-configured.",),
+        notes=("Mock L2 adapter config is written into the run directory and launched with LMCache MP L2 CLI flags.",),
     ),
     "d": PacketSpec(
         packet_id="d",
@@ -820,6 +824,22 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--lookup-hash-log-max-files",
         "10",
     ]
+    if spec.l2_configured:
+        l2_adapter = {
+            "type": spec.l2_adapter or "mock",
+            "max_size_gb": 80,
+            "mock_bandwidth_gb": 4,
+        }
+        cmd.extend(
+            [
+                "--l2-store-policy",
+                spec.l2_store_policy or "skip_l1",
+                "--l2-prefetch-policy",
+                spec.l2_prefetch_policy or "default",
+                "--l2-adapter",
+                json.dumps(l2_adapter, separators=(",", ":")),
+            ]
+        )
     if spec.enable_otel:
         cmd.extend(["--enable-tracing"])
     return cmd
@@ -831,7 +851,13 @@ def _write_l2_config(run_dir: Path, spec: PacketSpec) -> Path | None:
     l2_dir = run_dir / "l2-fs"
     l2_dir.mkdir(parents=True, exist_ok=True)
     config = {
-        "adapter": spec.l2_adapter or "fs",
+        "adapter": {
+            "type": spec.l2_adapter or "mock",
+            "max_size_gb": 80,
+            "mock_bandwidth_gb": 4,
+        },
+        "l2_store_policy": spec.l2_store_policy or "skip_l1",
+        "l2_prefetch_policy": spec.l2_prefetch_policy or "default",
         "path": str(l2_dir),
         "claim_status": "runner_configured_unvalidated_until_modal_packet_runs",
         "notes": [
@@ -849,14 +875,6 @@ def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[st
     spec = spec or PACKETS["a"]
     env: dict[str, str] = {}
     l2_config_path = run_dir / L2_CONFIG_FILE
-    if spec.l2_configured:
-        env.update(
-            {
-                "LMCACHE_CONFIG_FILE": str(l2_config_path),
-                "LMCACHE_L2_ADAPTER": spec.l2_adapter or "fs",
-                "LMCACHE_L2_PATH": str(run_dir / "l2-fs"),
-            }
-        )
     if spec.enable_otel:
         endpoint = f"http://127.0.0.1:{OTLP_HTTP_PORT}"
         env.update(

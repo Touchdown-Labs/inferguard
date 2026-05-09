@@ -753,23 +753,32 @@ def test_packet_b_inferguard_gate_keeps_blocked_reports(tmp_path: Path) -> None:
     assert "diagnose-bottleneck" in calls[4][1]
 
 
-def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:
+def test_packet_c_wires_current_lmcache_mp_l2_cli_contract_and_strict_report_flags(
+    tmp_path: Path,
+) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["c"]
     (tmp_path / "lmcache-packet").mkdir()
     (tmp_path / "lmcache-packet" / "lmcache_trace_replay_evidence.json").write_text("{}", encoding="utf-8")
 
+    cmd = lab._build_lmcache_command(tmp_path, spec)
     config_path = lab._write_l2_config(tmp_path, spec)
     env = lab._build_lmcache_env(tmp_path, spec)
     collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
     compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
+    assert spec.l2_adapter == "mock"
+    assert cmd[cmd.index("--l2-store-policy") + 1] == "skip_l1"
+    assert cmd[cmd.index("--l2-prefetch-policy") + 1] == "default"
+    adapter = json.loads(cmd[cmd.index("--l2-adapter") + 1])
+    assert adapter["type"] == "mock"
+    assert adapter["max_size_gb"] == 80
+    assert adapter["mock_bandwidth_gb"] == 4
     assert config_path == tmp_path / "lmcache_l2_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    assert config["adapter"] == "fs"
-    assert env["LMCACHE_CONFIG_FILE"] == str(config_path)
-    assert env["LMCACHE_L2_ADAPTER"] == "fs"
+    assert config["adapter"] == adapter
+    assert env == {}
     assert "--l2-configured" in collect
     assert "--l2-configured" in compat
     assert "--l2-configured" in coverage

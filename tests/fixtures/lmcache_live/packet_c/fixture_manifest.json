@@ -1,0 +1,14 @@
+{
+  "acceptance_status": "accepted",
+  "local_artifact_path": "/Users/chen/Projects/inferguard/modal-out/packet-c/20260509T080022Z",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-mtwMK7Ii611jxjGNQPux3F",
+  "packet_id": "c",
+  "raw_hashes_removed": true,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "remote_artifact_path": "lmcache-mp-lab:/packet-c/20260509T080022Z",
+  "row_id": "D1",
+  "score_points": 6,
+  "source": "live_modal_h100",
+  "workload": "l2_reuse"
+}

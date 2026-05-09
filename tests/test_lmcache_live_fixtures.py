@@ -38,6 +38,12 @@ PACKET_B_REQUIRED_FILES = (
     "packet-b-lifecycle-evidence.json",
     "agent_kv_offload_report.json",
 )
+PACKET_C_REQUIRED_FILES = (
+    *PACKET_A_REQUIRED_FILES,
+    "workload_manifest.json",
+    "traffic_requests.jsonl",
+    "lmcache_l2_config.json",
+)
 PACKET_B_REQUIRED_FAMILIES = (
     "lookup_reuse",
     "lookup_hits",
@@ -70,6 +76,8 @@ def test_landed_live_fixtures_are_sanitized_and_pass_acceptance_contract() -> No
             _assert_packet_a_b1_acceptance(fixture_dir)
         elif fixture_dir.name == "packet_b":
             _assert_packet_b_c1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_c":
+            _assert_packet_c_d1_acceptance(fixture_dir)
         else:
             raise AssertionError(f"unknown accepted LMCache live fixture: {fixture_dir}")
 
@@ -256,6 +264,59 @@ def _assert_packet_b_c1_acceptance(fixture_dir: Path) -> None:
         assert row and row.get("status") == "populated", f"compat report missing Packet B {family}"
 
 
+def _assert_packet_c_d1_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    _assert_packet_c_manifest(manifest)
+    _assert_required_files(fixture_dir, PACKET_C_REQUIRED_FILES, row_id="D1")
+    _assert_fixture_sanitized(fixture_dir)
+
+    workload = _read_json(fixture_dir / "workload_manifest.json")
+    l2_config = _read_json(fixture_dir / "lmcache_l2_config.json")
+    lmcache_command = _read_json_list(fixture_dir / "lmcache_command.json")
+    packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    coverage = _read_json(fixture_dir / "observability_coverage.json")
+    trace = _read_json(fixture_dir / "lmcache_trace_evidence.json")
+    trace_replay = _read_json(fixture_dir / "lmcache_trace_replay_evidence.json")
+
+    assert workload.get("packet_id") == "c"
+    assert workload.get("workload") == "l2_reuse"
+    assert workload.get("raw_prompts_recorded") is False
+    _assert_packet_b_traffic_rows_metadata_only(fixture_dir / "traffic_requests.jsonl")
+
+    assert _cmd_value(lmcache_command, "--l2-store-policy") == "skip_l1"
+    assert _cmd_value(lmcache_command, "--l2-prefetch-policy") == "default"
+    adapter = json.loads(_cmd_value(lmcache_command, "--l2-adapter"))
+    assert adapter == {"type": "mock", "max_size_gb": 80, "mock_bandwidth_gb": 4}
+    assert l2_config.get("adapter") == adapter
+
+    assert packet_manifest.get("detected_mode") == "mp"
+    assert packet_manifest.get("l2_configured") is True
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_mode") == "mp"
+    assert compat.get("l2_configured") is True
+    assert coverage.get("detected_lmcache_mode") == "mp"
+    assert coverage.get("config", {}).get("l2_configured") is True
+
+    family_rows = {
+        (row.get("surface"), row.get("family")): row
+        for row in compat.get("families", [])
+        if isinstance(row, dict)
+    }
+    for family in ("l2_counters", "l2_throughput"):
+        row = family_rows.get(("lmcache_mp", family))
+        assert row and row.get("status") == "populated", f"compat report missing Packet C {family}"
+        assert row.get("matched_metrics"), f"Packet C family has no matched metric: {family}"
+    l2_summary = compat.get("lmcache_l2_summary", {})
+    _assert_positive(l2_summary.get("store_tasks"), "lmcache_l2_summary.store_tasks")
+    _assert_positive(l2_summary.get("store_completed"), "lmcache_l2_summary.store_completed")
+    _assert_positive(l2_summary.get("load_completed"), "lmcache_l2_summary.load_completed")
+
+    assert trace.get("claim_status") == "measured"
+    _assert_positive(trace.get("record_count"), "lmcache_trace_evidence.record_count")
+    assert trace_replay.get("claim_status") == "measured"
+
+
 def _assert_packet_b_traffic_rows_metadata_only(path: Path) -> None:
     required = {
         "request_index",
@@ -325,6 +386,18 @@ def _assert_packet_b_manifest(manifest: dict[str, Any]) -> None:
     assert manifest.get("benchmark_id") == "LC1"
     assert manifest.get("workload_profile") == "long_context_agent_kv_offload"
     assert manifest.get("raw_prompts_recorded", False) is False
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 6
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    assert manifest.get("acceptance_status") == "accepted"
+
+
+def _assert_packet_c_manifest(manifest: dict[str, Any]) -> None:
+    assert manifest.get("row_id") == "D1"
+    assert manifest.get("packet_id") == "c"
+    assert manifest.get("workload") == "l2_reuse"
     assert manifest.get("source") == "live_modal_h100"
     assert manifest.get("score_points") == 6
     assert manifest.get("redacted") is True
