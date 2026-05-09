@@ -161,7 +161,7 @@ def test_packet_specs_cover_h1_h2_h3_without_claiming_live_validation() -> None:
     )
 
 
-def test_h1_vllm_embedded_command_uses_lmcacheconnectorv1_path(tmp_path: Path) -> None:
+def test_h1_vllm_embedded_command_uses_current_lmcacheconnectorv1_contract(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["h1"]
 
@@ -171,13 +171,18 @@ def test_h1_vllm_embedded_command_uses_lmcacheconnectorv1_path(tmp_path: Path) -
     proof_path = lab._write_launch_proof(tmp_path, spec)
 
     assert cmd[:3] == ["vllm", "serve", lab.MODEL]
-    assert cmd[cmd.index("--kv-offloading-backend") + 1] == "lmcache"
+    assert "--kv-offloading-backend" not in cmd
+    assert "lmcache" not in cmd
+    assert "--kv-transfer-config" in cmd
+    transfer_config = json.loads(cmd[cmd.index("--kv-transfer-config") + 1])
+    assert transfer_config == {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
     assert "LMCacheMPConnector" not in json.dumps(cmd)
     assert env["LMCACHE_CONFIG_FILE"] == str(tmp_path / lab.LMCACHE_CONFIG_FILE)
 
     config = json.loads((tmp_path / lab.LMCACHE_CONFIG_FILE).read_text(encoding="utf-8"))
     proof = json.loads(proof_path.read_text(encoding="utf-8"))
     assert "LMCacheConnectorV1" in config["expected_connector_evidence"]
+    assert "--kv-transfer-config" in config["expected_connector_evidence"]
     assert proof["expect_lmcache_mode"] == "embedded"
     assert proof["claim_status"] == "runner_scaffold_only_not_live_validated"
     assert any("LMCacheConnectorV1" in item for item in proof["required_live_proof"])

@@ -226,11 +226,11 @@ PACKETS: dict[str, EmbeddedAdvancedPacketSpec] = {
         workload="repeated_prefix_vllm_embedded",
         output_slug="packet-h1-embedded-vllm",
         external_cache_configured=True,
-        connector_proof=("LMCacheConnectorV1", "--kv-offloading-backend lmcache"),
+        connector_proof=("LMCacheConnectorV1", "--kv-transfer-config"),
         extra_required_artifacts=(),
         notes=(
-            "Uses vLLM embedded/backcompat --kv-offloading-backend lmcache, not "
-            "LMCacheMPConnector.",
+            "Uses vLLM embedded/in-process --kv-transfer-config with "
+            "LMCacheConnectorV1, not LMCacheMPConnector.",
         ),
     ),
     "h2": EmbeddedAdvancedPacketSpec(
@@ -518,8 +518,6 @@ def _build_vllm_embedded_command(
         "vllm",
         "serve",
         MODEL,
-        "--kv-offloading-backend",
-        "lmcache",
         "--max-model-len",
         str(MODEL_MAX_LEN),
         "--gpu-memory-utilization",
@@ -529,22 +527,22 @@ def _build_vllm_embedded_command(
     ]
     if spec.enable_pd:
         role = "kv_producer" if port == spec.primary_port else "kv_consumer"
-        cmd.extend(
-            [
-                "--kv-transfer-config",
-                json.dumps(
-                    {
-                        "kv_connector": "NixlConnector",
-                        "kv_role": role,
-                        "kv_connector_extra_config": {
-                            "lmcache_pd_proxy": "http://127.0.0.1:6500",
-                            "transport": "nixl",
-                        },
-                    },
-                    separators=(",", ":"),
-                ),
-            ]
-        )
+        transfer_config = {
+            "kv_connector": "NixlConnector",
+            "kv_role": role,
+            "kv_connector_extra_config": {
+                "lmcache_pd_proxy": "http://127.0.0.1:6500",
+                "transport": "nixl",
+            },
+        }
+    else:
+        transfer_config = {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
+    cmd.extend(
+        [
+            "--kv-transfer-config",
+            json.dumps(transfer_config, separators=(",", ":")),
+        ]
+    )
     return cmd
 
 
@@ -607,7 +605,7 @@ def _write_launch_proof(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Path
 def _required_live_proof(spec: EmbeddedAdvancedPacketSpec) -> list[str]:
     if spec.packet_id == "h1":
         return [
-            "vLLM command/config proves LMCacheConnectorV1 or --kv-offloading-backend lmcache",
+            "vLLM command/config proves LMCacheConnectorV1 via --kv-transfer-config",
             "engine /metrics includes embedded lmcache:* or lmcache_* production counters",
             "repeated-prefix traffic produces nonzero reuse/hit metrics",
             "logs prove store/retrieve/lookup activity",
