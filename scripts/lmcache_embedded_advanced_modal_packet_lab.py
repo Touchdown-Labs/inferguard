@@ -51,60 +51,135 @@ MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
-volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
-
-image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .apt_install("curl", "git")
-    .pip_install(
-        "vllm",
-        "lmcache",
-        "sglang",
-        "hf-transfer",
-        "huggingface-hub",
-        "nvidia-cuda-runtime-cu12",
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "pyproject.toml"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "README.md"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "LICENSE"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
-        copy=True,
-    )
-    .add_local_dir(
-        local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
-        copy=True,
-    )
-    .run_commands(INFERGUARD_LOCAL_INSTALL_COMMAND)
-    .env(
-        {
-            "HF_HUB_ENABLE_HF_TRANSFER": "1",
-            "HF_HOME": "/out/hf-cache",
-            "VLLM_CACHE_ROOT": "/out/vllm-cache",
-            "PYTHONHASHSEED": "0",
-            "LMCACHE_USE_EXPERIMENTAL": "True",
-            "LMCACHE_LOCAL_CPU": "True",
-            "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
-            "LMCACHE_CHUNK_SIZE": "256",
-            "VLLM_USE_FLASHINFER_SAMPLER": "0",
-            "VLLM_USE_DEEP_GEMM": "0",
-            "VLLM_DEEP_GEMM_WARMUP": "skip",
-            "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
-            "LD_LIBRARY_PATH": (
-                "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
-            ),
-        }
-    )
+MODAL_LMCACHE_SOURCE = "/opt/lmcache"
+MODAL_SGLANG_SOURCE = "/opt/sglang"
+LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_H_LMCACHE_LOCAL_SOURCE"
+SGLANG_LOCAL_SOURCE_ENV = "INFERGUARD_H_SGLANG_LOCAL_SOURCE"
+DEFAULT_LMCACHE_LOCAL_SOURCE = REPO_ROOT.parent / "LMCache"
+DEFAULT_SGLANG_LOCAL_SOURCE = REPO_ROOT.parent / "sglang"
+PINNED_VLLM_PACKAGE = "vllm==0.10.2"
+CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
+CUDA_SOURCE_BUILD_ENV = {
+    "CC": "gcc",
+    "CXX": "g++",
+    "CUDA_HOME": "/usr/local/cuda",
+    "TORCH_CUDA_ARCH_LIST": "9.0",
+    "ENABLE_CXX11_ABI": "1",
+    "LD_LIBRARY_PATH": (
+        "/usr/local/cuda/lib64:"
+        "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+    ),
+}
+BASE_MODAL_PIP_PACKAGES = (
+    PINNED_VLLM_PACKAGE,
+    "hf-transfer",
+    "huggingface-hub",
+    "nvidia-cuda-runtime-cu12",
+    "ninja",
+    "packaging>=24.2",
+    "setuptools>=77.0.3,<81.0.0",
+    "setuptools_scm>=8",
+    "wheel",
 )
+LMCACHE_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation"
+SGLANG_LOCAL_INSTALL_COMMAND = (
+    f"python -m pip install -e {MODAL_SGLANG_SOURCE}/python --no-build-isolation"
+)
+
+
+def _optional_local_source(env_key: str, default_path: Path) -> Path | None:
+    raw = os.environ.get(env_key, "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    if default_path.exists():
+        return default_path
+    return None
+
+
+LMCACHE_LOCAL_SOURCE = _optional_local_source(LMCACHE_LOCAL_SOURCE_ENV, DEFAULT_LMCACHE_LOCAL_SOURCE)
+SGLANG_LOCAL_SOURCE = _optional_local_source(SGLANG_LOCAL_SOURCE_ENV, DEFAULT_SGLANG_LOCAL_SOURCE)
+
+
+def _runtime_env() -> dict[str, str]:
+    return {
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        "HF_HOME": "/out/hf-cache",
+        "VLLM_CACHE_ROOT": "/out/vllm-cache",
+        "PYTHONHASHSEED": "0",
+        "LMCACHE_USE_EXPERIMENTAL": "True",
+        "LMCACHE_LOCAL_CPU": "True",
+        "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
+        "LMCACHE_CHUNK_SIZE": "256",
+        "VLLM_USE_FLASHINFER_SAMPLER": "0",
+        "VLLM_USE_DEEP_GEMM": "0",
+        "VLLM_DEEP_GEMM_WARMUP": "skip",
+        "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
+        **CUDA_SOURCE_BUILD_ENV,
+        "INFERGUARD_H_LMCACHE_SOURCE_REF": str(LMCACHE_LOCAL_SOURCE or "pypi"),
+        "INFERGUARD_H_SGLANG_SOURCE_REF": str(SGLANG_LOCAL_SOURCE or "not-installed"),
+        "INFERGUARD_H_VLLM_PACKAGE": PINNED_VLLM_PACKAGE,
+    }
+
+
+def _with_local_runtime_sources(built_image: modal.Image) -> modal.Image:
+    if LMCACHE_LOCAL_SOURCE is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(LMCACHE_LOCAL_SOURCE),
+            remote_path=MODAL_LMCACHE_SOURCE,
+            copy=True,
+        )
+    if SGLANG_LOCAL_SOURCE is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(SGLANG_LOCAL_SOURCE),
+            remote_path=MODAL_SGLANG_SOURCE,
+            copy=True,
+        )
+    return built_image
+
+
+def _runtime_install_commands() -> tuple[str, ...]:
+    commands = []
+    if LMCACHE_LOCAL_SOURCE is not None:
+        commands.append(LMCACHE_LOCAL_INSTALL_COMMAND)
+    commands.append(INFERGUARD_LOCAL_INSTALL_COMMAND)
+    return tuple(commands)
+
+
+def _build_modal_image() -> modal.Image:
+    built_image = (
+        modal.Image.from_registry(CUDA_DEVEL_IMAGE, add_python="3.11")
+        .apt_install("build-essential", "curl", "git")
+        .pip_install(*BASE_MODAL_PIP_PACKAGES)
+    )
+    built_image = _with_local_runtime_sources(built_image)
+    return (
+        built_image.add_local_file(
+            local_path=str(REPO_ROOT / "pyproject.toml"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "README.md"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "LICENSE"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
+            copy=True,
+        )
+        .add_local_dir(
+            local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
+            copy=True,
+        )
+        .env(_runtime_env())
+        .run_commands(*_runtime_install_commands())
+    )
+
+
+volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
+image = _build_modal_image()
 
 app = modal.App(APP_NAME, image=image)
 
@@ -319,6 +394,14 @@ def _wait_for_http(
             return
         time.sleep(10)
     raise RuntimeError(f"{label} did not become healthy at {url}")
+
+
+def _ensure_sglang_runtime(run_dir: Path) -> None:
+    if SGLANG_LOCAL_SOURCE is None:
+        raise FileNotFoundError(
+            f"{SGLANG_LOCAL_SOURCE_ENV} must point to an SGLang checkout for H2"
+        )
+    _run_required(["sh", "-lc", SGLANG_LOCAL_INSTALL_COMMAND], run_dir / "setup.log", timeout=20 * 60)
 
 
 def _write_env_snapshot(run_dir: Path) -> None:
@@ -937,6 +1020,8 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
     otel_proc: subprocess.Popen[str] | None = None
     handles: list[object] = []
     try:
+        if spec.engine == "sglang":
+            _ensure_sglang_runtime(run_dir)
         _write_env_snapshot(run_dir)
         _write_lmcache_config(run_dir, spec)
         _write_launch_proof(run_dir, spec)

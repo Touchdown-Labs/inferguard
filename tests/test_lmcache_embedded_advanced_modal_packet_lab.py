@@ -22,6 +22,12 @@ def _load_lab_module():
             image.calls.append(("debian_slim", (), kwargs))
             return image
 
+        @classmethod
+        def from_registry(cls, *args, **kwargs):
+            image = cls()
+            image.calls.append(("from_registry", args, kwargs))
+            return image
+
         def apt_install(self, *args):
             self.calls.append(("apt_install", args, {}))
             return self
@@ -77,6 +83,38 @@ def _load_lab_module():
     return module
 
 
+def test_embedded_advanced_image_uses_cuda_devel_base_for_local_lmcache_build() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    from_registry_args = next(args for name, args, _kwargs in calls if name == "from_registry")
+    assert from_registry_args == (lab.CUDA_DEVEL_IMAGE,)
+    apt_install_args = next(args for name, args, _kwargs in calls if name == "apt_install")
+    assert "build-essential" in apt_install_args
+    env_index = next(index for index, (name, _args, _kwargs) in enumerate(calls) if name == "env")
+    run_commands_index = next(
+        index for index, (name, _args, _kwargs) in enumerate(calls) if name == "run_commands"
+    )
+    assert env_index < run_commands_index
+    runtime_env = calls[env_index][1][0]
+    assert runtime_env["CUDA_HOME"] == "/usr/local/cuda"
+    assert runtime_env["TORCH_CUDA_ARCH_LIST"] == "9.0"
+
+
+def test_embedded_advanced_image_avoids_shared_unpinned_runtime_backtracking() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    forbidden_unpinned = {"vllm", "lmcache", "sglang"}
+    assert not (forbidden_unpinned & set(pip_install_args))
+    assert any(arg.startswith("vllm==") for arg in pip_install_args)
+    assert "sglang" not in pip_install_args
+    assert "lmcache" not in pip_install_args
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+    assert any("pip install -e /opt/lmcache" in command for command in run_commands_args)
+
+
 def test_embedded_advanced_image_installs_current_local_inferguard_source() -> None:
     lab = _load_lab_module()
 
@@ -89,18 +127,24 @@ def test_embedded_advanced_image_installs_current_local_inferguard_source() -> N
     calls = lab.image.calls
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "inferguard" not in pip_install_args
-    assert "vllm" in pip_install_args
-    assert "lmcache" in pip_install_args
-    assert "sglang" in pip_install_args
+    assert any(arg.startswith("vllm==") for arg in pip_install_args)
+    assert "lmcache" not in pip_install_args
+    assert "sglang" not in pip_install_args
 
-    add_local_dir = next(kwargs for name, _args, kwargs in calls if name == "add_local_dir")
+    add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
+    add_local_dir = next(
+        kwargs
+        for kwargs in add_local_dirs
+        if kwargs["remote_path"] == f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}"
+    )
     assert add_local_dir == {
         "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
         "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
         "copy": True,
     }
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
+    assert run_commands_args[-1] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
+    assert any("pip install -e /opt/lmcache" in command for command in run_commands_args)
 
 
 def test_packet_specs_cover_h1_h2_h3_without_claiming_live_validation() -> None:
