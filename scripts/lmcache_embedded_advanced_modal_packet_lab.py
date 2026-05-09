@@ -93,10 +93,13 @@ LMCACHE_RUNTIME_DEP_PACKAGES = (
 # SGLang's pyproject lists a large runtime dependency set that includes heavy
 # and conflicting pins (notably torch/transformers). H2 installs SGLang editable
 # with --no-deps and relies on the vLLM image for shared server/runtime packages.
-# The failed live H2 artifact showed that orjson was the missing import from
-# sglang.srt.utils.common; install it explicitly without invoking SGLang's full
-# resolver.
-SGLANG_RUNTIME_DEP_PACKAGES = ("orjson",)
+# Failed live H2 artifacts under editable --no-deps exposed only direct import
+# blockers on the SGLang launch path. Keep this allowlist minimal and evidence-
+# backed instead of installing the full SGLang requirements resolver:
+# - orjson: sglang.srt.utils.common import blocker from the first H2 live run
+# - IPython: sglang/utils.py imports IPython.display; also declared in
+#   SGLang python/pyproject.toml.
+SGLANG_RUNTIME_DEP_PACKAGES = ("orjson", "IPython")
 CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
 CUDA_SOURCE_BUILD_ENV = {
     "CC": "gcc",
@@ -751,8 +754,9 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
             {
                 "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
                 "patch_target": str(sitecustomize_path),
+                "engine_name": "vllm-instance",
                 "hook": "GPUWorker.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)",
-                "source_basis": "LMCache examples/blend_kv_v1 README documents this vLLM-side CacheBlend hook",
+                "source_basis": "LMCache examples/blend_kv_v1 README documents this vLLM-side CacheBlend hook; lmcache.integration.vllm.utils.ENGINE_NAME is vllm-instance",
                 "applied": True,
             },
             indent=2,

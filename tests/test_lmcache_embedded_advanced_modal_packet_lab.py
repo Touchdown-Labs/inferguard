@@ -171,8 +171,9 @@ def test_h2_image_installs_minimal_sglang_runtime_deps_without_lifting_vllm_pins
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
 
-    assert lab.SGLANG_RUNTIME_DEP_PACKAGES == ("orjson",)
+    assert lab.SGLANG_RUNTIME_DEP_PACKAGES == ("orjson", "IPython")
     assert "orjson" in pip_install_args
+    assert "IPython" in pip_install_args
     assert lab.PINNED_VLLM_PACKAGE in pip_install_args
     assert lab.PINNED_TRANSFORMERS_PACKAGE in pip_install_args
     assert lab.PINNED_TOKENIZERS_PACKAGE in pip_install_args
@@ -355,15 +356,59 @@ def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path:
     lab = _load_lab_module()
 
     source = lab._patch_vllm_cacheblend_model_tracker.__doc__ or ""
-    constants = lab._patch_vllm_cacheblend_model_tracker.__code__.co_consts
-    joined_constants = "\n".join(str(item) for item in constants)
+    patch_log = lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+    patch = json.loads(patch_log.read_text(encoding="utf-8"))
+    sitecustomize_text = sitecustomize.read_text(encoding="utf-8")
 
     assert "VLLMModelTracker.get_model(ENGINE_NAME)" in source
     assert "GPUWorker.load_model" in source
-    assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)" in joined_constants
-    assert "INFERGUARD_H3_REGISTER_VLLM_MODEL" in joined_constants
-    assert "vllm_cacheblend_model_tracker_patch.json" in joined_constants
-    assert "sitecustomize.py" in joined_constants
+    assert patch_log.name == "vllm_cacheblend_model_tracker_patch.json"
+    assert sitecustomize.exists()
+    assert patch["patch_target"] == str(sitecustomize)
+    assert patch["engine_name"] == "vllm-instance"
+    assert patch["applied"] is True
+    assert "INFERGUARD_H3_REGISTER_VLLM_MODEL" in sitecustomize_text
+    assert "from lmcache.integration.vllm.utils import ENGINE_NAME" in sitecustomize_text
+    assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)" in sitecustomize_text
+
+
+def test_h3_cacheblend_model_tracker_patch_is_created_before_engine_launch(tmp_path: Path, monkeypatch) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+    events: list[str] = []
+
+    def fake_patch(run_dir: Path):
+        events.append("patch")
+        path = run_dir / "vllm_cacheblend_model_tracker_patch.json"
+        path.write_text("{}", encoding="utf-8")
+        (run_dir / "sitecustomize.py").write_text("", encoding="utf-8")
+        return path
+
+    def fake_launch(*_args, **_kwargs):
+        events.append("launch")
+        raise RuntimeError("stop before Modal engine launch")
+
+    monkeypatch.setattr(lab, "OUT_ROOT", tmp_path)
+    monkeypatch.setattr(lab, "_patch_vllm_cacheblend_model_tracker", fake_patch)
+    monkeypatch.setattr(lab, "_prepare_prometheus_multiproc_dir", lambda _run_dir: None)
+    monkeypatch.setattr(lab, "_write_env_snapshot", lambda _run_dir: None)
+    monkeypatch.setattr(lab, "_write_lmcache_config", lambda run_dir, _spec: run_dir / lab.LMCACHE_CONFIG_FILE)
+    monkeypatch.setattr(lab, "_write_launch_proof", lambda run_dir, _spec: run_dir / lab.RUNNER_PROOF_FILE)
+    monkeypatch.setattr(lab, "_start_otel_collector", lambda _run_dir: (None, None))
+    monkeypatch.setattr(lab, "_launch_engine", fake_launch)
+    monkeypatch.setattr(lab, "_terminate", lambda _proc: None)
+    monkeypatch.setattr(lab, "_close_handles", lambda _handles: None)
+    monkeypatch.setattr(lab.volume, "commit", lambda: None)
+
+    try:
+        lab._run_packet(spec)
+    except RuntimeError as exc:
+        assert "stop before Modal engine launch" in str(exc)
+    else:
+        raise AssertionError("expected fake launch to stop packet run")
+
+    assert events == ["patch", "launch"]
 
 
 def test_h3_p2p_writes_two_engine_peer_scaffold(tmp_path: Path) -> None:
