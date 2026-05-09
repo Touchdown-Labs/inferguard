@@ -1,0 +1,15 @@
+{
+  "acceptance_status": "accepted",
+  "local_artifact_path": "/Users/chen/Projects/inferguard/modal-out/packet-f/20260509T084753Z",
+  "modal_run_url": null,
+  "modal_run_url_note": "Previous RepoPrompt session stalled before preserving the Modal app URL; recovered from Modal volume artifact instead.",
+  "packet_id": "f",
+  "raw_hashes_removed": true,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "remote_artifact_path": "lmcache-mp-lab:/packet-f/20260509T084753Z",
+  "row_id": "F1",
+  "score_points": 4,
+  "source": "live_modal_h100",
+  "workload": "cache_salt_isolated_lru"
+}

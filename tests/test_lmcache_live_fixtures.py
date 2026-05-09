@@ -44,6 +44,24 @@ PACKET_C_REQUIRED_FILES = (
     "traffic_requests.jsonl",
     "lmcache_l2_config.json",
 )
+PACKET_D_REQUIRED_FILES = (
+    *PACKET_A_REQUIRED_FILES,
+    "workload_manifest.json",
+    "traffic_requests.jsonl",
+    "lmcache_otel.jsonl",
+    "lmcache_otel_evidence.json",
+)
+PACKET_E_REQUIRED_FILES = (
+    *PACKET_A_REQUIRED_FILES,
+    "workload_manifest.json",
+    "traffic_requests.jsonl",
+)
+PACKET_F_REQUIRED_FILES = (
+    *PACKET_A_REQUIRED_FILES,
+    "workload_manifest.json",
+    "traffic_requests.jsonl",
+    "lmcache_lookup_hash_evidence.json",
+)
 PACKET_B_REQUIRED_FAMILIES = (
     "lookup_reuse",
     "lookup_hits",
@@ -78,6 +96,12 @@ def test_landed_live_fixtures_are_sanitized_and_pass_acceptance_contract() -> No
             _assert_packet_b_c1_acceptance(fixture_dir)
         elif fixture_dir.name == "packet_c":
             _assert_packet_c_d1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_d":
+            _assert_packet_d_e1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_e":
+            _assert_packet_e_e2_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_f":
+            _assert_packet_f_f1_acceptance(fixture_dir)
         else:
             raise AssertionError(f"unknown accepted LMCache live fixture: {fixture_dir}")
 
@@ -317,6 +341,117 @@ def _assert_packet_c_d1_acceptance(fixture_dir: Path) -> None:
     assert trace_replay.get("claim_status") == "measured"
 
 
+def _assert_packet_d_e1_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    _assert_packet_d_manifest(manifest)
+    _assert_required_files(fixture_dir, PACKET_D_REQUIRED_FILES, row_id="E1")
+    _assert_fixture_sanitized(fixture_dir)
+
+    workload = _read_json(fixture_dir / "workload_manifest.json")
+    lmcache_command = _read_json_list(fixture_dir / "lmcache_command.json")
+    lmcache_env = _read_json(fixture_dir / "lmcache_env.json")
+    packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    coverage = _read_json(fixture_dir / "observability_coverage.json")
+    otel = _read_json(fixture_dir / "lmcache_otel_evidence.json")
+    diagnosis = _read_json(fixture_dir / "bottleneck_diagnosis.json")
+
+    assert workload.get("packet_id") == "d"
+    assert workload.get("workload") == "otel_reuse"
+    assert workload.get("raw_prompts_recorded") is False
+    _assert_packet_b_traffic_rows_metadata_only(fixture_dir / "traffic_requests.jsonl")
+
+    assert "--enable-tracing" in lmcache_command
+    assert _cmd_value(lmcache_command, "--otlp-endpoint") == "http://127.0.0.1:4317"
+    assert lmcache_env.get("OTEL_SERVICE_NAME") == "lmcache-mp-packet-d"
+
+    assert packet_manifest.get("detected_mode") == "mp"
+    assert packet_manifest.get("claim_status") == "measured"
+    assert packet_manifest.get("compat_summary", {}).get("failure_reasons") == []
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_mode") == "mp"
+    assert compat.get("observed", {}).get("lmcache_mp_evidence") is True
+    assert compat.get("observed", {}).get("lmcache_mp_metrics_prometheus_unavailable") is True
+    assert coverage.get("detected_lmcache_mode") == "mp"
+
+    assert otel.get("claim_status") == "measured"
+    _assert_positive(otel.get("span_count"), "lmcache_otel_evidence.span_count")
+    _assert_positive(otel.get("mp_span_count"), "lmcache_otel_evidence.mp_span_count")
+    _assert_positive(otel.get("request_span_count"), "lmcache_otel_evidence.request_span_count")
+    assert diagnosis.get("claim_status") in {"measured", "inferred"}
+
+
+def _assert_packet_e_e2_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    _assert_packet_e_manifest(manifest)
+    _assert_required_files(fixture_dir, PACKET_E_REQUIRED_FILES, row_id="E2")
+    _assert_fixture_sanitized(fixture_dir)
+
+    workload = _read_json(fixture_dir / "workload_manifest.json")
+    packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    coverage = _read_json(fixture_dir / "observability_coverage.json")
+    trace_replay = _read_json(fixture_dir / "lmcache_trace_replay_evidence.json")
+
+    assert workload.get("packet_id") == "e"
+    assert workload.get("workload") == "trace_replay"
+    assert workload.get("raw_prompts_recorded") is False
+    _assert_packet_b_traffic_rows_metadata_only(fixture_dir / "traffic_requests.jsonl")
+
+    assert packet_manifest.get("detected_mode") == "mp"
+    assert packet_manifest.get("claim_status") == "measured"
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_mode") == "mp"
+    assert coverage.get("detected_lmcache_mode") == "mp"
+    assert trace_replay.get("claim_status") == "measured"
+    assert trace_replay.get("failed_rows") == 0
+    _assert_positive(trace_replay.get("rows_seen"), "lmcache_trace_replay_evidence.rows_seen")
+    _assert_positive(trace_replay.get("duration_s"), "lmcache_trace_replay_evidence.duration_s")
+
+
+def _assert_packet_f_f1_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    _assert_packet_f_manifest(manifest)
+    _assert_required_files(fixture_dir, PACKET_F_REQUIRED_FILES, row_id="F1")
+    _assert_fixture_sanitized(fixture_dir)
+
+    workload = _read_json(fixture_dir / "workload_manifest.json")
+    lmcache_command = _read_json_list(fixture_dir / "lmcache_command.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    lookup_hash = _read_json(fixture_dir / "lmcache_lookup_hash_evidence.json")
+
+    assert workload.get("packet_id") == "f"
+    assert workload.get("workload") == "cache_salt_isolated_lru"
+    assert workload.get("workload_profile") == "cache_salt_isolated_lru"
+    assert workload.get("eviction_policy") == "IsolatedLRU"
+    assert workload.get("raw_prompts_recorded") is False
+    _assert_packet_b_traffic_rows_metadata_only(fixture_dir / "traffic_requests.jsonl")
+
+    assert _cmd_value(lmcache_command, "--eviction-policy") == "IsolatedLRU"
+    assert "--lookup-hash-log-dir" in lmcache_command
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_mode") == "mp"
+    observability = compat.get("lmcache_mp_observability", {})
+    assert observability.get("cache_salt_values") == ["tenant-0", "tenant-1"]
+    assert observability.get("cache_salt_cardinality") == 2
+    assert observability.get("cache_salt_cardinality_risk") is False
+
+    assert lookup_hash.get("claim_status") == "measured"
+    assert lookup_hash.get("present") is True
+    _assert_positive(lookup_hash.get("row_count"), "lmcache_lookup_hash_evidence.row_count")
+    for file_row in lookup_hash.get("files", []):
+        assert file_row.get("claim_status") == "measured"
+        assert file_row.get("malformed_rows") == 0
+        assert file_row.get("chunk_hash_count", {}).get("count", 0) > 0
+
+    rows = [
+        json.loads(line)
+        for line in (fixture_dir / "traffic_requests.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert {row.get("cache_salt") for row in rows} == {"tenant-0", "tenant-1"}
+
+
 def _assert_packet_b_traffic_rows_metadata_only(path: Path) -> None:
     required = {
         "request_index",
@@ -400,6 +535,42 @@ def _assert_packet_c_manifest(manifest: dict[str, Any]) -> None:
     assert manifest.get("workload") == "l2_reuse"
     assert manifest.get("source") == "live_modal_h100"
     assert manifest.get("score_points") == 6
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    assert manifest.get("acceptance_status") == "accepted"
+
+
+def _assert_packet_e_manifest(manifest: dict[str, Any]) -> None:
+    assert manifest.get("row_id") == "E2"
+    assert manifest.get("packet_id") == "e"
+    assert manifest.get("workload") == "trace_replay"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 4
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    assert manifest.get("acceptance_status") == "accepted"
+
+
+def _assert_packet_d_manifest(manifest: dict[str, Any]) -> None:
+    assert manifest.get("row_id") == "E1"
+    assert manifest.get("packet_id") == "d"
+    assert manifest.get("workload") == "otel_reuse"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 4
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    assert manifest.get("acceptance_status") == "accepted"
+
+
+def _assert_packet_f_manifest(manifest: dict[str, Any]) -> None:
+    assert manifest.get("row_id") == "F1"
+    assert manifest.get("packet_id") == "f"
+    assert manifest.get("workload") == "cache_salt_isolated_lru"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 4
     assert manifest.get("redacted") is True
     assert manifest.get("raw_hashes_removed") is True
     assert manifest.get("raw_prompts_removed") is True

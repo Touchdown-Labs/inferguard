@@ -800,6 +800,7 @@ def test_packet_d_wires_otel_collector_evidence_into_reports(tmp_path: Path) -> 
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
     assert "--enable-tracing" in cmd
+    assert cmd[cmd.index("--otlp-endpoint") + 1] == "http://127.0.0.1:4317"
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(tmp_path / "lmcache_otel.jsonl")
     assert "--mp-tracing-enabled" in collect

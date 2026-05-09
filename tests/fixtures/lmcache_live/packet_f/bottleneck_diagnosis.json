@@ -1,0 +1,222 @@
+{
+  "claim_status": "inferred",
+  "confidence": 0.0,
+  "downgrades": [
+    {
+      "claim_id": "lmcache_mp_compatibility",
+      "from": "measured",
+      "reason": "vllm_external_prefix_no_hits",
+      "to": "inferred"
+    }
+  ],
+  "evidence_paths": [
+    "/out/packet-f/20260509T084753Z/inferguard-job/metrics/lmcache_compat_report.json"
+  ],
+  "job_id": "inferguard-job",
+  "metric_values": {
+    "lmcache_compat.detected_mode": "mp",
+    "lmcache_compat.surfaces": {
+      "lmcache_cacheblend": {
+        "family_count": 9,
+        "missing": 0,
+        "not_applicable": 9,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_embedded": {
+        "family_count": 20,
+        "missing": 0,
+        "not_applicable": 20,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_http": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_logs": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_lookup_hash": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_mp": {
+        "family_count": 16,
+        "missing": 5,
+        "not_applicable": 3,
+        "populated": 6,
+        "status": "partial",
+        "zero": 2
+      },
+      "lmcache_otel": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_trace_recording": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_trace_replay": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "vllm_prefix_cache": {
+        "family_count": 4,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 4,
+        "status": "complete",
+        "zero": 0
+      },
+      "vllm_simple_cpu_offload": {
+        "family_count": 2,
+        "missing": 2,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      }
+    },
+    "lmcache_compat.upstream_question_codes": [
+      "vllm_external_prefix_no_hits"
+    ]
+  },
+  "primary_evidence": [
+    {
+      "claim_status": "inferred",
+      "metric": "diagnose.required_evidence",
+      "source": "/out/packet-f/20260509T084753Z/inferguard-job/metrics/lmcache_compat_report.json",
+      "value": {
+        "lmcache_compat.detected_mode": "mp",
+        "lmcache_compat.surfaces": {
+          "lmcache_cacheblend": {
+            "family_count": 9,
+            "missing": 0,
+            "not_applicable": 9,
+            "populated": 0,
+            "status": "not_applicable",
+            "zero": 0
+          },
+          "lmcache_embedded": {
+            "family_count": 20,
+            "missing": 0,
+            "not_applicable": 20,
+            "populated": 0,
+            "status": "not_applicable",
+            "zero": 0
+          },
+          "lmcache_http": {
+            "family_count": 1,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 1,
+            "status": "complete",
+            "zero": 0
+          },
+          "lmcache_logs": {
+            "family_count": 1,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 1,
+            "status": "complete",
+            "zero": 0
+          },
+          "lmcache_lookup_hash": {
+            "family_count": 1,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 1,
+            "status": "complete",
+            "zero": 0
+          },
+          "lmcache_mp": {
+            "family_count": 16,
+            "missing": 5,
+            "not_applicable": 3,
+            "populated": 6,
+            "status": "partial",
+            "zero": 2
+          },
+          "lmcache_otel": {
+            "family_count": 1,
+            "missing": 1,
+            "not_applicable": 0,
+            "populated": 0,
+            "status": "missing",
+            "zero": 0
+          },
+          "lmcache_trace_recording": {
+            "family_count": 1,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 1,
+            "status": "complete",
+            "zero": 0
+          },
+          "lmcache_trace_replay": {
+            "family_count": 1,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 1,
+            "status": "complete",
+            "zero": 0
+          },
+          "vllm_prefix_cache": {
+            "family_count": 4,
+            "missing": 0,
+            "not_applicable": 0,
+            "populated": 4,
+            "status": "complete",
+            "zero": 0
+          },
+          "vllm_simple_cpu_offload": {
+            "family_count": 2,
+            "missing": 2,
+            "not_applicable": 0,
+            "populated": 0,
+            "status": "missing",
+            "zero": 0
+          }
+        },
+        "lmcache_compat.upstream_question_codes": [
+          "vllm_external_prefix_no_hits"
+        ]
+      }
+    }
+  ],
+  "reasoning": "LMCache MP telemetry is present, but a required observability surface is missing or ambiguous. The run proves MP is wired, not that the cache economics are fully diagnosable.",
+  "recommended_next_probe": "inferguard collect-metrics --engine <engine> --engine-metrics-url <url> --dcgm-metrics-url <url> --output-dir /out/packet-f/20260509T084753Z/inferguard-job/metrics --duration-seconds 120",
+  "rule_fired": "vllm_external_prefix_no_hits",
+  "schema_version": "inferguard-bottleneck-diagnosis/v1",
+  "secondary_evidence": [],
+  "supporting_request_rows": [],
+  "verdict": "not_enough_evidence"
+}

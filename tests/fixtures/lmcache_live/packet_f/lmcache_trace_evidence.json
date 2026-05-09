@@ -1,0 +1,148 @@
+{
+  "claim_status": "measured",
+  "file_size_bytes": 102767,
+  "first_record": {
+    "args": {
+      "external_request_id": "cmpl-a3802b3e6e288756-0-95ca5aef",
+      "extra_count": 0,
+      "keys": [
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        },
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        }
+      ],
+      "layout_desc": {
+        "__t__": "MemoryLayoutDesc",
+        "v": {
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ]
+        }
+      }
+    },
+    "qualname": "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task"
+  },
+  "header": {
+    "format_version": 1,
+    "level": "storage",
+    "magic": "<bytes:4>",
+    "sm_config_digest": "eb13583309aa9cf3b30eda26fd4c0bd284b5f55194ecd7d968c78ccd8aff705d",
+    "sm_config_json": "{\"eviction_config\": {\"eviction_policy\": \"IsolatedLRU\", \"eviction_ratio\": 0.2, \"trigger_watermark\": 0.8}, \"l1_manager_config\": {\"memory_config\": {\"align_bytes\": 4096, \"init_size_in_bytes\": 8589934592, \"size_in_bytes\": 8589934592, \"use_lazy\": true}, \"read_ttl_seconds\": 300, \"write_ttl_seconds\": 600}, \"l2_adapter_config\": {\"adapters\": []}, \"prefetch_max_in_flight\": 8, \"prefetch_policy\": \"default\", \"store_policy\": \"default\"}",
+    "t_mono_start": 15.575398953,
+    "t_wall_start": 1778316488.472518,
+    "trace_schema_version": 1,
+    "type": "header"
+  },
+  "last_record": {
+    "args": {
+      "keys": [
+        {
+          "__t__": "ObjectKey",
+          "v": {
+            "chunk_hash": "<bytes:32>",
+            "kv_rank": 16777472,
+            "model_name": "Qwen/Qwen3-8B"
+          }
+        }
+      ],
+      "layout_desc": {
+        "__t__": "MemoryLayoutDesc",
+        "v": {
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ]
+        }
+      },
+      "mode": "new"
+    },
+    "qualname": "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write"
+  },
+  "parse_error": "",
+  "present": true,
+  "record_count": 100,
+  "schema_version": "inferguard-lmcache-trace-evidence/v1",
+  "sha256": "a291101855a977c88c361626724241064e261f668a648cac60fb386149907f08",
+  "storage_calls": {
+    "finish_read_prefetched": 20,
+    "finish_write": 25,
+    "reserve_write": 31,
+    "submit_prefetch_task": 24
+  },
+  "truncated": false
+}

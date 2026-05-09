@@ -40,6 +40,7 @@ LMCACHE_HOST = "127.0.0.1"
 LMCACHE_ZMQ_PORT = 6555
 LMCACHE_HTTP_PORT = 8080
 LMCACHE_PROMETHEUS_PORT = 9090
+OTLP_GRPC_PORT = 4317
 OTLP_HTTP_PORT = 4318
 MP_EVENT_BUS_QUEUE_SIZE = 10000
 MP_METRICS_SAMPLE_RATE = 1.0
@@ -841,7 +842,7 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
             ]
         )
     if spec.enable_otel:
-        cmd.extend(["--enable-tracing"])
+        cmd.extend(["--enable-tracing", "--otlp-endpoint", f"http://127.0.0.1:{OTLP_GRPC_PORT}"])
     return cmd
 
 
@@ -1151,32 +1152,44 @@ def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]
     script = r"""
 import json
 import sys
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from concurrent import futures
+
+import grpc
+from google.protobuf.json_format import MessageToDict
+from opentelemetry.proto.collector.metrics.v1 import metrics_service_pb2, metrics_service_pb2_grpc
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2, trace_service_pb2_grpc
 
 out = sys.argv[1]
 port = int(sys.argv[2])
 
-class Handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        length = int(self.headers.get("content-length", "0") or "0")
-        body = self.rfile.read(length)
-        with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
-                "path": self.path,
-                "content_type": self.headers.get("content-type"),
-                "body_preview": body.decode("utf-8", errors="replace")[:20000],
-                "body_bytes": len(body),
-            }) + "\n")
-        self.send_response(200)
-        self.end_headers()
 
-    def log_message(self, fmt, *args):
-        print(fmt % args, flush=True)
+def _append(payload):
+    with open(out, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+
+class TraceService(trace_service_pb2_grpc.TraceServiceServicer):
+    def Export(self, request, context):
+        payload = MessageToDict(request, preserving_proto_field_name=True)
+        _append(payload)
+        return trace_service_pb2.ExportTraceServiceResponse()
+
+
+class MetricsService(metrics_service_pb2_grpc.MetricsServiceServicer):
+    def Export(self, request, context):
+        return metrics_service_pb2.ExportMetricsServiceResponse()
+
+
+server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+trace_service_pb2_grpc.add_TraceServiceServicer_to_server(TraceService(), server)
+metrics_service_pb2_grpc.add_MetricsServiceServicer_to_server(MetricsService(), server)
+server.add_insecure_port(f"127.0.0.1:{port}")
+server.start()
+print(f"OTLP gRPC collector listening on 127.0.0.1:{port}", flush=True)
+server.wait_for_termination()
 """
     proc = subprocess.Popen(
-        ["python3", "-c", script, str(otel_path), str(OTLP_HTTP_PORT)],
+        ["python3", "-c", script, str(otel_path), str(OTLP_GRPC_PORT)],
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         text=True,
