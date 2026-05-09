@@ -2,7 +2,14 @@
 
 from pathlib import Path
 
-from inferguard.disagg.adapters import _parse_dynamo, _parse_lmcache, _parse_sglang, _parse_vllm
+from inferguard.disagg.adapters import (
+    LLMD_FIELD_MAP,
+    _parse_dynamo,
+    _parse_lmcache,
+    _parse_sglang,
+    _parse_vllm,
+    _parse_with_map,
+)
 from inferguard.disagg.engines import detect_engine
 
 
@@ -35,6 +42,20 @@ def test_detect_engine_dynamo_prefixes() -> None:
 def test_detect_engine_llmd_prefixes() -> None:
     assert detect_engine("llmd_foo 1\n") == "llm-d"
     assert detect_engine("llm_d_bar 1\n") == "llm-d"
+
+
+def test_parse_llmd_is_explicitly_adapter_pending() -> None:
+    snap = _parse_with_map(
+        "llmd_prefill_queue_depth 1\n",
+        url="http://dlm",
+        role="prefill",
+        engine="llm-d",
+        field_map=LLMD_FIELD_MAP,
+    )
+
+    assert LLMD_FIELD_MAP == {}
+    assert snap.endpoint.engine == "llm-d"
+    assert snap.scrape_error == "adapter_not_implemented"
 
 
 def test_parse_vllm_fixture() -> None:
@@ -70,6 +91,24 @@ def test_parse_sglang_fixture() -> None:
     assert snap.kv_cache_usage == 0.55
     assert snap.requests_running == 12
     assert snap.kv_transfer_errors_total == 0
+
+
+def test_parse_sglang_mooncake_is_connector_label_not_runtime_proof() -> None:
+    snap = _parse_sglang(
+        'sglang:token_usage 0.10\n'
+        'sglang:num_running_reqs 1\n'
+        'sglang:kv_transfer_sent_bytes_total{connector="mooncake"} 1024\n'
+        'sglang:kv_transfer_recv_bytes_total{connector="mooncake"} 2048\n'
+        'sglang:kv_transfer_errors_total{connector="mooncake"} 0\n',
+        url="http://sglang",
+        role="decode",
+    )
+
+    assert snap.endpoint.engine == "sglang"
+    assert snap.endpoint.connector == "mooncake"
+    assert snap.kv_transfer_sent_bytes_total == 1024
+    assert snap.kv_transfer_recv_bytes_total == 2048
+    assert snap.scrape_error == ""
 
 
 def test_parse_vllm_no_metrics_returns_error() -> None:
