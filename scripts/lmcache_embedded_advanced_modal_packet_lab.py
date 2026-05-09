@@ -90,6 +90,13 @@ LMCACHE_RUNTIME_DEP_PACKAGES = (
     "pyzmq>=25.0.0",
     "sortedcontainers==2.4.0",
 )
+# SGLang's pyproject lists a large runtime dependency set that includes heavy
+# and conflicting pins (notably torch/transformers). H2 installs SGLang editable
+# with --no-deps and relies on the vLLM image for shared server/runtime packages.
+# The failed live H2 artifact showed that orjson was the missing import from
+# sglang.srt.utils.common; install it explicitly without invoking SGLang's full
+# resolver.
+SGLANG_RUNTIME_DEP_PACKAGES = ("orjson",)
 CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
 CUDA_SOURCE_BUILD_ENV = {
     "CC": "gcc",
@@ -107,6 +114,7 @@ BASE_MODAL_PIP_PACKAGES = (
     PINNED_TRANSFORMERS_PACKAGE,
     PINNED_TOKENIZERS_PACKAGE,
     *LMCACHE_RUNTIME_DEP_PACKAGES,
+    *SGLANG_RUNTIME_DEP_PACKAGES,
     "hf-transfer",
     "huggingface-hub",
     "nvidia-cuda-runtime-cu12",
@@ -525,6 +533,8 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
     if spec.enable_cacheblend:
         env.update(
             {
+                "INFERGUARD_H3_REGISTER_VLLM_MODEL": "1",
+                "PYTHONPATH": str(run_dir),
                 "LMCACHE_ENABLE_BLENDING": "True",
                 "LMCACHE_USE_LAYERWISE": "True",
                 "LMCACHE_BLEND_CHECK_LAYERS": "1",
@@ -700,6 +710,58 @@ def _launch_engine(
     )
     proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
+
+
+def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
+    """Install a sitecustomize hook to register the loaded vLLM model for CacheBlend.
+
+    LMCache's CacheBlend path calls ``VLLMModelTracker.get_model(ENGINE_NAME)``
+    while building the blender. The upstream LMCache example documents the
+    required vLLM-side hook: register the loaded vLLM model at the end of
+    ``GPUWorker.load_model``. This writes a disposable ``sitecustomize.py`` into
+    the run directory and adds that directory to ``PYTHONPATH`` for the H3
+    engine process, avoiding fragile in-place edits to the installed vLLM wheel.
+    """
+
+    sitecustomize_path = run_dir / "sitecustomize.py"
+    patch_log = run_dir / "vllm_cacheblend_model_tracker_patch.json"
+    sitecustomize_path.write_text(
+        r'''
+import os
+
+if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
+    from vllm.v1.worker.gpu_worker import GPUWorker
+
+    _inferguard_original_load_model = GPUWorker.load_model
+
+    def _inferguard_cacheblend_load_model(self, *args, **kwargs):
+        result = _inferguard_original_load_model(self, *args, **kwargs)
+        from lmcache.integration.vllm.utils import ENGINE_NAME
+        from lmcache.v1.compute.models.utils import VLLMModelTracker
+
+        VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)
+        return result
+
+    GPUWorker.load_model = _inferguard_cacheblend_load_model
+'''.lstrip(),
+        encoding="utf-8",
+    )
+    patch_log.write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
+                "patch_target": str(sitecustomize_path),
+                "hook": "GPUWorker.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)",
+                "source_basis": "LMCache examples/blend_kv_v1 README documents this vLLM-side CacheBlend hook",
+                "applied": True,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return patch_log
 
 
 def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
@@ -965,6 +1027,8 @@ REQUIRED_ARTIFACTS = [
     "artifact_index.json",
 ]
 
+CACHEBLEND_REQUIRED_ARTIFACTS = ["vllm_cacheblend_model_tracker_patch.json"]
+
 OPTIONAL_ARTIFACTS = [
     "secondary_engine.log",
     "secondary_engine_metrics_loaded.prom",
@@ -975,7 +1039,8 @@ OPTIONAL_ARTIFACTS = [
 
 
 def _required_artifacts(spec: EmbeddedAdvancedPacketSpec) -> list[str]:
-    return list(dict.fromkeys([*REQUIRED_ARTIFACTS, *spec.extra_required_artifacts]))
+    cacheblend_artifacts = CACHEBLEND_REQUIRED_ARTIFACTS if spec.enable_cacheblend else []
+    return list(dict.fromkeys([*REQUIRED_ARTIFACTS, *cacheblend_artifacts, *spec.extra_required_artifacts]))
 
 
 def _optional_artifacts(_spec: EmbeddedAdvancedPacketSpec) -> list[str]:
@@ -1088,6 +1153,8 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
     try:
         if spec.engine == "sglang":
             _ensure_sglang_runtime(run_dir)
+        if spec.enable_cacheblend:
+            _patch_vllm_cacheblend_model_tracker(run_dir)
         _prepare_prometheus_multiproc_dir(run_dir)
         _write_env_snapshot(run_dir)
         _write_lmcache_config(run_dir, spec)

@@ -164,6 +164,25 @@ def test_h1_image_installs_minimal_lmcache_runtime_deps_without_lifting_tokenize
     assert "python -m pip install -r /opt/lmcache/requirements/common.txt" not in run_commands_args
 
 
+def test_h2_image_installs_minimal_sglang_runtime_deps_without_lifting_vllm_pins() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
+    run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
+
+    assert lab.SGLANG_RUNTIME_DEP_PACKAGES == ("orjson",)
+    assert "orjson" in pip_install_args
+    assert lab.PINNED_VLLM_PACKAGE in pip_install_args
+    assert lab.PINNED_TRANSFORMERS_PACKAGE in pip_install_args
+    assert lab.PINNED_TOKENIZERS_PACKAGE in pip_install_args
+    assert "torch==2.11.0" not in pip_install_args
+    assert "transformers==5.6.0" not in pip_install_args
+    assert lab.SGLANG_LOCAL_INSTALL_COMMAND in run_commands_args
+    assert lab.SGLANG_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
+    assert "python -m pip install -r /opt/sglang/python/requirements.txt" not in run_commands_args
+
+
 def test_embedded_advanced_image_installs_current_local_inferguard_source() -> None:
     lab = _load_lab_module()
 
@@ -308,6 +327,8 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
+    assert env["INFERGUARD_H3_REGISTER_VLLM_MODEL"] == "1"
+    assert env["PYTHONPATH"] == str(tmp_path)
     assert env["LMCACHE_ENABLE_BLENDING"] == "True"
     assert env["LMCACHE_USE_LAYERWISE"] == "True"
     assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == f"http://127.0.0.1:{lab.OTLP_GRPC_PORT}"
@@ -327,6 +348,22 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert config["enable_blending"] is True
     assert config["use_layerwise"] is True
     assert lab.LMCACHE_OTEL_FILE in lab._required_artifacts(spec)
+    assert "vllm_cacheblend_model_tracker_patch.json" in lab._required_artifacts(spec)
+
+
+def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+
+    source = lab._patch_vllm_cacheblend_model_tracker.__doc__ or ""
+    constants = lab._patch_vllm_cacheblend_model_tracker.__code__.co_consts
+    joined_constants = "\n".join(str(item) for item in constants)
+
+    assert "VLLMModelTracker.get_model(ENGINE_NAME)" in source
+    assert "GPUWorker.load_model" in source
+    assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)" in joined_constants
+    assert "INFERGUARD_H3_REGISTER_VLLM_MODEL" in joined_constants
+    assert "vllm_cacheblend_model_tracker_patch.json" in joined_constants
+    assert "sitecustomize.py" in joined_constants
 
 
 def test_h3_p2p_writes_two_engine_peer_scaffold(tmp_path: Path) -> None:
