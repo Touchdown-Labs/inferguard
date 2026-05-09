@@ -29,8 +29,8 @@ APP_NAME = "lmcache-embedded-advanced-lab"
 VOLUME_NAME = "lmcache-embedded-advanced-lab"
 OUT_ROOT = Path("/out")
 
-MODEL = "Qwen/Qwen3-8B"
-MODEL_MAX_LEN = 16384
+MODEL = "Qwen/Qwen3-0.6B"
+MODEL_MAX_LEN = 8192
 ENGINE_HOST = "127.0.0.1"
 ENGINE_PORT = 8000
 SECONDARY_ENGINE_PORT = 8001
@@ -49,6 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
 MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
+MODAL_SOURCE_IGNORE = ("**/__pycache__/**", "**/*.pyc")
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
 MODAL_LMCACHE_SOURCE = "/opt/lmcache"
@@ -58,6 +59,8 @@ SGLANG_LOCAL_SOURCE_ENV = "INFERGUARD_H_SGLANG_LOCAL_SOURCE"
 DEFAULT_LMCACHE_LOCAL_SOURCE = REPO_ROOT.parent / "LMCache"
 DEFAULT_SGLANG_LOCAL_SOURCE = REPO_ROOT.parent / "sglang"
 PINNED_VLLM_PACKAGE = "vllm==0.10.2"
+PINNED_TRANSFORMERS_PACKAGE = "transformers==4.57.6"
+PINNED_TOKENIZERS_PACKAGE = "tokenizers==0.22.2"
 CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
 CUDA_SOURCE_BUILD_ENV = {
     "CC": "gcc",
@@ -72,6 +75,8 @@ CUDA_SOURCE_BUILD_ENV = {
 }
 BASE_MODAL_PIP_PACKAGES = (
     PINNED_VLLM_PACKAGE,
+    PINNED_TRANSFORMERS_PACKAGE,
+    PINNED_TOKENIZERS_PACKAGE,
     "hf-transfer",
     "huggingface-hub",
     "nvidia-cuda-runtime-cu12",
@@ -81,7 +86,7 @@ BASE_MODAL_PIP_PACKAGES = (
     "setuptools_scm>=8",
     "wheel",
 )
-LMCACHE_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation"
+LMCACHE_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation --no-deps"
 SGLANG_LOCAL_INSTALL_COMMAND = (
     f"python -m pip install -e {MODAL_SGLANG_SOURCE}/python --no-build-isolation"
 )
@@ -118,6 +123,8 @@ def _runtime_env() -> dict[str, str]:
         "INFERGUARD_H_LMCACHE_SOURCE_REF": str(LMCACHE_LOCAL_SOURCE or "pypi"),
         "INFERGUARD_H_SGLANG_SOURCE_REF": str(SGLANG_LOCAL_SOURCE or "not-installed"),
         "INFERGUARD_H_VLLM_PACKAGE": PINNED_VLLM_PACKAGE,
+        "INFERGUARD_H_TRANSFORMERS_PACKAGE": PINNED_TRANSFORMERS_PACKAGE,
+        "INFERGUARD_H_TOKENIZERS_PACKAGE": PINNED_TOKENIZERS_PACKAGE,
     }
 
 
@@ -172,6 +179,7 @@ def _build_modal_image() -> modal.Image:
             local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
             remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
             copy=True,
+            ignore=MODAL_SOURCE_IGNORE,
         )
         .env(_runtime_env())
         .run_commands(*_runtime_install_commands())

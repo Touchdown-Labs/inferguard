@@ -106,13 +106,28 @@ def test_embedded_advanced_image_avoids_shared_unpinned_runtime_backtracking() -
 
     calls = lab.image.calls
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
-    forbidden_unpinned = {"vllm", "lmcache", "sglang"}
+    forbidden_unpinned = {"vllm", "lmcache", "sglang", "transformers"}
     assert not (forbidden_unpinned & set(pip_install_args))
+    assert lab.PINNED_VLLM_PACKAGE == "vllm==0.10.2"
+    assert lab.PINNED_TRANSFORMERS_PACKAGE == "transformers==4.57.6"
+    assert lab.PINNED_TOKENIZERS_PACKAGE == "tokenizers==0.22.2"
+    assert lab.PINNED_TRANSFORMERS_PACKAGE in pip_install_args
+    assert lab.PINNED_TOKENIZERS_PACKAGE in pip_install_args
     assert any(arg.startswith("vllm==") for arg in pip_install_args)
     assert "sglang" not in pip_install_args
     assert "lmcache" not in pip_install_args
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert any("pip install -e /opt/lmcache" in command for command in run_commands_args)
+    assert lab.LMCACHE_LOCAL_INSTALL_COMMAND in run_commands_args
+    assert lab.LMCACHE_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
+
+
+def test_h1_uses_tiny_qwen3_tokenizer_with_vllm_compatible_transformers_pin() -> None:
+    lab = _load_lab_module()
+
+    assert lab.MODEL == "Qwen/Qwen3-0.6B"
+    assert lab.MODEL_MAX_LEN == 8192
+    assert lab.PINNED_TRANSFORMERS_PACKAGE == "transformers==4.57.6"
+    assert lab.PINNED_TOKENIZERS_PACKAGE == "tokenizers==0.22.2"
 
 
 def test_embedded_advanced_image_installs_current_local_inferguard_source() -> None:
@@ -141,7 +156,10 @@ def test_embedded_advanced_image_installs_current_local_inferguard_source() -> N
         "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
         "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
         "copy": True,
+        "ignore": lab.MODAL_SOURCE_IGNORE,
     }
+    assert "**/__pycache__/**" in lab.MODAL_SOURCE_IGNORE
+    assert "**/*.pyc" in lab.MODAL_SOURCE_IGNORE
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
     assert run_commands_args[-1] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
     assert any("pip install -e /opt/lmcache" in command for command in run_commands_args)
