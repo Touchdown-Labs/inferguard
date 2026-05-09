@@ -51,10 +51,19 @@ MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
 MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 MODAL_SOURCE_IGNORE = ("**/__pycache__/**", "**/*.pyc")
+SGLANG_SOURCE_IGNORE = (
+    "**/.git/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/uv.lock",
+    "**/*.egg-info/**",
+)
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
 MODAL_LMCACHE_SOURCE = "/opt/lmcache"
 MODAL_SGLANG_SOURCE = "/opt/sglang"
+MODAL_SGLANG_PYTHON_SOURCE = f"{MODAL_SGLANG_SOURCE}/python"
 LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_H_LMCACHE_LOCAL_SOURCE"
 SGLANG_LOCAL_SOURCE_ENV = "INFERGUARD_H_SGLANG_LOCAL_SOURCE"
 DEFAULT_LMCACHE_LOCAL_SOURCE = REPO_ROOT.parent / "LMCache"
@@ -156,6 +165,12 @@ def _runtime_env() -> dict[str, str]:
         "LMCACHE_LOCAL_CPU": "True",
         "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
         "LMCACHE_CHUNK_SIZE": "256",
+        # LMCache usage telemetry calls py-cpuinfo during engine init. The H3
+        # Modal artifact 20260509T223947Z showed py-cpuinfo JSONDecodeError in
+        # that non-critical telemetry path, followed by LMCache engine failure.
+        # Disable usage tracking for live packet validation; InferGuard still
+        # collects the engine/LMCache metrics, logs, OTel, and reports below.
+        "LMCACHE_TRACK_USAGE": "false",
         "VLLM_USE_FLASHINFER_SAMPLER": "0",
         "VLLM_USE_DEEP_GEMM": "0",
         "VLLM_DEEP_GEMM_WARMUP": "skip",
@@ -183,9 +198,10 @@ def _with_local_runtime_sources(built_image: modal.Image) -> modal.Image:
         )
     if SGLANG_LOCAL_SOURCE is not None:
         built_image = built_image.add_local_dir(
-            local_path=str(SGLANG_LOCAL_SOURCE),
-            remote_path=MODAL_SGLANG_SOURCE,
+            local_path=str(SGLANG_LOCAL_SOURCE / "python"),
+            remote_path=MODAL_SGLANG_PYTHON_SOURCE,
             copy=True,
+            ignore=SGLANG_SOURCE_IGNORE,
         )
     return built_image
 
@@ -532,6 +548,7 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
         "LMCACHE_CHUNK_SIZE": "256",
         "PYTHONHASHSEED": "0",
         "PROMETHEUS_MULTIPROC_DIR": str(run_dir / PROMETHEUS_MULTIPROC_DIRNAME),
+        "LMCACHE_TRACK_USAGE": "false",
     }
     if spec.enable_cacheblend:
         env.update(
@@ -719,10 +736,10 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
     """Install a sitecustomize hook to register the loaded vLLM model for CacheBlend.
 
     LMCache's CacheBlend path calls ``VLLMModelTracker.get_model(ENGINE_NAME)``
-    while building the blender. The upstream LMCache example documents the
-    required vLLM-side hook: register the loaded vLLM model at the end of
-    ``GPUWorker.load_model``. This writes a disposable ``sitecustomize.py`` into
-    the run directory and adds that directory to ``PYTHONPATH`` for the H3
+    while building the blender. vLLM 0.10.2 exposes the stable model load hook
+    on ``GPUModelRunner.load_model`` rather than exporting ``GPUWorker`` from
+    ``vllm.v1.worker.gpu_worker``. This writes a disposable ``sitecustomize.py``
+    into the run directory and adds that directory to ``PYTHONPATH`` for the H3
     engine process, avoiding fragile in-place edits to the installed vLLM wheel.
     """
 
@@ -730,22 +747,40 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
     patch_log = run_dir / "vllm_cacheblend_model_tracker_patch.json"
     sitecustomize_path.write_text(
         r'''
+import importlib
 import os
 
+
+def _inferguard_import_gpu_model_runner():
+    for module_name in (
+        "vllm.v1.worker.gpu_model_runner",
+        "vllm.v1.worker.gpu.model_runner",
+    ):
+        try:
+            module = importlib.import_module(module_name)
+            return module.GPUModelRunner, module_name
+        except (ImportError, AttributeError):
+            continue
+    return None, None
+
+
 if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
-    from vllm.v1.worker.gpu_worker import GPUWorker
+    GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
+    if GPUModelRunner is not None and not getattr(
+        GPUModelRunner.load_model, "_inferguard_cacheblend_patched", False
+    ):
+        _inferguard_original_load_model = GPUModelRunner.load_model
 
-    _inferguard_original_load_model = GPUWorker.load_model
+        def _inferguard_cacheblend_load_model(self, *args, **kwargs):
+            result = _inferguard_original_load_model(self, *args, **kwargs)
+            from lmcache.integration.vllm.utils import ENGINE_NAME
+            from lmcache.v1.compute.models.utils import VLLMModelTracker
 
-    def _inferguard_cacheblend_load_model(self, *args, **kwargs):
-        result = _inferguard_original_load_model(self, *args, **kwargs)
-        from lmcache.integration.vllm.utils import ENGINE_NAME
-        from lmcache.v1.compute.models.utils import VLLMModelTracker
+            VLLMModelTracker.register_model(ENGINE_NAME, self.model)
+            return result
 
-        VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)
-        return result
-
-    GPUWorker.load_model = _inferguard_cacheblend_load_model
+        _inferguard_cacheblend_load_model._inferguard_cacheblend_patched = True
+        GPUModelRunner.load_model = _inferguard_cacheblend_load_model
 '''.lstrip(),
         encoding="utf-8",
     )
@@ -755,8 +790,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
                 "patch_target": str(sitecustomize_path),
                 "engine_name": "vllm-instance",
-                "hook": "GPUWorker.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)",
-                "source_basis": "LMCache examples/blend_kv_v1 README documents this vLLM-side CacheBlend hook; lmcache.integration.vllm.utils.ENGINE_NAME is vllm-instance",
+                "hook": "GPUModelRunner.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model)",
+                "source_basis": "vLLM 0.10.2 defines GPUModelRunner.load_model in vllm.v1.worker.gpu_model_runner and does not export GPUWorker from vllm.v1.worker.gpu_worker; lmcache.integration.vllm.utils.ENGINE_NAME is vllm-instance",
                 "applied": True,
             },
             indent=2,

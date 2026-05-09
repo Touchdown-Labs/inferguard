@@ -293,6 +293,24 @@ def test_h2_sglang_source_binding_is_exported_into_modal_runtime() -> None:
     assert lab.SGLANG_LOCAL_INSTALL_COMMAND.endswith("--no-build-isolation --no-deps")
 
 
+def test_h2_sglang_modal_context_copies_only_python_package_subtree() -> None:
+    lab = _load_lab_module()
+
+    calls = lab.image.calls
+    add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
+    sglang_dir = next(
+        kwargs for kwargs in add_local_dirs if kwargs["remote_path"] == lab.MODAL_SGLANG_PYTHON_SOURCE
+    )
+
+    assert sglang_dir["local_path"] == str(lab.SGLANG_LOCAL_SOURCE / "python")
+    assert sglang_dir["remote_path"] == "/opt/sglang/python"
+    assert sglang_dir["copy"] is True
+    assert "**/.git/**" in sglang_dir["ignore"]
+    assert "**/.venv/**" in sglang_dir["ignore"]
+    assert "**/uv.lock" in sglang_dir["ignore"]
+    assert "**/*.egg-info/**" in sglang_dir["ignore"]
+
+
 def test_h2_sglang_command_uses_enable_lmcache_and_layerwise_evidence(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["h2"]
@@ -362,15 +380,31 @@ def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path:
     sitecustomize_text = sitecustomize.read_text(encoding="utf-8")
 
     assert "VLLMModelTracker.get_model(ENGINE_NAME)" in source
-    assert "GPUWorker.load_model" in source
+    assert "GPUModelRunner.load_model" in source
     assert patch_log.name == "vllm_cacheblend_model_tracker_patch.json"
     assert sitecustomize.exists()
     assert patch["patch_target"] == str(sitecustomize)
     assert patch["engine_name"] == "vllm-instance"
     assert patch["applied"] is True
+    assert patch["hook"] == "GPUModelRunner.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model)"
     assert "INFERGUARD_H3_REGISTER_VLLM_MODEL" in sitecustomize_text
     assert "from lmcache.integration.vllm.utils import ENGINE_NAME" in sitecustomize_text
-    assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model_runner.model)" in sitecustomize_text
+    assert "vllm.v1.worker.gpu_model_runner" in sitecustomize_text
+    assert "vllm.v1.worker.gpu.model_runner" in sitecustomize_text
+    assert "from vllm.v1.worker.gpu_worker import GPUWorker" not in sitecustomize_text
+    assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model)" in sitecustomize_text
+
+
+def test_h_runners_disable_lmcache_usage_tracking_to_avoid_modal_cpuinfo_probe(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+
+    runtime_env_call = next(args for name, args, _kwargs in lab.image.calls if name == "env")
+    runtime_env = runtime_env_call[0]
+    runner_env = lab._build_runner_env(tmp_path, spec)
+
+    assert runtime_env["LMCACHE_TRACK_USAGE"] == "false"
+    assert runner_env["LMCACHE_TRACK_USAGE"] == "false"
 
 
 def test_h3_cacheblend_model_tracker_patch_is_created_before_engine_launch(tmp_path: Path, monkeypatch) -> None:
