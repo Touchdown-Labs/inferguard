@@ -1,0 +1,8 @@
+{
+  "LMCACHE_CHUNK_SIZE": "256",
+  "LMCACHE_CONFIG_FILE": "/out/packet-h1-embedded-vllm/20260509T210602Z/lmcache_embedded_config.json",
+  "LMCACHE_LOCAL_CPU": "True",
+  "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
+  "PROMETHEUS_MULTIPROC_DIR": "/out/packet-h1-embedded-vllm/20260509T210602Z/prometheus_multiproc",
+  "PYTHONHASHSEED": "0"
+}

@@ -62,6 +62,18 @@ PACKET_F_REQUIRED_FILES = (
     "traffic_requests.jsonl",
     "lmcache_lookup_hash_evidence.json",
 )
+PACKET_H1_REQUIRED_FILES = (
+    "fixture_manifest.json",
+    "primary_engine_command.json",
+    "primary_engine_env.json",
+    "runner_launch_proof.json",
+    "engine_metrics_loaded.prom",
+    "packet_manifest.json",
+    "lmcache_compat_report.json",
+    "observability_coverage.json",
+    "bottleneck_diagnosis.json",
+    "lmcache_log_evidence.json",
+)
 PACKET_B_REQUIRED_FAMILIES = (
     "lookup_reuse",
     "lookup_hits",
@@ -102,6 +114,8 @@ def test_landed_live_fixtures_are_sanitized_and_pass_acceptance_contract() -> No
             _assert_packet_e_e2_acceptance(fixture_dir)
         elif fixture_dir.name == "packet_f":
             _assert_packet_f_f1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_h1":
+            _assert_packet_h1_acceptance(fixture_dir)
         else:
             raise AssertionError(f"unknown accepted LMCache live fixture: {fixture_dir}")
 
@@ -205,6 +219,54 @@ def _assert_packet_a_b1_acceptance(fixture_dir: Path) -> None:
     _assert_required_files(fixture_dir, PACKET_A_REQUIRED_FILES)
     _assert_fixture_sanitized(fixture_dir)
     _assert_shared_mp_artifact_metric_acceptance(fixture_dir)
+
+
+def _assert_packet_h1_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    assert manifest.get("row_id") == "H1"
+    assert manifest.get("packet_id") == "h1"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("acceptance_status") == "accepted"
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    _assert_required_files(fixture_dir, PACKET_H1_REQUIRED_FILES)
+    _assert_fixture_sanitized(fixture_dir)
+
+    command = _read_json_list(fixture_dir / "primary_engine_command.json")
+    env = _read_json(fixture_dir / "primary_engine_env.json")
+    proof = _read_json(fixture_dir / "runner_launch_proof.json")
+    packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    coverage = _read_json(fixture_dir / "observability_coverage.json")
+    log_evidence = _read_json(fixture_dir / "lmcache_log_evidence.json")
+
+    assert "--kv-transfer-config" in command
+    transfer_config = json.loads(command[command.index("--kv-transfer-config") + 1])
+    assert transfer_config == {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
+    assert env.get("PROMETHEUS_MULTIPROC_DIR")
+    assert proof.get("expect_lmcache_mode") == "embedded"
+
+    metrics_text = (fixture_dir / "engine_metrics_loaded.prom").read_text(encoding="utf-8")
+    assert "lmcache:num_retrieve_requests_total" in metrics_text
+    assert "lmcache:num_store_requests_total" in metrics_text
+    assert "lmcache_mp_" not in metrics_text
+    assert "lmcache_mp." not in metrics_text
+
+    assert packet_manifest.get("detected_mode") == "embedded"
+    assert packet_manifest.get("claim_status") == "measured"
+    assert packet_manifest.get("compat_summary", {}).get("failure_reasons") == []
+    assert compat.get("detected_mode") == "embedded"
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_architecture", {}).get("label") == "vllm_embedded_lmcache"
+    assert compat.get("detected_architecture", {}).get("claim_status") == "measured"
+    assert compat.get("observed", {}).get("lmcache_embedded") is True
+    assert compat.get("observed", {}).get("lmcache_mp") is False
+    assert coverage.get("detected_lmcache_mode") == "embedded"
+    assert log_evidence.get("booleans", {}).get("has_store") is True
+    assert log_evidence.get("booleans", {}).get("has_retrieve") is True
+    _assert_positive(log_evidence.get("event_counts", {}).get("store"), "lmcache_log_evidence.store")
+    _assert_positive(log_evidence.get("event_counts", {}).get("retrieve"), "lmcache_log_evidence.retrieve")
 
 
 def _assert_shared_mp_artifact_metric_acceptance(fixture_dir: Path) -> None:

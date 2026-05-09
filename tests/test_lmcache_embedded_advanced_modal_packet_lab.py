@@ -226,6 +226,7 @@ def test_h1_vllm_embedded_command_uses_current_lmcacheconnectorv1_contract(tmp_p
     assert transfer_config == {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
     assert "LMCacheMPConnector" not in json.dumps(cmd)
     assert env["LMCACHE_CONFIG_FILE"] == str(tmp_path / lab.LMCACHE_CONFIG_FILE)
+    assert env["PROMETHEUS_MULTIPROC_DIR"] == str(tmp_path / lab.PROMETHEUS_MULTIPROC_DIRNAME)
 
     config = json.loads((tmp_path / lab.LMCACHE_CONFIG_FILE).read_text(encoding="utf-8"))
     proof = json.loads(proof_path.read_text(encoding="utf-8"))
@@ -233,7 +234,24 @@ def test_h1_vllm_embedded_command_uses_current_lmcacheconnectorv1_contract(tmp_p
     assert "--kv-transfer-config" in config["expected_connector_evidence"]
     assert proof["expect_lmcache_mode"] == "embedded"
     assert proof["claim_status"] == "runner_scaffold_only_not_live_validated"
+    assert proof["environment"]["PROMETHEUS_MULTIPROC_DIR"] == str(
+        tmp_path / lab.PROMETHEUS_MULTIPROC_DIRNAME
+    )
     assert any("LMCacheConnectorV1" in item for item in proof["required_live_proof"])
+
+
+def test_h1_prepares_shared_prometheus_multiproc_dir_for_embedded_metrics(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    metrics_dir = tmp_path / lab.PROMETHEUS_MULTIPROC_DIRNAME
+    metrics_dir.mkdir()
+    stale = metrics_dir / "counter_123.db"
+    stale.write_text("stale", encoding="utf-8")
+
+    prepared = lab._prepare_prometheus_multiproc_dir(tmp_path)
+
+    assert prepared == metrics_dir
+    assert prepared.exists()
+    assert list(prepared.iterdir()) == []
 
 
 def test_h2_sglang_command_uses_enable_lmcache_and_layerwise_evidence(tmp_path: Path) -> None:

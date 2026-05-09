@@ -44,6 +44,7 @@ SECONDARY_ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{SECONDARY_ENGINE_PORT}"
 LMCACHE_CONFIG_FILE = "lmcache_embedded_config.json"
 RUNNER_PROOF_FILE = "runner_launch_proof.json"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
+PROMETHEUS_MULTIPROC_DIRNAME = "prometheus_multiproc"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
@@ -504,6 +505,7 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
         "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
         "LMCACHE_CHUNK_SIZE": "256",
         "PYTHONHASHSEED": "0",
+        "PROMETHEUS_MULTIPROC_DIR": str(run_dir / PROMETHEUS_MULTIPROC_DIRNAME),
     }
     if spec.enable_cacheblend:
         env.update(
@@ -1022,6 +1024,14 @@ def _artifact_checkbox(run_dir: Path, rel: str) -> str:
     return f"- [{marker}] `{rel}`"
 
 
+def _prepare_prometheus_multiproc_dir(run_dir: Path) -> Path:
+    metrics_dir = run_dir / PROMETHEUS_MULTIPROC_DIRNAME
+    if metrics_dir.exists():
+        shutil.rmtree(metrics_dir)
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    return metrics_dir
+
+
 def _terminate(proc: subprocess.Popen[str] | None) -> None:
     if proc is None or proc.poll() is not None:
         return
@@ -1053,6 +1063,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
     try:
         if spec.engine == "sglang":
             _ensure_sglang_runtime(run_dir)
+        _prepare_prometheus_multiproc_dir(run_dir)
         _write_env_snapshot(run_dir)
         _write_lmcache_config(run_dir, spec)
         _write_launch_proof(run_dir, spec)
