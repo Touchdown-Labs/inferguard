@@ -572,6 +572,9 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     packet_dir = tmp_path / "lmcache-packet"
     packet_dir.mkdir()
     (tmp_path / lab.LMCACHE_OTEL_FILE).write_text('{"name":"cb.lookup"}\n', encoding="utf-8")
+    (tmp_path / lab.LMCACHE_BLEND_METRICS_FILE).write_text(
+        "lmcache_blend_lookup_requests_total 1\n", encoding="utf-8"
+    )
     (packet_dir / "lmcache_otel_evidence.json").write_text(
         '{"claim_status":"measured"}', encoding="utf-8"
     )
@@ -587,6 +590,8 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert env["LMCACHE_ENABLE_BLENDING"] == "True"
     assert env["LMCACHE_USE_LAYERWISE"] == "True"
     assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == f"http://127.0.0.1:{lab.OTLP_GRPC_PORT}"
+    assert env["INFERGUARD_H3_LMCACHE_OTEL_FILE"] == str(tmp_path / lab.LMCACHE_OTEL_FILE)
+    assert env["INFERGUARD_H3_BLEND_METRICS_FILE"] == str(tmp_path / lab.LMCACHE_BLEND_METRICS_FILE)
     cmd = lab._build_vllm_embedded_command(tmp_path, spec)
     assert cmd[cmd.index("--otlp-traces-endpoint") + 1] == lab._vllm_otel_endpoint()
     assert cmd[cmd.index("--collect-detailed-traces") + 1] == "all"
@@ -607,6 +612,36 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert config["use_layerwise"] is True
     assert lab._h3_otel_contract_satisfied(tmp_path, spec)
     assert "vllm_cacheblend_model_tracker_patch.json" in lab._required_artifacts(spec)
+    assert lab.LMCACHE_BLEND_METRICS_FILE in lab._optional_artifacts(spec)
+
+
+def test_h3_cacheblend_contract_rejects_non_cb_otel_jsonl(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+    (tmp_path / lab.LMCACHE_OTEL_FILE).write_text('{"name":"llm.request"}\n', encoding="utf-8")
+
+    assert not lab._h3_otel_contract_satisfied(tmp_path, spec)
+
+    (tmp_path / lab.LMCACHE_OTEL_FILE).write_text('{"name":"cb.request"}\n', encoding="utf-8")
+    assert lab._h3_otel_contract_satisfied(tmp_path, spec)
+
+
+def test_h3_cacheblend_appends_overlay_metrics_to_loaded_scrape(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+    loaded = tmp_path / "engine_metrics_loaded.prom"
+    loaded.write_text("vllm:num_requests_running 0\n", encoding="utf-8")
+    (tmp_path / lab.LMCACHE_BLEND_METRICS_FILE).write_text(
+        "lmcache_blend_lookup_requests_total 2\n"
+        "lmcache_blend_store_final_requests_total 1\n",
+        encoding="utf-8",
+    )
+
+    lab._append_h3_cacheblend_metrics_overlay(tmp_path, spec, "loaded")
+
+    metrics = loaded.read_text(encoding="utf-8")
+    assert "# inferguard_h3_cacheblend_overlay" in metrics
+    assert "lmcache_blend_lookup_requests_total 2" in metrics
 
 
 def test_h3_cacheblend_writes_blocked_evidence_when_collector_has_no_cb_spans(tmp_path: Path) -> None:
@@ -729,6 +764,8 @@ def test_h3_cacheblend_traffic_uses_unique_prefix_shared_suffix_to_avoid_vllm_pr
     assert "shared_suffix" in script
     assert "unique_prefix = f\"InferGuard H3 CacheBlend unique prefix" in script
     assert "if requests == 20" in script
+    assert "elif idx >= 10" in script
+    assert "repeated_cacheblend_probe" in script
     assert "shared_prefix +" in script
     assert captured["cmd"][-1] == "20"
 
