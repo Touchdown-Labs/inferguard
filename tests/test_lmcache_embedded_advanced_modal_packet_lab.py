@@ -587,6 +587,9 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert env["LMCACHE_ENABLE_BLENDING"] == "True"
     assert env["LMCACHE_USE_LAYERWISE"] == "True"
     assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == f"http://127.0.0.1:{lab.OTLP_GRPC_PORT}"
+    cmd = lab._build_vllm_embedded_command(tmp_path, spec)
+    assert cmd[cmd.index("--otlp-traces-endpoint") + 1] == lab._vllm_otel_endpoint()
+    assert cmd[cmd.index("--collect-detailed-traces") + 1] == "all"
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )
@@ -602,8 +605,27 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     config = json.loads((tmp_path / lab.LMCACHE_CONFIG_FILE).read_text(encoding="utf-8"))
     assert config["enable_blending"] is True
     assert config["use_layerwise"] is True
-    assert lab.LMCACHE_OTEL_FILE in lab._required_artifacts(spec)
+    assert lab._h3_otel_contract_satisfied(tmp_path, spec)
     assert "vllm_cacheblend_model_tracker_patch.json" in lab._required_artifacts(spec)
+
+
+def test_h3_cacheblend_writes_blocked_evidence_when_collector_has_no_cb_spans(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+    (tmp_path / "otel_collector.log").write_text(
+        f"OTLP gRPC collector listening on 127.0.0.1:{lab.OTLP_GRPC_PORT}\n",
+        encoding="utf-8",
+    )
+
+    evidence_path = lab._write_h3_otel_blocked_evidence(tmp_path, spec)
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+
+    assert evidence["claim_status"] == "blocked_no_cb_spans"
+    assert evidence["collector_started"] is True
+    assert evidence["expected_span_prefix"] == "cb."
+    assert lab._h3_otel_contract_satisfied(tmp_path, spec)
+    assert evidence_path.name == lab.LMCACHE_OTEL_BLOCKED_FILE
+    assert (tmp_path / "lmcache-packet" / "lmcache_otel_evidence.json").exists()
 
 
 def test_h3_cacheblend_patch_defers_process_qkv_when_layer0_gpu_buffer_is_not_ready(

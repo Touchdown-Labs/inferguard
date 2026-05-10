@@ -36,6 +36,15 @@ ENGINE_PORT = 8000
 SECONDARY_ENGINE_PORT = 8001
 OTLP_GRPC_PORT = 4317
 
+
+def _otel_endpoint() -> str:
+    return f"http://127.0.0.1:{OTLP_GRPC_PORT}"
+
+
+def _vllm_otel_endpoint() -> str:
+    return f"grpc://127.0.0.1:{OTLP_GRPC_PORT}"
+
+
 ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{ENGINE_PORT}"
 ENGINE_HEALTH_URL = f"{ENGINE_BASE_URL}/health"
 ENGINE_METRICS_URL = f"{ENGINE_BASE_URL}/metrics"
@@ -44,6 +53,7 @@ SECONDARY_ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{SECONDARY_ENGINE_PORT}"
 LMCACHE_CONFIG_FILE = "lmcache_embedded_config.json"
 RUNNER_PROOF_FILE = "runner_launch_proof.json"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
+LMCACHE_OTEL_BLOCKED_FILE = "lmcache_otel_blocked.json"
 PROMETHEUS_MULTIPROC_DIRNAME = "prometheus_multiproc"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -333,8 +343,10 @@ PACKETS: dict[str, EmbeddedAdvancedPacketSpec] = {
         external_cache_configured=True,
         connector_proof=("CacheBlend",),
         cache_proof=("lmcache_blend_*", "cb.*"),
-        extra_required_artifacts=(LMCACHE_OTEL_FILE,),
-        notes=("Requires live lmcache_blend_* metrics plus cb.* OTel spans before scoring.",),
+        notes=(
+            "Requires live lmcache_blend_* metrics plus cb.* OTel spans before scoring; "
+            "if CacheBlend emits no cb.* spans, runner must write explicit blocked evidence.",
+        ),
     ),
     "h3-p2p": EmbeddedAdvancedPacketSpec(
         packet_id="h3-p2p",
@@ -559,8 +571,8 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
                 "LMCACHE_USE_LAYERWISE": "True",
                 "LMCACHE_BLEND_CHECK_LAYERS": "1",
                 "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
-                "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_GRPC_PORT}",
-                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_GRPC_PORT}",
+                "OTEL_EXPORTER_OTLP_ENDPOINT": _otel_endpoint(),
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": _vllm_otel_endpoint(),
                 "OTEL_TRACES_EXPORTER": "otlp",
                 "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
                 "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "grpc",
@@ -626,6 +638,15 @@ def _build_vllm_embedded_command(
             json.dumps(transfer_config, separators=(",", ":")),
         ]
     )
+    if spec.enable_otel:
+        cmd.extend(
+            [
+                "--otlp-traces-endpoint",
+                _vllm_otel_endpoint(),
+                "--collect-detailed-traces",
+                "all",
+            ]
+        )
     return cmd
 
 
@@ -1097,7 +1118,77 @@ server.wait_for_termination()
         stderr=subprocess.STDOUT,
         text=True,
     )
+    _wait_for_otel_collector(run_dir, proc)
     return proc, log_handle
+
+
+def _wait_for_otel_collector(run_dir: Path, proc: subprocess.Popen[str], timeout_seconds: float = 10.0) -> None:
+    log_path = run_dir / "otel_collector.log"
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"OTel collector exited before startup; see {log_path}")
+        if log_path.exists() and "OTLP gRPC collector listening" in log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            return
+        time.sleep(0.2)
+    raise RuntimeError(f"OTel collector did not report startup within {timeout_seconds}s")
+
+
+def _write_h3_otel_blocked_evidence(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Path:
+    packet_dir = run_dir / "lmcache-packet"
+    packet_dir.mkdir(parents=True, exist_ok=True)
+    otel_path = run_dir / LMCACHE_OTEL_FILE
+    collector_log = run_dir / "otel_collector.log"
+    collector_text = (
+        collector_log.read_text(encoding="utf-8", errors="replace") if collector_log.exists() else ""
+    )
+    evidence = {
+        "schema_version": "inferguard-h3-cacheblend-otel-blocked/v1",
+        "packet_id": spec.packet_id,
+        "claim_status": "blocked_no_cb_spans",
+        "reason": "OTLP collector was started, but no non-empty lmcache_otel.jsonl with cb.* spans was captured before strict validation.",
+        "expected_span_prefix": "cb.",
+        "collector_started": "OTLP gRPC collector listening" in collector_text,
+        "collector_endpoint": _otel_endpoint(),
+        "vllm_otlp_traces_endpoint": _vllm_otel_endpoint(),
+        "otel_jsonl_path": str(otel_path),
+        "otel_jsonl_exists": otel_path.exists(),
+        "otel_jsonl_bytes": otel_path.stat().st_size if otel_path.exists() else 0,
+        "artifact_state": "blocked_not_accepted",
+    }
+    for path in (run_dir / LMCACHE_OTEL_BLOCKED_FILE, packet_dir / "lmcache_otel_evidence.json"):
+        path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return run_dir / LMCACHE_OTEL_BLOCKED_FILE
+
+
+def _h3_otel_contract_satisfied(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> bool:
+    if spec.packet_id != "h3-cacheblend":
+        return True
+    otel_path = run_dir / LMCACHE_OTEL_FILE
+    if otel_path.exists() and otel_path.stat().st_size > 0:
+        return True
+    blocked = run_dir / LMCACHE_OTEL_BLOCKED_FILE
+    if not (blocked.exists() and blocked.stat().st_size > 0):
+        return False
+    try:
+        evidence = json.loads(blocked.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    return evidence.get("claim_status") == "blocked_no_cb_spans"
+
+
+def _ensure_h3_otel_contract(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
+    if spec.packet_id != "h3-cacheblend":
+        return
+    deadline = time.time() + 15.0
+    while time.time() < deadline:
+        otel_path = run_dir / LMCACHE_OTEL_FILE
+        if otel_path.exists() and otel_path.stat().st_size > 0:
+            return
+        time.sleep(0.5)
+    _write_h3_otel_blocked_evidence(run_dir, spec)
 
 
 def _drive_traffic(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
@@ -1323,6 +1414,7 @@ OPTIONAL_ARTIFACTS = [
     "secondary_engine.log",
     "secondary_engine_metrics_loaded.prom",
     LMCACHE_OTEL_FILE,
+    LMCACHE_OTEL_BLOCKED_FILE,
     "lmcache-packet/lmcache_otel_evidence.json",
     "diagnose-bottleneck/bottleneck_diagnosis.json",
 ]
@@ -1351,6 +1443,8 @@ def _missing_artifacts(run_dir: Path, rel_paths: list[str], *, require_nonempty:
 def _validate_required_artifacts(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
     _write_summary_and_index(run_dir, spec)
     missing = _missing_artifacts(run_dir, _required_artifacts(spec), require_nonempty=True)
+    if not _h3_otel_contract_satisfied(run_dir, spec):
+        missing.append(f"{LMCACHE_OTEL_FILE} or {LMCACHE_OTEL_BLOCKED_FILE}")
     if missing:
         raise RuntimeError(f"Packet {spec.packet_id} missing required artifacts: " + ", ".join(missing))
 
@@ -1367,6 +1461,8 @@ def _write_summary_and_index(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) ->
     required = _required_artifacts(spec)
     optional = _optional_artifacts(spec)
     missing_required = _missing_artifacts(run_dir, required, require_nonempty=True)
+    if not _h3_otel_contract_satisfied(run_dir, spec):
+        missing_required.append(f"{LMCACHE_OTEL_FILE} or {LMCACHE_OTEL_BLOCKED_FILE}")
     missing_optional = _missing_artifacts(run_dir, optional, require_nonempty=True)
     lines = [
         f"# {spec.sdlc_id} {spec.name} Modal Lab Summary",
@@ -1476,6 +1572,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
             )
         _capture_metrics(run_dir, "empty")
         _drive_traffic(run_dir, spec)
+        _ensure_h3_otel_contract(run_dir, spec)
         _capture_metrics(run_dir, "loaded")
         _run_inferguard_packet(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
