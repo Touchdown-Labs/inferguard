@@ -749,12 +749,63 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
     sitecustomize_path.write_text(
         r'''
 import importlib
+import inspect
 import os
 import sys
 import types
 
 
 _INFERGUARD_PENDING_CACHEBLEND = {}
+
+
+def _inferguard_patch_lmcache_rope_compat():
+    """Adapt LMCache CacheBlend RoPE calls to the installed vLLM signature."""
+    try:
+        positional_encoding = importlib.import_module("lmcache.v1.compute.positional_encoding")
+    except ImportError:
+        return False
+    original_get_rope = getattr(positional_encoding, "vllm_get_rope", None)
+    if original_get_rope is None or getattr(original_get_rope, "_inferguard_rope_compat_patched", False):
+        return bool(original_get_rope)
+    try:
+        parameters = inspect.signature(original_get_rope).parameters
+    except (TypeError, ValueError):
+        return False
+    if "rope_parameters" in parameters:
+        original_get_rope._inferguard_rope_compat_patched = True
+        return True
+
+    def _inferguard_rope_compat_get_rope(*args, **kwargs):
+        rope_parameters = kwargs.pop("rope_parameters", None) or {}
+        if "rope_scaling" in parameters and "rope_scaling" not in kwargs:
+            rope_scaling = {
+                key: value
+                for key, value in rope_parameters.items()
+                if key not in ("rope_theta", "partial_rotary_factor", "rope_dim")
+            }
+            if "rope_type" in rope_scaling and "type" not in rope_scaling:
+                rope_scaling["type"] = rope_scaling.pop("rope_type")
+            kwargs["rope_scaling"] = rope_scaling or None
+        if "base" in parameters and "base" not in kwargs and "rope_theta" in rope_parameters:
+            kwargs["base"] = rope_parameters["rope_theta"]
+        if "rotary_dim" in parameters and "rotary_dim" not in kwargs:
+            if "rope_dim" in rope_parameters:
+                kwargs["rotary_dim"] = rope_parameters["rope_dim"]
+            elif "head_size" in kwargs:
+                partial_factor = rope_parameters.get("partial_rotary_factor", 1.0)
+                kwargs["rotary_dim"] = int(kwargs["head_size"] * partial_factor)
+        if (
+            "partial_rotary_factor" in parameters
+            and "partial_rotary_factor" not in kwargs
+            and "partial_rotary_factor" in rope_parameters
+        ):
+            kwargs["partial_rotary_factor"] = rope_parameters["partial_rotary_factor"]
+        filtered_kwargs = {key: value for key, value in kwargs.items() if key in parameters}
+        return original_get_rope(*args, **filtered_kwargs)
+
+    _inferguard_rope_compat_get_rope._inferguard_rope_compat_patched = True
+    positional_encoding.vllm_get_rope = _inferguard_rope_compat_get_rope
+    return True
 
 
 def _inferguard_patch_lmcache_attention_utils():
@@ -842,6 +893,7 @@ class _InferGuardDeferredLMCBlender:
 
 
 if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
+    _inferguard_patch_lmcache_rope_compat()
     _inferguard_patch_lmcache_attention_utils()
     GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
     LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
@@ -905,7 +957,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "engine_name": "vllm-instance",
                 "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
                 "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
-                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras.",
+                "rope_compat": "map LMCache rope_parameters onto installed vLLM get_rope signature when needed",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source.",
                 "applied": True,
             },
             indent=2,

@@ -350,6 +350,154 @@ def test_h3_cacheblend_uses_non_sparse_attention_without_flashinfer_dependency(t
     assert "elif attn_name == \"FlashAttentionImpl\" and not enable_sparse" in sitecustomize_text
 
 
+def test_h3_cacheblend_rope_patch_maps_rope_parameters_for_older_vllm_signature(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lab = _load_lab_module()
+    lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in ("lmcache", "lmcache.v1", "lmcache.v1.compute"):
+        module = install_module(package)
+        module.__path__ = []
+
+    positional_encoding = install_module("lmcache.v1.compute.positional_encoding")
+    calls: list[dict[str, object]] = []
+
+    def old_vllm_get_rope(
+        head_size,
+        rotary_dim,
+        max_position,
+        is_neox_style=True,
+        rope_scaling=None,
+        dtype=None,
+    ):
+        calls.append(
+            {
+                "head_size": head_size,
+                "rotary_dim": rotary_dim,
+                "max_position": max_position,
+                "is_neox_style": is_neox_style,
+                "rope_scaling": rope_scaling,
+                "dtype": dtype,
+            }
+        )
+        return "rope"
+
+    positional_encoding.vllm_get_rope = old_vllm_get_rope
+
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        result = positional_encoding.vllm_get_rope(
+            head_size=128,
+            max_position=8192,
+            is_neox_style=True,
+            rope_parameters={
+                "rope_theta": 1000000.0,
+                "partial_rotary_factor": 1.0,
+                "rope_type": "yarn",
+                "factor": 4.0,
+            },
+            dtype="float16",
+            dual_chunk_attention_config=None,
+        )
+
+        assert result == "rope"
+        assert calls == [
+            {
+                "head_size": 128,
+                "rotary_dim": 128,
+                "max_position": 8192,
+                "is_neox_style": True,
+                "rope_scaling": {"type": "yarn", "factor": 4.0},
+                "dtype": "float16",
+            }
+        ]
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
+
+
+def test_h3_cacheblend_rope_patch_preserves_new_vllm_rope_parameters_signature(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lab = _load_lab_module()
+    lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in ("lmcache", "lmcache.v1", "lmcache.v1.compute"):
+        module = install_module(package)
+        module.__path__ = []
+
+    positional_encoding = install_module("lmcache.v1.compute.positional_encoding")
+    calls: list[dict[str, object]] = []
+
+    def new_vllm_get_rope(
+        head_size,
+        max_position,
+        is_neox_style=True,
+        rope_parameters=None,
+        dtype=None,
+        dual_chunk_attention_config=None,
+    ):
+        calls.append(
+            {
+                "rope_parameters": rope_parameters,
+                "dual_chunk_attention_config": dual_chunk_attention_config,
+            }
+        )
+        return "rope"
+
+    positional_encoding.vllm_get_rope = new_vllm_get_rope
+
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        result = positional_encoding.vllm_get_rope(
+            head_size=128,
+            max_position=8192,
+            rope_parameters={"rope_theta": 1000000.0, "partial_rotary_factor": 1.0},
+            dtype="float16",
+            dual_chunk_attention_config=None,
+        )
+
+        assert result == "rope"
+        assert calls == [
+            {
+                "rope_parameters": {"rope_theta": 1000000.0, "partial_rotary_factor": 1.0},
+                "dual_chunk_attention_config": None,
+            }
+        ]
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
+
+
 def test_h3_cacheblend_lazy_attention_patch_avoids_importing_flashinfer_for_flashattention(
     tmp_path: Path, monkeypatch
 ) -> None:
