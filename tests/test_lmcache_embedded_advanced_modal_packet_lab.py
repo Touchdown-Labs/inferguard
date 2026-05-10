@@ -606,6 +606,111 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert "vllm_cacheblend_model_tracker_patch.json" in lab._required_artifacts(spec)
 
 
+def test_h3_cacheblend_patch_defers_process_qkv_when_layer0_gpu_buffer_is_not_ready(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lab = _load_lab_module()
+    patch_log = lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+    patch = json.loads(patch_log.read_text(encoding="utf-8"))
+    assert patch["layer0_gpu_buffer_deferral"] == (
+        "if LMCache CacheBlend process_qkv reaches get_kv before layer 0 is staged in "
+        "VLLMBufferLayerwiseGPUConnector.buffer_mapping, defer blending for that QKV pass "
+        "instead of crashing the engine"
+    )
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in (
+        "lmcache",
+        "lmcache.v1",
+        "lmcache.v1.compute",
+        "lmcache.v1.compute.blend",
+    ):
+        module = install_module(package)
+        module.__path__ = []
+
+    blender_module = install_module("lmcache.v1.compute.blend.blender")
+
+    class _FakeTensor:
+        shape = (2, 3)
+        dtype = "bf16"
+        device = "cuda"
+
+    class _FakeTorch:
+        @staticmethod
+        def empty(shape, dtype=None, device=None):
+            return ("empty", shape, dtype, device)
+
+    class _Metadata:
+        def __init__(self):
+            self.cleaned = False
+
+        def clean(self):
+            self.cleaned = True
+
+    class LMCBlender:
+        def __init__(self):
+            self.metadata = _Metadata()
+
+        def process_qkv(self, q, k, v, residual, layer_id, attn_output, attn_metadata):
+            raise ValueError(f"Layer {layer_id} is not loaded into GPU buffer.")
+
+    blender_module.LMCBlender = LMCBlender
+    monkeypatch.setitem(sys.modules, "torch", _FakeTorch)
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        blender = LMCBlender()
+        q = _FakeTensor()
+        k = object()
+        v = object()
+        residual = object()
+        attn_metadata = object()
+        result = blender.process_qkv(q, k, v, residual, 0, None, attn_metadata)
+
+        assert result == (q, k, v, residual, ("empty", q.shape, q.dtype, q.device), attn_metadata)
+        assert blender.metadata.cleaned is True
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
+        sys.modules.pop("torch", None)
+
+
+def test_h3_cacheblend_traffic_uses_unique_prefix_shared_suffix_to_avoid_vllm_prefix_only(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["h3-cacheblend"]
+    captured: dict[str, object] = {}
+
+    def fake_run(cmd, log_path, timeout=None, check=True):
+        captured["cmd"] = cmd
+        captured["log_path"] = log_path
+        captured["timeout"] = timeout
+        captured["check"] = check
+
+    monkeypatch.setattr(lab, "_run", fake_run)
+    lab._drive_traffic(tmp_path, spec)
+
+    script = captured["cmd"][2]
+    assert "shared_suffix" in script
+    assert "unique_prefix = f\"InferGuard H3 CacheBlend unique prefix" in script
+    assert "if requests == 20" in script
+    assert "shared_prefix +" in script
+    assert captured["cmd"][-1] == "20"
+
+
 def test_h3_cacheblend_lookup_payload_patch_normalizes_constant_list_for_msgspec(
     tmp_path: Path, monkeypatch
 ) -> None:

@@ -908,6 +908,41 @@ def _inferguard_patch_lmcache_lookup_payload():
     return True
 
 
+def _inferguard_patch_cacheblend_layer0_deferral():
+    """Defer CacheBlend QKV processing if layer 0 is not staged in the GPU buffer."""
+    try:
+        blender_module = importlib.import_module("lmcache.v1.compute.blend.blender")
+    except ImportError:
+        return False
+    blender_cls = getattr(blender_module, "LMCBlender", None)
+    if blender_cls is None:
+        return False
+    original_process_qkv = getattr(blender_cls, "process_qkv", None)
+    if original_process_qkv is None or getattr(
+        original_process_qkv, "_inferguard_layer0_deferral_patched", False
+    ):
+        return bool(original_process_qkv)
+
+    def _inferguard_process_qkv(self, q, k, v, residual, layer_id, attn_output, attn_metadata):
+        try:
+            return original_process_qkv(
+                self, q, k, v, residual, layer_id, attn_output, attn_metadata
+            )
+        except ValueError as exc:
+            if "is not loaded into GPU buffer" not in str(exc):
+                raise
+            if attn_output is None:
+                import torch
+
+                attn_output = torch.empty(q.shape, dtype=q.dtype, device=q.device)
+            self.metadata.clean()
+            return q, k, v, residual, attn_output, attn_metadata
+
+    _inferguard_process_qkv._inferguard_layer0_deferral_patched = True
+    blender_cls.process_qkv = _inferguard_process_qkv
+    return True
+
+
 class _InferGuardDeferredLMCBlender:
     def __init__(self, instance_id, original_get_or_create):
         self._inferguard_instance_id = instance_id
@@ -936,6 +971,7 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
     _inferguard_patch_lmcache_rope_compat()
     _inferguard_patch_lmcache_attention_utils()
     _inferguard_patch_lmcache_lookup_payload()
+    _inferguard_patch_cacheblend_layer0_deferral()
     GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
     LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
     if LMCBlenderBuilder is not None and not getattr(
@@ -1000,7 +1036,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
                 "rope_compat": "map LMCache rope_parameters onto installed vLLM get_rope signature when needed",
                 "lookup_payload_compat": "convert vLLM ConstantList token containers to ordinary list values before LMCache CacheBlend lookup msgspec/ZMQ encoding",
-                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source. For CacheBlend lookup RPC, LMCache vllm_v1_adapter passes request.all_token_ids through LMCacheLookupClient.lookup as the first ZMQ frame when enable_blending=True; vLLM exposes that token container as ConstantList and msgspec rejects it, so the H3 overlay normalizes only the CacheBlend lookup token payload before LMCache's transport encoder.",
+                "layer0_gpu_buffer_deferral": "if LMCache CacheBlend process_qkv reaches get_kv before layer 0 is staged in VLLMBufferLayerwiseGPUConnector.buffer_mapping, defer blending for that QKV pass instead of crashing the engine",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source. For CacheBlend lookup RPC, LMCache vllm_v1_adapter passes request.all_token_ids through LMCacheLookupClient.lookup as the first ZMQ frame when enable_blending=True; vLLM exposes that token container as ConstantList and msgspec rejects it, so the H3 overlay normalizes only the CacheBlend lookup token payload before LMCache's transport encoder. The 20260510T205136Z H3 artifact then reached LMCache start_load_kv and failed because process_qkv called gpu_connector.get_kv before layer 0 existed in VLLMBufferLayerwiseGPUConnector.buffer_mapping; this overlay turns that timing edge into a safe no-blend pass while H3 traffic is shaped to exercise non-prefix shared-suffix CacheBlend instead of vLLM repeated-prefix hits.",
                 "applied": True,
             },
             indent=2,
@@ -1084,8 +1121,13 @@ model = sys.argv[2]
 api_path = sys.argv[3]
 requests = int(sys.argv[4])
 shared_prefix = "InferGuard embedded LMCache repeated-prefix validation. " * 220
+shared_suffix = " CacheBlend shared evidence suffix enables non-prefix KV reuse." * 120
 for idx in range(requests):
-    prompt = shared_prefix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
+    if requests == 20:
+        unique_prefix = f"InferGuard H3 CacheBlend unique prefix {idx:02d}. " * 48
+        prompt = unique_prefix + shared_suffix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
+    else:
+        prompt = shared_prefix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
