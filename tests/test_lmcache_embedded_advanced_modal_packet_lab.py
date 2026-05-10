@@ -838,6 +838,68 @@ def test_h3_cacheblend_lookup_payload_patch_normalizes_constant_list_for_msgspec
             sys.modules.pop(name, None)
 
 
+def test_h3_cacheblend_retrieve_layer_source_patch_guards_no_key_path(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    source_root = tmp_path / "lmcache-src"
+    cache_engine = source_root / "lmcache" / "v1" / "cache_engine.py"
+    cache_engine.parent.mkdir(parents=True)
+    cache_engine.write_text(
+        """
+class LMCacheEngine:
+    def retrieve_layer(self):
+        starts = []
+        ends = []
+        keys = []
+
+        request_configs = None
+        if keys:
+            mem_obj_consumer = self.gpu_connector.batched_to_gpu(starts, ends)
+            next(mem_obj_consumer)
+
+            to_count_down = []
+            for layer_id in range(self.num_layers):
+                yield None
+        else:
+            # If no cache are found, we still need to yield to avoid
+            # `StopIteration`
+            for layer_id in range(self.num_layers):
+                yield None
+
+        yield None
+
+        # synchronize the last layer
+        next(mem_obj_consumer)
+
+        # Unpin any disk-loaded staging objects now that the device-side sync
+        # has been enqueued (mem_obj_consumer advanced past its sync point).
+        # Without this, pin_count stays at 1 forever and the CPU staging pool
+        # fills up, causing the next retrieve to deadlock inside allocate().
+        for mem_obj in to_count_down:
+            if mem_obj.is_pinned:
+                mem_obj.unpin()
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    patch_log = lab._patch_lmcache_retrieve_layer_no_keys_source(tmp_path, source_root)
+    patched = cache_engine.read_text(encoding="utf-8")
+    patch = json.loads(patch_log.read_text(encoding="utf-8"))
+
+    assert patch["schema_version"] == "inferguard-h3-lmcache-retrieve-layer-no-keys-patch/v1"
+    assert patch["changed"] is True
+    assert "mem_obj_consumer = None" in patched
+    assert "to_count_down = []" in patched
+    assert "if mem_obj_consumer is not None:" in patched
+    assert "do not catch exceptions from real keyed retrieval" in patch["behavior"]
+
+    namespace: dict[str, object] = {}
+    exec(patched, namespace)
+    engine = namespace["LMCacheEngine"]()
+    engine.num_layers = 2
+
+    assert list(engine.retrieve_layer()) == [None, None, None]
+
+
 def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path: Path) -> None:
     lab = _load_lab_module()
 
@@ -994,8 +1056,14 @@ def test_h3_cacheblend_model_tracker_patch_is_created_before_engine_launch(tmp_p
     spec = lab.PACKETS["h3-cacheblend"]
     events: list[str] = []
 
+    def fake_source_patch(run_dir: Path):
+        events.append("source-patch")
+        path = run_dir / "lmcache_retrieve_layer_no_keys_patch.json"
+        path.write_text("{}", encoding="utf-8")
+        return path
+
     def fake_patch(run_dir: Path):
-        events.append("patch")
+        events.append("sitecustomize-patch")
         path = run_dir / "vllm_cacheblend_model_tracker_patch.json"
         path.write_text("{}", encoding="utf-8")
         (run_dir / "sitecustomize.py").write_text("", encoding="utf-8")
@@ -1006,6 +1074,7 @@ def test_h3_cacheblend_model_tracker_patch_is_created_before_engine_launch(tmp_p
         raise RuntimeError("stop before Modal engine launch")
 
     monkeypatch.setattr(lab, "OUT_ROOT", tmp_path)
+    monkeypatch.setattr(lab, "_patch_lmcache_retrieve_layer_no_keys_source", fake_source_patch)
     monkeypatch.setattr(lab, "_patch_vllm_cacheblend_model_tracker", fake_patch)
     monkeypatch.setattr(lab, "_prepare_prometheus_multiproc_dir", lambda _run_dir: None)
     monkeypatch.setattr(lab, "_write_env_snapshot", lambda _run_dir: None)
@@ -1024,7 +1093,7 @@ def test_h3_cacheblend_model_tracker_patch_is_created_before_engine_launch(tmp_p
     else:
         raise AssertionError("expected fake launch to stop packet run")
 
-    assert events == ["patch", "launch"]
+    assert events == ["source-patch", "sitecustomize-patch", "launch"]
 
 
 def test_h3_p2p_writes_two_engine_peer_scaffold(tmp_path: Path) -> None:

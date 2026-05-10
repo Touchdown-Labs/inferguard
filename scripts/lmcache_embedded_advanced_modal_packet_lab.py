@@ -756,6 +756,64 @@ def _launch_engine(
     return proc, log_handle
 
 
+def _patch_lmcache_retrieve_layer_no_keys_source(run_dir: Path, source_root: Path | None = None) -> Path:
+    """Patch LMCache retrieve_layer's no-key layerwise path for H3 CacheBlend only.
+
+    Source basis: LMCache ``retrieve_layer`` assigns ``mem_obj_consumer`` and
+    ``to_count_down`` only inside ``if keys:``, but the current local source
+    unconditionally synchronizes ``next(mem_obj_consumer)`` and unpins
+    ``to_count_down`` after the ``else`` cache-miss path. The H3 artifact
+    20260510T214803Z hit that no-key path from CacheBlend and crashed with
+    ``UnboundLocalError: mem_obj_consumer`` before InferGuard report generation.
+
+    This mutates only the Modal runtime copy of the local LMCache source before
+    launching H3 CacheBlend. Real retrieval failures inside ``if keys:`` are not
+    caught or suppressed.
+    """
+    source_root = source_root or Path(os.environ.get(LMCACHE_LOCAL_SOURCE_ENV, MODAL_LMCACHE_SOURCE))
+    cache_engine = source_root / "lmcache" / "v1" / "cache_engine.py"
+    patch_log = run_dir / "lmcache_retrieve_layer_no_keys_patch.json"
+    text = cache_engine.read_text(encoding="utf-8")
+    original_text = text
+
+    if "\n        mem_obj_consumer = None\n" not in text:
+        text = text.replace(
+            "        starts = []\n        ends = []\n        keys = []\n\n        request_configs =",
+            "        starts = []\n        ends = []\n        keys = []\n        mem_obj_consumer = None\n        to_count_down = []\n\n        request_configs =",
+            1,
+        )
+    text = text.replace("\n            to_count_down = []\n            for layer_id in range(self.num_layers):\n", "\n            for layer_id in range(self.num_layers):\n", 1)
+    text = text.replace(
+        "        # synchronize the last layer\n        next(mem_obj_consumer)\n\n        # Unpin any disk-loaded staging objects now that the device-side sync\n        # has been enqueued (mem_obj_consumer advanced past its sync point).\n        # Without this, pin_count stays at 1 forever and the CPU staging pool\n        # fills up, causing the next retrieve to deadlock inside allocate().\n        for mem_obj in to_count_down:\n            if mem_obj.is_pinned:\n                mem_obj.unpin()\n",
+        "        if mem_obj_consumer is not None:\n            # synchronize the last layer\n            next(mem_obj_consumer)\n\n            # Unpin any disk-loaded staging objects now that the device-side sync\n            # has been enqueued (mem_obj_consumer advanced past its sync point).\n            # Without this, pin_count stays at 1 forever and the CPU staging pool\n            # fills up, causing the next retrieve to deadlock inside allocate().\n            for mem_obj in to_count_down:\n                if mem_obj.is_pinned:\n                    mem_obj.unpin()\n",
+        1,
+    )
+    if (
+        "\n        mem_obj_consumer = None\n" not in text
+        or "\n        to_count_down = []\n" not in text
+        or "if mem_obj_consumer is not None:" not in text
+    ):
+        raise RuntimeError(f"Unable to patch LMCache retrieve_layer source at {cache_engine}")
+    cache_engine.write_text(text, encoding="utf-8")
+    patch_log.write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-h3-lmcache-retrieve-layer-no-keys-patch/v1",
+                "patch_target": str(cache_engine),
+                "source_basis": "LMCache retrieve_layer no-key path yielded per-layer None values, then unconditionally called next(mem_obj_consumer) even though mem_obj_consumer is assigned only inside if keys; H3 CacheBlend artifact 20260510T214803Z reached that path and raised UnboundLocalError before report generation.",
+                "behavior": "initialize mem_obj_consumer/to_count_down before the if keys branch and synchronize/unpin only when a GPU consumer was created; do not catch exceptions from real keyed retrieval.",
+                "applied": True,
+                "changed": text != original_text,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return patch_log
+
+
 def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
     """Install a sitecustomize hook to register the loaded vLLM model for CacheBlend.
 
@@ -1536,7 +1594,10 @@ REQUIRED_ARTIFACTS = [
     "artifact_index.json",
 ]
 
-CACHEBLEND_REQUIRED_ARTIFACTS = ["vllm_cacheblend_model_tracker_patch.json"]
+CACHEBLEND_REQUIRED_ARTIFACTS = [
+    "lmcache_retrieve_layer_no_keys_patch.json",
+    "vllm_cacheblend_model_tracker_patch.json",
+]
 
 OPTIONAL_ARTIFACTS = [
     "secondary_engine.log",
@@ -1669,6 +1730,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
         if spec.engine == "sglang":
             _ensure_sglang_runtime(run_dir)
         if spec.enable_cacheblend:
+            _patch_lmcache_retrieve_layer_no_keys_source(run_dir)
             _patch_vllm_cacheblend_model_tracker(run_dir)
         _prepare_prometheus_multiproc_dir(run_dir)
         _write_env_snapshot(run_dir)
