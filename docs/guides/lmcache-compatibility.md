@@ -15,12 +15,13 @@ The old `LMCacheConnector` v0-style string is not a priority. InferGuard should 
 ## Progress
 
 The upstream tracker for this effort is
-`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/188-2026-05-07-lmcache-inferguard-observability-source-of-truth.md`.
-As of that tracker, LMCache observability coverage remains **58 / 100**. This
-page documents parser, packet, report, and diagnosis behavior that exists in
-InferGuard; it does not claim live-complete coverage. The next score movement
-requires one clean live vLLM + standalone LMCache MP packet with metrics, HTTP,
-logs, trace recording, fixture replay, and tests.
+`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
+As of the I1 release-readiness closeout, original vLLM + LMCache + InferGuard
+CLI coverage is **release-ready**. Accepted
+live evidence covers MP Packets A-F, G1 diagnostic calibration, embedded vLLM
+H1, and embedded CacheBlend/vLLM H3. H2/SGLang, Mooncake, P2P/PD expansion, and
+DLM/llm-d remain paused backend-expansion lanes rather than blockers for the
+original vLLM + LMCache finish line.
 
 ## Support Levels
 
@@ -31,7 +32,7 @@ logs, trace recording, fixture replay, and tests.
 | Embedded SGLang LMCache | SGLang `--enable-lmcache` using `LMCacheLayerwiseConnector` through SGLang's radix cache | SGLang `/metrics`, aggregate `sglang:cache_hit_rate`, HiCache/storage metrics when present, LMCache config/log evidence | Partial, compatibility priority |
 | P2P sharing | multiple engines, `enable_p2p`, controller, NIXL | production `lmcache:*` P2P metrics when present; logs can be parsed as conservative packet evidence and surfaced by diagnosis | Parser/report partial; live proof missing |
 | Disaggregated prefill | prefiller/decoder roles using NIXL | launch/config artifacts and NIXL/PD log hints can be parsed as conservative packet evidence and surfaced by diagnosis | Parser/report partial; live proof missing |
-| CacheBlend | blend-mode lookups/retrieve/store with `lmcache_blend_*` and `cb.*` spans | `lmcache_blend_*` metrics are normalized, CacheBlend OTel spans are parsed, and report/diagnosis can surface CacheBlend finding codes | Parser/report partial; live proof missing |
+| CacheBlend | blend-mode lookups/retrieve/store with `lmcache_blend_*` and `cb.*` spans | `lmcache_blend_*` metrics are normalized, CacheBlend OTel spans are parsed, and report/diagnosis can surface CacheBlend finding codes | H3 live-validated for embedded CacheBlend/vLLM |
 | Lookup-hash JSONL | `lookup_hashes_*.jsonl` with redacted key-shape metadata | privacy-bounded parser redacts raw hashes and preserves request/model/chunk-shape summaries; packet/report plumbing accepts lookup-hash evidence | Parser/report partial; live proof missing |
 | Controller / internal API | `lmcache_controller` or internal API server | not collected as a structured packet yet | Planned |
 | Logs | engine and LMCache logs | copied into packets and parsed for conservative LMCache hints | Partial |
@@ -133,9 +134,9 @@ inferguard lmcache-compat \
 This fixture proves only the diagnostic shape. It should show `detected_mode=mp`,
 then fail on missing required Prometheus families such as `lookup_tokens` and
 `l1_memory`. The bundled HTTP/log/lookup-hash evidence is alternate live-shaped
-evidence, not scoreable replacement metrics. Keep coverage at **58 / 100** until
-a real Packet A run exports those Prometheus families, is imported as an
-accepted compact fixture, and passes tests.
+evidence, not scoreable replacement metrics. The rejected fixture must never
+move score; accepted Packet A-F/H1/H3 compact fixtures and I1 docs/test gates are
+the release-ready evidence.
 
 `diagnose-bottleneck` reads `metrics/lmcache_compat_report.json` and now
 promotes user-facing LMCache finding codes for MP logs, CacheBlend, P2P, PD,

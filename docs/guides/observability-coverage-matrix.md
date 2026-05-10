@@ -22,23 +22,32 @@ Status meanings:
 
 The active upstream tracker is
 `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
-It supersedes docs 188/189/190. Current LMCache coverage is **68 / 100**.
-This matrix records structural parser, packet, report, and diagnosis surfaces
-that exist now. Packet A is live-validated; Packet B-F/H1-H3 are still pending,
-so these rows must not be read as 100% LMCache compatibility.
+It supersedes docs 188/189/190. Original vLLM + LMCache + InferGuard CLI
+coverage is release-ready when the I1 local docs/test gates pass. Accepted
+runtime evidence covers Packet A-F MP, G1 diagnostics, H1 embedded vLLM, and H3
+embedded CacheBlend/vLLM. H2/SGLang, Mooncake, P2P/PD expansion, and DLM/llm-d
+are paused backend-expansion lanes, not blockers for the original vLLM + LMCache
+CLI finish line.
 
-Run Packet B from the full repo checkout:
+Keep accepted live fixtures pinned under `tests/fixtures/lmcache_live/` and run
+the I1 local gate before updating release claims:
 
 ```bash
 cd /Users/chen/Projects/inferguard
-python scripts/lmcache_mp_packet_commands.py
-INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
+uv run --with pytest --with pytest-asyncio --with aiohttp --with msgpack pytest -q \
+  tests/test_lmcache_metrics_adapter.py \
+  tests/test_observability_coverage.py \
+  tests/test_lmcache_mp_modal_packet_lab.py \
+  tests/test_lmcache_packet.py \
+  tests/test_collect_metrics.py \
+  tests/test_diagnose_bottleneck.py \
+  tests/test_lmcache_otel.py \
+  tests/test_lmcache_trace.py \
+  tests/test_lmcache_lookup_hash.py \
+  tests/test_lmcache_live_fixtures.py \
+  tests/test_lmcache_embedded_advanced_modal_packet_lab.py
+uv run mkdocs build
 ```
-
-B1 Packet A is accepted and pinned under
-`tests/fixtures/lmcache_live/packet_a/`; the matrix is now **68 / 100**.
-Packet B lifecycle is the next score-moving gate.
 
 Source refresh for the Worker Docs/CLI checklist on 2026-05-07 used:
 
@@ -70,7 +79,7 @@ the parser or collector path exists and is fixture-tested, not that the lane is
 | LMCache | Logs | partial | `engine.log`, `lmcache.log`, `lmcache_log_evidence.json`, `packet_manifest.json`, `bottleneck_diagnosis.json` | `parse_lmcache_logs`, `collect-lmcache --engine-log-file --lmcache-log-file`, `diagnose-bottleneck` | Mode-specific checks for zero-hit-after-warmup, hashseed mismatch, P2P failures, PD role mismatch, and MP store/retrieve lifecycle. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
 | LMCache | OTel spans | partial | `lmcache_otel.jsonl`, `lmcache_otel_evidence.json`, `packet_manifest.json`, `lmcache_compat_report.json`, `observability_coverage.json` | `collect-lmcache --lmcache-otel-file`, `lmcache-compat --lmcache-otel-evidence-file`, `observability-coverage --lmcache-otel-evidence-file`, `parse_lmcache_otel_jsonl` | Real OTel collector export and tracing-enabled-without-spans detector. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/otel" --lmcache-otel-file "$PACKET_DIR/otel/lmcache-otel.jsonl"` |
 | LMCache | Trace recording `.lct` | partial | `lmcache_trace.lct`, `lmcache_trace_evidence.json`, `packet_manifest.json`, `lmcache_compat_report.json`, `observability_coverage.json` | `collect-lmcache --lmcache-trace-file`, `lmcache-compat --lmcache-trace-evidence-file`, `observability-coverage --lmcache-trace-evidence-file`, `parse_lmcache_trace_file` | Real `.lct` msgpack trace from `--trace-level storage`. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/trace" --lmcache-trace-file "$PACKET_DIR/trace/lmcache-trace.lct"` |
-| LMCache | CacheBlend metrics/spans | partial | `lmcache_metrics.prom`, `lmcache_otel.jsonl`, `lmcache_compat_report.json`, `observability_coverage.json`, `bottleneck_diagnosis.json` | `parse_lmcache_prometheus`, `parse_lmcache_otel_jsonl`, `lmcache-compat`, `observability-coverage`, `diagnose-bottleneck` | Compact fixtures from a real CacheBlend run and live CacheBlend packet. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/cacheblend.prom" --output "$PACKET_DIR/cacheblend_report.json" --expect-mode mp` |
+| LMCache | CacheBlend metrics/spans | live_validated | `lmcache_blend_metrics.prom`, `lmcache_otel.jsonl`, `lmcache_compat_report.json`, `observability_coverage.json`, `bottleneck_diagnosis.json` | `parse_lmcache_prometheus`, `parse_lmcache_otel_jsonl`, `lmcache-compat`, `observability-coverage`, `diagnose-bottleneck` | H3 embedded CacheBlend/vLLM fixture is accepted; P2P/PD remain backend expansion. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_blend_metrics.prom" --expect-mode auto --fail-on missing-required --json` |
 | LMCache | Lookup-hash JSONL | partial | `lookup_hashes_*.jsonl`, `lmcache_lookup_hash_evidence.json`, `packet_manifest.json`, `lmcache_compat_report.json`, `bottleneck_diagnosis.json` | `parse_lmcache_lookup_hash_jsonl`, `collect-lmcache --lmcache-lookup-hash-path`, `diagnose-bottleneck` | Live lookup-hash packet and real rotation/config fields. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/lookup-hash" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
 | LMCache | Trace replay metadata | partial | `lmcache_trace_replay_evidence.json`, `packet_manifest.json`, `lmcache_compat_report.json`, `bottleneck_diagnosis.json` | `parse_lmcache_trace_replay_file`, `parse_lmcache_trace_replay_dir`, `collect-lmcache --lmcache-trace-replay-output` | Live replay proof tied to the same `.lct` trace and config digest. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/trace-replay" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay"` |
 | LMCache | P2P / PD log evidence | partial | `lmcache_log_evidence.json`, `packet_manifest.json`, `bottleneck_diagnosis.json` | `parse_lmcache_logs`, `collect-lmcache --engine-log-file --lmcache-log-file`, `diagnose-bottleneck` | Metric/config correlation, connection-failure detectors, PD role/proxy/NIXL proof packets, and live two-engine P2P plus prefiller/decoder fixtures. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/p2p" --engine-log-file "$PACKET_DIR/p2p/engine.log" --lmcache-log-file "$PACKET_DIR/p2p/lmcache.log"` |
@@ -103,7 +112,7 @@ reach 100/100. The states intentionally use the stricter SDLC taxonomy.
 | Lookup-hash JSONL | fixture_backed | redacted hashes, request/model/chunk metadata, rotation/config evidence | Live lookup-hash directory from Packet A. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/lookup-hash" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
 | P2P and PD | parser_only | P2P transfer metrics/logs, peer evidence, PD role/config/proxy/NIXL logs, request profile | Live two-engine P2P and 1p1d PD packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/pd" --engine-log-file "$PACKET_DIR/pd/engine.log" --lmcache-log-file "$PACKET_DIR/pd/lmcache.log"` |
 | Diagnostics | missing / fixture_backed mixed | mode-aware findings for hit rate, cache salt, L1/L2 pressure, EventBus loss, trace gaps, CacheBlend, P2P, PD, stale connector | Calibrated thresholds from live packets. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
-| Release readiness | partial | docs, CLI reference, fixture tests, docs build, release notes, upstream question log | Full test/build proof after fixture import. | `uv run mkdocs build` |
+| Release readiness | release_ready | docs, CLI reference, fixture tests, docs build, release notes, rollback notes, upstream question log | Keep local docs/test receipts attached to the release note. | `uv run mkdocs build` |
 
 ## Metric Family Closeout
 

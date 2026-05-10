@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Docs
 
-- Aligned LMCache coverage docs and CLI references to SDLC 195 as the active
-  58/100 score source, pointed operators at the full repo Modal packet runner in
-  `/Users/chen/Projects/inferguard`, normalized score-moving snippets to the
-  current CLI flags, and clarified that local-source Modal packaging addressed
-  the previous pinned-package blocker while B1 still needs live proof.
+- Closed I1 release-readiness documentation for original vLLM + LMCache +
+  InferGuard CLI coverage: refreshed CLI references for accepted MP Packet A-F,
+  G1 diagnostics, H1 embedded vLLM, and H3 embedded CacheBlend/vLLM; added
+  rollback guidance for private vLLM/LMCache overlays and accepted fixture
+  rollback; and kept H2/SGLang, Mooncake, P2P/PD, and DLM/llm-d paused as
+  backend-expansion lanes outside the active release finish line.
 
 ## [0.7.3] - 2026-05-08
 
