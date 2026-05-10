@@ -381,18 +381,132 @@ def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path:
 
     assert "VLLMModelTracker.get_model(ENGINE_NAME)" in source
     assert "GPUModelRunner.load_model" in source
+    assert "LMCBlenderBuilder.get_or_create" in source
     assert patch_log.name == "vllm_cacheblend_model_tracker_patch.json"
     assert sitecustomize.exists()
     assert patch["patch_target"] == str(sitecustomize)
     assert patch["engine_name"] == "vllm-instance"
     assert patch["applied"] is True
-    assert patch["hook"] == "GPUModelRunner.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model)"
+    assert patch["hook"] == (
+        "defer LMCBlenderBuilder.get_or_create until "
+        "GPUModelRunner.load_model registers ENGINE_NAME"
+    )
     assert "INFERGUARD_H3_REGISTER_VLLM_MODEL" in sitecustomize_text
     assert "from lmcache.integration.vllm.utils import ENGINE_NAME" in sitecustomize_text
     assert "vllm.v1.worker.gpu_model_runner" in sitecustomize_text
     assert "vllm.v1.worker.gpu.model_runner" in sitecustomize_text
     assert "from vllm.v1.worker.gpu_worker import GPUWorker" not in sitecustomize_text
     assert "VLLMModelTracker.register_model(ENGINE_NAME, self.model)" in sitecustomize_text
+    assert "LMCBlenderBuilder.get_or_create = classmethod(_inferguard_cacheblend_get_or_create)" in sitecustomize_text
+
+
+def test_h3_cacheblend_patch_defers_blender_until_vllm_model_load(tmp_path: Path, monkeypatch) -> None:
+    lab = _load_lab_module()
+    lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in (
+        "vllm",
+        "vllm.v1",
+        "vllm.v1.worker",
+        "lmcache",
+        "lmcache.integration",
+        "lmcache.integration.vllm",
+        "lmcache.v1",
+        "lmcache.v1.compute",
+        "lmcache.v1.compute.models",
+        "lmcache.v1.compute.blend",
+    ):
+        module = install_module(package)
+        module.__path__ = []
+
+    gpu_module = install_module("vllm.v1.worker.gpu_model_runner")
+
+    class GPUModelRunner:
+        def load_model(self):
+            self.model = "loaded-vllm-model"
+
+    gpu_module.GPUModelRunner = GPUModelRunner
+
+    utils_module = install_module("lmcache.integration.vllm.utils")
+    utils_module.ENGINE_NAME = "vllm-instance"
+
+    tracker_module = install_module("lmcache.v1.compute.models.utils")
+
+    class VLLMModelTracker:
+        _vllm_models = {}
+
+        @classmethod
+        def register_model(cls, instance_id, vllm_model):
+            cls._vllm_models[instance_id] = vllm_model
+
+        @classmethod
+        def get_model(cls, instance_id):
+            if instance_id not in cls._vllm_models:
+                raise ValueError(f"vllm model for {instance_id} not found.")
+            return cls._vllm_models[instance_id]
+
+    tracker_module.VLLMModelTracker = VLLMModelTracker
+
+    blend_module = install_module("lmcache.v1.compute.blend.utils")
+
+    class _FakeBlender:
+        def __init__(self, model):
+            self.model = model
+            self.layerwise_model = object()
+            self.blend_calls = 0
+
+        def blend(self, *args, **kwargs):
+            self.blend_calls += 1
+            return "blended"
+
+    class LMCBlenderBuilder:
+        _blenders = {}
+        create_calls = 0
+
+        @classmethod
+        def get_or_create(cls, instance_id, cache_engine, gpu_connector, config):
+            cls.create_calls += 1
+            blender = _FakeBlender(VLLMModelTracker.get_model(instance_id))
+            cls._blenders[instance_id] = blender
+            return blender
+
+        @classmethod
+        def get(cls, instance_id):
+            return cls._blenders[instance_id]
+
+    blend_module.LMCBlenderBuilder = LMCBlenderBuilder
+
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        proxy = LMCBlenderBuilder.get_or_create("vllm-instance", "engine", "gpu", "config")
+        assert LMCBlenderBuilder.create_calls == 1
+        assert "vllm-instance" not in LMCBlenderBuilder._blenders
+
+        runner = GPUModelRunner()
+        runner.load_model()
+
+        assert VLLMModelTracker.get_model("vllm-instance") == "loaded-vllm-model"
+        assert LMCBlenderBuilder.create_calls == 2
+        assert LMCBlenderBuilder.get("vllm-instance").model == "loaded-vllm-model"
+        assert proxy.blend() == "blended"
+        assert LMCBlenderBuilder.get("vllm-instance").blend_calls == 1
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
 
 
 def test_h_runners_disable_lmcache_usage_tracking_to_avoid_modal_cpuinfo_probe(tmp_path: Path) -> None:

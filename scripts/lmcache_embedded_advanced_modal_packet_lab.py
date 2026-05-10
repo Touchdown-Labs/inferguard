@@ -736,11 +736,12 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
     """Install a sitecustomize hook to register the loaded vLLM model for CacheBlend.
 
     LMCache's CacheBlend path calls ``VLLMModelTracker.get_model(ENGINE_NAME)``
-    while building the blender. vLLM 0.10.2 exposes the stable model load hook
-    on ``GPUModelRunner.load_model`` rather than exporting ``GPUWorker`` from
-    ``vllm.v1.worker.gpu_worker``. This writes a disposable ``sitecustomize.py``
-    into the run directory and adds that directory to ``PYTHONPATH`` for the H3
-    engine process, avoiding fragile in-place edits to the installed vLLM wheel.
+    from ``LMCBlenderBuilder.get_or_create`` while vLLM is still inside
+    ``GPUWorker.init_device``. vLLM 0.10.2 does not assign ``GPUModelRunner.model``
+    until ``GPUModelRunner.load_model`` runs later. This hook defers only the H3
+    CacheBlend blender creation until that model-load hook registers
+    ``vllm-instance``; it avoids fragile in-place edits to the installed vLLM or
+    LMCache wheels.
     """
 
     sitecustomize_path = run_dir / "sitecustomize.py"
@@ -749,6 +750,9 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
         r'''
 import importlib
 import os
+
+
+_INFERGUARD_PENDING_CACHEBLEND = {}
 
 
 def _inferguard_import_gpu_model_runner():
@@ -764,8 +768,68 @@ def _inferguard_import_gpu_model_runner():
     return None, None
 
 
+def _inferguard_import_cacheblend_builder():
+    try:
+        module = importlib.import_module("lmcache.v1.compute.blend.utils")
+        return module.LMCBlenderBuilder
+    except (ImportError, AttributeError):
+        return None
+
+
+class _InferGuardDeferredLMCBlender:
+    def __init__(self, instance_id, original_get_or_create):
+        self._inferguard_instance_id = instance_id
+        self._inferguard_original_get_or_create = original_get_or_create
+
+    def _inferguard_real_blender(self):
+        from lmcache.v1.compute.blend.utils import LMCBlenderBuilder
+
+        if self._inferguard_instance_id in LMCBlenderBuilder._blenders:
+            return LMCBlenderBuilder._blenders[self._inferguard_instance_id]
+        cache_engine, gpu_connector, config = _INFERGUARD_PENDING_CACHEBLEND[
+            self._inferguard_instance_id
+        ]
+        return self._inferguard_original_get_or_create(
+            self._inferguard_instance_id, cache_engine, gpu_connector, config
+        )
+
+    def __getattr__(self, name):
+        return getattr(self._inferguard_real_blender(), name)
+
+    def blend(self, *args, **kwargs):
+        return self._inferguard_real_blender().blend(*args, **kwargs)
+
+
 if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
     GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
+    LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
+    if LMCBlenderBuilder is not None and not getattr(
+        LMCBlenderBuilder.get_or_create, "_inferguard_cacheblend_patched", False
+    ):
+        _inferguard_original_get_or_create = LMCBlenderBuilder.get_or_create
+
+        def _inferguard_cacheblend_get_or_create(
+            cls, instance_id, cache_engine, gpu_connector, config
+        ):
+            try:
+                return _inferguard_original_get_or_create(
+                    instance_id, cache_engine, gpu_connector, config
+                )
+            except ValueError as exc:
+                if "vllm model for" not in str(exc) or "not found" not in str(exc):
+                    raise
+                _INFERGUARD_PENDING_CACHEBLEND[instance_id] = (
+                    cache_engine,
+                    gpu_connector,
+                    config,
+                )
+                return _InferGuardDeferredLMCBlender(
+                    instance_id, _inferguard_original_get_or_create
+                )
+
+        _inferguard_cacheblend_get_or_create._inferguard_cacheblend_patched = True
+        LMCBlenderBuilder.get_or_create = classmethod(_inferguard_cacheblend_get_or_create)
+
     if GPUModelRunner is not None and not getattr(
         GPUModelRunner.load_model, "_inferguard_cacheblend_patched", False
     ):
@@ -777,6 +841,13 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
             from lmcache.v1.compute.models.utils import VLLMModelTracker
 
             VLLMModelTracker.register_model(ENGINE_NAME, self.model)
+            if LMCBlenderBuilder is not None:
+                pending = _INFERGUARD_PENDING_CACHEBLEND.pop(ENGINE_NAME, None)
+                if pending is not None and ENGINE_NAME not in LMCBlenderBuilder._blenders:
+                    cache_engine, gpu_connector, config = pending
+                    _inferguard_original_get_or_create(
+                        ENGINE_NAME, cache_engine, gpu_connector, config
+                    )
             return result
 
         _inferguard_cacheblend_load_model._inferguard_cacheblend_patched = True
@@ -790,8 +861,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
                 "patch_target": str(sitecustomize_path),
                 "engine_name": "vllm-instance",
-                "hook": "GPUModelRunner.load_model -> VLLMModelTracker.register_model(ENGINE_NAME, self.model)",
-                "source_basis": "vLLM 0.10.2 defines GPUModelRunner.load_model in vllm.v1.worker.gpu_model_runner and does not export GPUWorker from vllm.v1.worker.gpu_worker; lmcache.integration.vllm.utils.ENGINE_NAME is vllm-instance",
+                "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME.",
                 "applied": True,
             },
             indent=2,
