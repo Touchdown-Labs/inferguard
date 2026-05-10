@@ -868,6 +868,46 @@ def _inferguard_import_cacheblend_builder():
         return None
 
 
+def _inferguard_msgspec_primitive(value):
+    """Convert vLLM read-only token containers before LMCache ZMQ msgpack RPC."""
+    if isinstance(value, list):
+        return [_inferguard_msgspec_primitive(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_inferguard_msgspec_primitive(item) for item in value)
+    if hasattr(value, "tolist"):
+        try:
+            return _inferguard_msgspec_primitive(value.tolist())
+        except TypeError:
+            pass
+    type_name = type(value).__name__
+    if "ConstantList" in type_name and hasattr(value, "__iter__"):
+        return [_inferguard_msgspec_primitive(item) for item in value]
+    return value
+
+
+def _inferguard_patch_lmcache_lookup_payload():
+    """Normalize CacheBlend lookup tokens at LMCache's msgspec/ZMQ boundary."""
+    try:
+        lookup_module = importlib.import_module("lmcache.v1.lookup_client.lmcache_lookup_client")
+    except ImportError:
+        return False
+    lookup_client = getattr(lookup_module, "LMCacheLookupClient", None)
+    if lookup_client is None:
+        return False
+    original_lookup = getattr(lookup_client, "lookup", None)
+    if original_lookup is None or getattr(original_lookup, "_inferguard_constant_list_patched", False):
+        return bool(original_lookup)
+
+    def _inferguard_lookup(self, token_ids, lookup_id, request_configs=None):
+        if getattr(self, "enable_blending", False):
+            token_ids = _inferguard_msgspec_primitive(token_ids)
+        return original_lookup(self, token_ids, lookup_id, request_configs)
+
+    _inferguard_lookup._inferguard_constant_list_patched = True
+    lookup_client.lookup = _inferguard_lookup
+    return True
+
+
 class _InferGuardDeferredLMCBlender:
     def __init__(self, instance_id, original_get_or_create):
         self._inferguard_instance_id = instance_id
@@ -895,6 +935,7 @@ class _InferGuardDeferredLMCBlender:
 if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
     _inferguard_patch_lmcache_rope_compat()
     _inferguard_patch_lmcache_attention_utils()
+    _inferguard_patch_lmcache_lookup_payload()
     GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
     LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
     if LMCBlenderBuilder is not None and not getattr(
@@ -958,7 +999,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
                 "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
                 "rope_compat": "map LMCache rope_parameters onto installed vLLM get_rope signature when needed",
-                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source.",
+                "lookup_payload_compat": "convert vLLM ConstantList token containers to ordinary list values before LMCache CacheBlend lookup msgspec/ZMQ encoding",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source. For CacheBlend lookup RPC, LMCache vllm_v1_adapter passes request.all_token_ids through LMCacheLookupClient.lookup as the first ZMQ frame when enable_blending=True; vLLM exposes that token container as ConstantList and msgspec rejects it, so the H3 overlay normalizes only the CacheBlend lookup token payload before LMCache's transport encoder.",
                 "applied": True,
             },
             indent=2,

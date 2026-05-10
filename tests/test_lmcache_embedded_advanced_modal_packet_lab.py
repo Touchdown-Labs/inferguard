@@ -4,7 +4,10 @@ import importlib.util
 import json
 import sys
 import types
+from collections.abc import Sequence
 from pathlib import Path
+
+import pytest
 
 
 def _load_lab_module():
@@ -338,6 +341,10 @@ def test_h3_cacheblend_uses_non_sparse_attention_without_flashinfer_dependency(t
     sitecustomize_text = sitecustomize.read_text(encoding="utf-8")
 
     assert patch["attention_backend"] == "lazy non-sparse FlashAttention path for CacheBlend"
+    assert patch["lookup_payload_compat"] == (
+        "convert vLLM ConstantList token containers to ordinary list values before "
+        "LMCache CacheBlend lookup msgspec/ZMQ encoding"
+    )
     assert "flashinfer" not in lab.BASE_MODAL_PIP_PACKAGES
     assert "flashinfer" not in lab.LMCACHE_RUNTIME_DEP_PACKAGES
     assert "LMCACHE_EXTRA_CONFIG" not in lab._build_runner_env(tmp_path, lab.PACKETS["h3-cacheblend"])
@@ -597,6 +604,74 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert config["use_layerwise"] is True
     assert lab.LMCACHE_OTEL_FILE in lab._required_artifacts(spec)
     assert "vllm_cacheblend_model_tracker_patch.json" in lab._required_artifacts(spec)
+
+
+def test_h3_cacheblend_lookup_payload_patch_normalizes_constant_list_for_msgspec(
+    tmp_path: Path, monkeypatch
+) -> None:
+    msgspec = pytest.importorskip("msgspec")
+    lab = _load_lab_module()
+    lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+
+    class ConstantListLike(Sequence):
+        def __init__(self, values):
+            self._values = list(values)
+
+        def __getitem__(self, item):
+            return self._values[item]
+
+        def __len__(self):
+            return len(self._values)
+
+    raw_tokens = ConstantListLike([101, 202, 303])
+    with pytest.raises(TypeError, match="ConstantListLike"):
+        msgspec.msgpack.Encoder().encode(raw_tokens)
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in (
+        "lmcache",
+        "lmcache.v1",
+        "lmcache.v1.lookup_client",
+    ):
+        module = install_module(package)
+        module.__path__ = []
+
+    lookup_module = install_module("lmcache.v1.lookup_client.lmcache_lookup_client")
+    calls: list[object] = []
+
+    class LMCacheLookupClient:
+        enable_blending = True
+
+        def lookup(self, token_ids, lookup_id, request_configs=None):
+            msg_buf = [token_ids, lookup_id, ""]
+            for item in msg_buf:
+                msgspec.msgpack.Encoder().encode(item)
+            calls.append(token_ids)
+            return 0
+
+    lookup_module.LMCacheLookupClient = LMCacheLookupClient
+
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        client = LMCacheLookupClient()
+        assert client.lookup(raw_tokens, "req-1") == 0
+        assert calls == [[101, 202, 303]]
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
 
 
 def test_h3_cacheblend_model_tracker_patch_registers_loaded_vllm_model(tmp_path: Path) -> None:
