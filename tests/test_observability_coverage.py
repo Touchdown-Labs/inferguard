@@ -260,14 +260,14 @@ lmcache_blend_store_final_failures_total 0
 lmcache_blend_fingerprints_registered_total 8
 lmcache_blend_chunks_evicted_total 2
 """,
-        expect_lmcache_mode="mp",
+        expect_lmcache_mode="auto",
     )
 
     compat = report["lmcache_compat"]
     families = {(row["surface"], row["family"]): row for row in compat["families"]}
     assert compat["observed"]["lmcache_cacheblend"] is True
     assert compat["observed"]["lmcache_embedded"] is False
-    assert compat["detected_architecture"]["label"] == "lmcache_mp_server"
+    assert compat["detected_architecture"]["label"] == "lmcache_cacheblend"
     assert report["surfaces"]["lmcache_cacheblend"]["status"] == "complete"
     assert families[("lmcache_cacheblend", "lookup")]["status"] == "populated"
     assert families[("lmcache_cacheblend", "failure")]["status"] == "populated"

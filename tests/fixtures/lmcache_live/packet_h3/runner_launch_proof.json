@@ -1,0 +1,58 @@
+{
+  "claim_status": "runner_scaffold_only_not_live_validated",
+  "environment": {
+    "INFERGUARD_H3_BLEND_METRICS_FILE": "/out/packet-h3-cacheblend/20260510T221217Z/lmcache_blend_metrics.prom",
+    "INFERGUARD_H3_LMCACHE_OTEL_FILE": "/out/packet-h3-cacheblend/20260510T221217Z/lmcache_otel.jsonl",
+    "INFERGUARD_H3_REGISTER_VLLM_MODEL": "1",
+    "LMCACHE_BLEND_CHECK_LAYERS": "1",
+    "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
+    "LMCACHE_CHUNK_SIZE": "256",
+    "LMCACHE_CONFIG_FILE": "/out/packet-h3-cacheblend/20260510T221217Z/lmcache_embedded_config.json",
+    "LMCACHE_ENABLE_BLENDING": "True",
+    "LMCACHE_LOCAL_CPU": "True",
+    "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
+    "LMCACHE_TRACK_USAGE": "false",
+    "LMCACHE_USE_LAYERWISE": "True",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4317",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "http://127.0.0.1:4317",
+    "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "grpc",
+    "OTEL_SERVICE_NAME": "inferguard-h3-cacheblend",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "PROMETHEUS_MULTIPROC_DIR": "/out/packet-h3-cacheblend/20260510T221217Z/prometheus_multiproc",
+    "PYTHONHASHSEED": "0",
+    "PYTHONPATH": "/out/packet-h3-cacheblend/20260510T221217Z"
+  },
+  "expect_lmcache_mode": "auto",
+  "expected_engine": "vllm",
+  "notes": [
+    "Requires live lmcache_blend_* metrics plus cb.* OTel spans before scoring; if CacheBlend emits no cb.* spans, runner must write explicit blocked evidence."
+  ],
+  "packet_id": "h3-cacheblend",
+  "primary_command": [
+    "vllm",
+    "serve",
+    "Qwen/Qwen3-0.6B",
+    "--max-model-len",
+    "8192",
+    "--gpu-memory-utilization",
+    "0.80",
+    "--port",
+    "8000",
+    "--kv-transfer-config",
+    "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}",
+    "--otlp-traces-endpoint",
+    "http://127.0.0.1:4317",
+    "--collect-detailed-traces",
+    "all"
+  ],
+  "required_live_proof": [
+    "lmcache_blend_* metrics",
+    "cb.* OTel spans",
+    "CacheBlend logs/config"
+  ],
+  "schema_version": "inferguard-lmcache-live-runner-proof/v1",
+  "sdlc_id": "H3",
+  "secondary_command": null,
+  "secondary_environment": null
+}

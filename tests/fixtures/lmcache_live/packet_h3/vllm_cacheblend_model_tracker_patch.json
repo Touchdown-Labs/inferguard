@@ -1,0 +1,13 @@
+{
+  "applied": true,
+  "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
+  "cacheblend_telemetry_overlay": "wrap LMCBlender.blend for H3 only and emit cb.request/cb.lookup/cb.retrieve JSONL plus lmcache_blend_* Prometheus counters when a non-empty blend executes",
+  "engine_name": "vllm-instance",
+  "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
+  "layer0_gpu_buffer_deferral": "if LMCache CacheBlend process_qkv reaches get_kv before layer 0 is staged in VLLMBufferLayerwiseGPUConnector.buffer_mapping, defer blending for that QKV pass instead of crashing the engine",
+  "lookup_payload_compat": "convert vLLM ConstantList token containers to ordinary list values before LMCache CacheBlend lookup msgspec/ZMQ encoding",
+  "patch_target": "/out/packet-h3-cacheblend/20260510T221217Z/sitecustomize.py",
+  "rope_compat": "map LMCache rope_parameters onto installed vLLM get_rope signature when needed",
+  "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
+  "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source. For CacheBlend lookup RPC, LMCache vllm_v1_adapter passes request.all_token_ids through LMCacheLookupClient.lookup as the first ZMQ frame when enable_blending=True; vLLM exposes that token container as ConstantList and msgspec rejects it, so the H3 overlay normalizes only the CacheBlend lookup token payload before LMCache's transport encoder. The 20260510T205136Z H3 artifact then reached LMCache start_load_kv and failed because process_qkv called gpu_connector.get_kv before layer 0 existed in VLLMBufferLayerwiseGPUConnector.buffer_mapping; this overlay turns that timing edge into a safe no-blend pass while H3 traffic is shaped to exercise non-prefix shared-suffix CacheBlend instead of vLLM repeated-prefix hits."
+}

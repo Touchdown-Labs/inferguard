@@ -1,0 +1,17 @@
+[
+  "vllm",
+  "serve",
+  "Qwen/Qwen3-0.6B",
+  "--max-model-len",
+  "8192",
+  "--gpu-memory-utilization",
+  "0.80",
+  "--port",
+  "8000",
+  "--kv-transfer-config",
+  "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}",
+  "--otlp-traces-endpoint",
+  "http://127.0.0.1:4317",
+  "--collect-detailed-traces",
+  "all"
+]

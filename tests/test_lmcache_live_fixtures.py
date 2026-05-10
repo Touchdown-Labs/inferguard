@@ -74,6 +74,23 @@ PACKET_H1_REQUIRED_FILES = (
     "bottleneck_diagnosis.json",
     "lmcache_log_evidence.json",
 )
+PACKET_H3_REQUIRED_FILES = (
+    "fixture_manifest.json",
+    "primary_engine_command.json",
+    "primary_engine_env.json",
+    "runner_launch_proof.json",
+    "engine_metrics_loaded.prom",
+    "lmcache_blend_metrics.prom",
+    "packet_manifest.json",
+    "lmcache_compat_report.json",
+    "observability_coverage.json",
+    "bottleneck_diagnosis.json",
+    "lmcache_log_evidence.json",
+    "lmcache_otel.jsonl",
+    "lmcache_otel_evidence.json",
+    "lmcache_retrieve_layer_no_keys_patch.json",
+    "vllm_cacheblend_model_tracker_patch.json",
+)
 PACKET_B_REQUIRED_FAMILIES = (
     "lookup_reuse",
     "lookup_hits",
@@ -116,6 +133,8 @@ def test_landed_live_fixtures_are_sanitized_and_pass_acceptance_contract() -> No
             _assert_packet_f_f1_acceptance(fixture_dir)
         elif fixture_dir.name == "packet_h1":
             _assert_packet_h1_acceptance(fixture_dir)
+        elif fixture_dir.name == "packet_h3":
+            _assert_packet_h3_acceptance(fixture_dir)
         else:
             raise AssertionError(f"unknown accepted LMCache live fixture: {fixture_dir}")
 
@@ -267,6 +286,81 @@ def _assert_packet_h1_acceptance(fixture_dir: Path) -> None:
     assert log_evidence.get("booleans", {}).get("has_retrieve") is True
     _assert_positive(log_evidence.get("event_counts", {}).get("store"), "lmcache_log_evidence.store")
     _assert_positive(log_evidence.get("event_counts", {}).get("retrieve"), "lmcache_log_evidence.retrieve")
+
+
+def _assert_packet_h3_acceptance(fixture_dir: Path) -> None:
+    manifest = _read_json(fixture_dir / "fixture_manifest.json")
+    assert manifest.get("row_id") == "H3"
+    assert manifest.get("packet_id") == "h3-cacheblend"
+    assert manifest.get("workload") == "cacheblend_reuse"
+    assert manifest.get("source") == "live_modal_h100"
+    assert manifest.get("score_points") == 3
+    assert manifest.get("acceptance_status") == "accepted"
+    assert manifest.get("redacted") is True
+    assert manifest.get("raw_hashes_removed") is True
+    assert manifest.get("raw_prompts_removed") is True
+    _assert_required_files(fixture_dir, PACKET_H3_REQUIRED_FILES, row_id="H3")
+    _assert_fixture_sanitized(fixture_dir)
+
+    command = _read_json_list(fixture_dir / "primary_engine_command.json")
+    proof = _read_json(fixture_dir / "runner_launch_proof.json")
+    packet_manifest = _read_json(fixture_dir / "packet_manifest.json")
+    compat = _read_json(fixture_dir / "lmcache_compat_report.json")
+    coverage = _read_json(fixture_dir / "observability_coverage.json")
+    diagnosis = _read_json(fixture_dir / "bottleneck_diagnosis.json")
+    otel = _read_json(fixture_dir / "lmcache_otel_evidence.json")
+    retrieve_patch = _read_json(fixture_dir / "lmcache_retrieve_layer_no_keys_patch.json")
+    model_patch = _read_json(fixture_dir / "vllm_cacheblend_model_tracker_patch.json")
+
+    assert command[:3] == ["vllm", "serve", "Qwen/Qwen3-0.6B"]
+    transfer_config = json.loads(command[command.index("--kv-transfer-config") + 1])
+    assert transfer_config == {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
+    assert _cmd_value(command, "--collect-detailed-traces") == "all"
+    assert proof.get("expected_engine") == "vllm"
+    assert proof.get("expect_lmcache_mode") == "auto"
+    assert "lmcache_blend_* metrics" in proof.get("required_live_proof", [])
+    assert "cb.* OTel spans" in proof.get("required_live_proof", [])
+
+    metrics_text = (fixture_dir / "lmcache_blend_metrics.prom").read_text(encoding="utf-8")
+    assert "lmcache_blend_lookup_requests_total" in metrics_text
+    assert "lmcache_blend_retrieve_requests_total" in metrics_text
+    assert "lmcache_mp_" not in metrics_text
+    assert "lmcache_mp." not in metrics_text
+
+    assert packet_manifest.get("detected_mode") == "embedded_cacheblend"
+    assert packet_manifest.get("claim_status") == "measured"
+    assert packet_manifest.get("compat_summary", {}).get("failure_reasons") == []
+    assert compat.get("detected_mode") == "embedded_cacheblend"
+    assert compat.get("failure_reasons") == []
+    assert compat.get("detected_architecture", {}).get("label") == "vllm_embedded_cacheblend"
+    assert compat.get("detected_architecture", {}).get("claim_status") == "measured"
+    assert compat.get("observed", {}).get("lmcache_cacheblend") is True
+    assert compat.get("observed", {}).get("lmcache_cacheblend_metrics") is True
+    assert compat.get("observed", {}).get("lmcache_cacheblend_evidence") is True
+    assert compat.get("observed", {}).get("lmcache_mp") is False
+    assert coverage.get("detected_lmcache_mode") == "embedded_cacheblend"
+
+    family_rows = {
+        (row.get("surface"), row.get("family")): row
+        for row in compat.get("families", [])
+        if isinstance(row, dict)
+    }
+    for family in ("lookup", "retrieve"):
+        row = family_rows.get(("lmcache_cacheblend", family))
+        assert row and row.get("status") == "populated", f"compat report missing CacheBlend {family}"
+        assert row.get("matched_metrics"), f"CacheBlend family has no matched metric: {family}"
+    for family in ("storage_manager", "lookup_tokens", "l1_counters", "l1_memory"):
+        row = family_rows.get(("lmcache_mp", family))
+        assert row and row.get("status") == "not_applicable", f"H3 must not require MP {family}"
+
+    assert otel.get("claim_status") == "measured"
+    _assert_positive(otel.get("cacheblend_span_count"), "lmcache_otel_evidence.cacheblend_span_count")
+    assert otel.get("span_counts", {}).get("cb.lookup", 0) > 0
+    assert otel.get("span_counts", {}).get("cb.retrieve", 0) > 0
+    assert diagnosis.get("claim_status") == "measured"
+    assert diagnosis.get("metric_values", {}).get("lmcache_compat.detected_mode") == "embedded_cacheblend"
+    assert retrieve_patch.get("changed") is True
+    assert model_patch.get("schema_version") == "inferguard-h3-cacheblend-vllm-patch/v1"
 
 
 def _assert_shared_mp_artifact_metric_acceptance(fixture_dir: Path) -> None:

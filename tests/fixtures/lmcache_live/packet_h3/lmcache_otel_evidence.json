@@ -1,0 +1,70 @@
+{
+  "attribute_keys": [
+    "hit_rate",
+    "hit_tokens",
+    "num_chunks",
+    "num_tokens",
+    "requested_tokens",
+    "session_id"
+  ],
+  "cacheblend_point_span_count": 0,
+  "cacheblend_span_count": 24,
+  "claim_status": "measured",
+  "latency_seconds": {
+    "cb.lookup": {
+      "avg": 0.0,
+      "count": 8.0,
+      "max": 0.0,
+      "min": 0.0
+    },
+    "cb.request": {
+      "avg": 0.0,
+      "count": 8.0,
+      "max": 0.0,
+      "min": 0.0
+    },
+    "cb.retrieve": {
+      "avg": 0.022903296,
+      "count": 8.0,
+      "max": 0.037159168,
+      "min": 0.020030208
+    }
+  },
+  "lmcache_span_count": 24,
+  "mp_span_count": 0,
+  "parse_errors": [
+    "json: Extra data"
+  ],
+  "present": true,
+  "request_attributes": {},
+  "request_span_count": 0,
+  "schema_version": "inferguard-lmcache-otel-evidence/v1",
+  "span_count": 41,
+  "span_counts": {
+    "cb.lookup": 8,
+    "cb.request": 8,
+    "cb.retrieve": 8
+  },
+  "span_groups": {
+    "cacheblend": {
+      "count": 24,
+      "span_counts": {
+        "cb.lookup": 8,
+        "cb.request": 8,
+        "cb.retrieve": 8
+      }
+    },
+    "cacheblend_point": {
+      "count": 0,
+      "span_counts": {}
+    },
+    "mp": {
+      "count": 0,
+      "span_counts": {}
+    },
+    "request": {
+      "count": 0,
+      "span_counts": {}
+    }
+  }
+}

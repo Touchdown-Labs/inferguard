@@ -1,0 +1,16 @@
+{
+  "acceptance_status": "accepted",
+  "accepted_reason": "local reclassification accepted existing H3 live artifact with cb.* spans and lmcache_blend_* counters; no H100 rerun required",
+  "artifact_path": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-wlmFK2sEYs6VH11zdeFuHf",
+  "packet_id": "h3-cacheblend",
+  "raw_hashes_removed": true,
+  "raw_prompts_recorded": false,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "row_id": "H3",
+  "schema_version": "inferguard-live-fixture-manifest/v1",
+  "score_points": 3,
+  "source": "live_modal_h100",
+  "workload": "cacheblend_reuse"
+}

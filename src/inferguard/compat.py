@@ -317,25 +317,25 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lmcache_cacheblend",
         "store_pre_computed",
         ("lmcache_blend_store_pre_computed_requests*", "lmcache_blend_store_pre_computed_chunks*"),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "store_final",
         ("lmcache_blend_store_final_requests*", "lmcache_blend_store_final_chunks*"),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "fingerprint",
         ("lmcache_blend_fingerprints_registered*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "evict",
         ("lmcache_blend_chunks_evicted*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
@@ -345,19 +345,19 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_blend_store_pre_computed_failures*",
             "lmcache_blend_store_final_failures*",
         ),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "no_gpu_context",
         ("lmcache_blend_lookup_no_gpu_context_errors*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "stale",
         ("lmcache_blend_lookup_stale_chunks*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
 )
 
@@ -401,9 +401,20 @@ def build_compat_report(
         and not name.startswith("lmcache_blend_")
         for name in observed_names
     )
+    observed_lmcache_mp_evidence = _has_measured_mp_evidence(
+        lmcache_http_evidence=lmcache_http_evidence,
+        lmcache_log_evidence=lmcache_log_evidence,
+        lmcache_otel_evidence=lmcache_otel_evidence,
+    )
+    observed_lmcache_cacheblend_evidence = _has_measured_cacheblend_evidence(
+        lmcache_otel_evidence=lmcache_otel_evidence,
+    )
+    cacheblend_observed = observed_lmcache_cacheblend or observed_lmcache_cacheblend_evidence
+    mp_metrics_prometheus_unavailable = observed_lmcache_mp_evidence and not observed_lmcache_mp
     detected_mode = _detected_mode(
-        observed_lmcache_mp or observed_lmcache_cacheblend,
+        observed_lmcache_mp or observed_lmcache_mp_evidence,
         observed_lmcache_embedded,
+        cacheblend_observed,
     )
     architecture = _architecture_detection(
         samples,
@@ -422,8 +433,9 @@ def build_compat_report(
             samples,
             detected_mode=detected_mode,
             l2_configured=l2_configured,
-            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled")),
-            cacheblend_observed=observed_lmcache_cacheblend,
+            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled"))
+            or mp_metrics_prometheus_unavailable,
+            cacheblend_observed=cacheblend_observed,
         )
         for spec in COMPAT_REGISTRY
     ]
@@ -489,7 +501,11 @@ def build_compat_report(
         "upstream_questions": upstream_questions,
         "observed": {
             "lmcache_mp": observed_lmcache_mp,
-            "lmcache_cacheblend": observed_lmcache_cacheblend,
+            "lmcache_mp_evidence": observed_lmcache_mp_evidence,
+            "lmcache_mp_metrics_prometheus_unavailable": mp_metrics_prometheus_unavailable,
+            "lmcache_cacheblend": cacheblend_observed,
+            "lmcache_cacheblend_metrics": observed_lmcache_cacheblend,
+            "lmcache_cacheblend_evidence": observed_lmcache_cacheblend_evidence,
             "lmcache_embedded": observed_lmcache_embedded,
             "vllm": any(name.startswith("vllm:") for name in observed_names),
             "total_series": len(observed_names),
@@ -678,6 +694,7 @@ def _evidence_family_rows(
         _evidence_family_row("lmcache_logs", "lifecycle_logs", lmcache_log_evidence),
         _evidence_family_row("lmcache_trace_recording", "storage_lct", lmcache_trace_evidence),
         _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
+        _evidence_family_row("lmcache_otel", "cacheblend_spans", lmcache_otel_evidence),
         _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
         _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
     ]
@@ -715,11 +732,34 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
     }
 
 
-def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -> str:
+def _has_measured_mp_evidence(
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_log_evidence: dict[str, Any] | None,
+    lmcache_otel_evidence: dict[str, Any] | None,
+) -> bool:
+    status = (lmcache_http_evidence or {}).get("endpoints", {}).get("status", {})
+    status_fields = status.get("fields") if isinstance(status, dict) else {}
+    engine_type = status_fields.get("engine_type") if isinstance(status_fields, dict) else None
+    log_modes = (lmcache_log_evidence or {}).get("mode_candidates") or []
+    otel_mp_spans = (lmcache_otel_evidence or {}).get("mp_span_count") or 0
+    return engine_type == "MPCacheEngine" or "mp" in log_modes or float(otel_mp_spans) > 0
+
+
+def _has_measured_cacheblend_evidence(*, lmcache_otel_evidence: dict[str, Any] | None) -> bool:
+    otel_cacheblend_spans = (lmcache_otel_evidence or {}).get("cacheblend_span_count") or 0
+    return float(otel_cacheblend_spans) > 0
+
+
+def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool, observed_lmcache_cacheblend: bool) -> str:
     if observed_lmcache_mp and observed_lmcache_embedded:
         return "mixed"
     if observed_lmcache_mp:
         return "mp"
+    if observed_lmcache_cacheblend and observed_lmcache_embedded:
+        return "embedded_cacheblend"
+    if observed_lmcache_cacheblend:
+        return "cacheblend"
     if observed_lmcache_embedded:
         return "embedded"
     return "unknown"
@@ -808,8 +848,11 @@ def _architecture_detection(
     )
     label = "unknown"
     confidence = "not_proven"
-    observed_mp_like = observed_lmcache_mp or observed_lmcache_cacheblend
-    if has_vllm and (observed_mp_like or has_mp_connector):
+    observed_mp_like = observed_lmcache_mp
+    if has_vllm and observed_lmcache_cacheblend:
+        label = "vllm_embedded_cacheblend"
+        confidence = "measured"
+    elif has_vllm and (observed_mp_like or has_mp_connector):
         label = "vllm_mp_lmcache"
         confidence = "measured" if observed_mp_like and has_mp_connector else "inferred"
     elif has_vllm and (
@@ -827,6 +870,9 @@ def _architecture_detection(
         confidence = "measured" if observed_lmcache_embedded else "inferred"
     elif observed_mp_like:
         label = "lmcache_mp_server"
+        confidence = "measured"
+    elif observed_lmcache_cacheblend:
+        label = "lmcache_cacheblend"
         confidence = "measured"
     elif observed_lmcache_embedded:
         label = "lmcache_embedded_unknown_engine"
@@ -870,7 +916,7 @@ def _is_applicable(
         return False
     if spec.surface == "lmcache_cacheblend" and (not cacheblend_observed or mp_metrics_disabled):
         return False
-    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed"}:
+    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed", "embedded_cacheblend"}:
         return False
     if spec.required_when == "l2_configured":
         return l2_configured
@@ -913,6 +959,14 @@ def _failures(
                     "code": "lmcache_mp_family_missing",
                     "family": family["family"],
                     "message": f"expected LMCache MP family {family['family']!r} was missing",
+                }
+            )
+        if family["surface"] == "lmcache_cacheblend" and family["status"] == "missing":
+            failures.append(
+                {
+                    "code": "lmcache_cacheblend_family_missing",
+                    "family": family["family"],
+                    "message": f"expected LMCache CacheBlend family {family['family']!r} was missing",
                 }
             )
     return failures

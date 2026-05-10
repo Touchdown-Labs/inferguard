@@ -1,0 +1,2146 @@
+{
+  "config": {
+    "cpu_offload_configured": false,
+    "disaggregated_or_external_cache": false,
+    "external_cache_configured": true,
+    "l2_configured": false
+  },
+  "coverage_gaps": [
+    {
+      "family": "external_prefix_cache",
+      "required_when": "external_cache_configured",
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "family": "prompt_tokens_by_source",
+      "required_when": "external_cache_configured",
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "family": "kv_block_lifecycle",
+      "required_when": "sampled",
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "family": "kv_transfer",
+      "required_when": "disaggregated_or_external_cache",
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "family": "legacy_retrieve",
+      "required_when": "always",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_detailed_profiling",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_remote_backend_network",
+      "required_when": "optional",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_local_cpu_backend",
+      "required_when": "optional",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_memory_management",
+      "required_when": "optional",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "legacy_local_cpu",
+      "required_when": "always",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "legacy_tier_usage",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_p2p",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_health",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_failures",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_health_internal",
+      "required_when": "optional",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_storage_events",
+      "required_when": "optional",
+      "status": "zero",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "production_connector_metrics",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_embedded"
+    },
+    {
+      "family": "store_pre_computed",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "store_final",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "fingerprint",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "evict",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "failure",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "no_gpu_context",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "stale",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_cacheblend"
+    },
+    {
+      "family": "external_prefix",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "vllm_prefix_cache"
+    },
+    {
+      "family": "prompt_tokens_by_source",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "vllm_prefix_cache"
+    },
+    {
+      "family": "prompt_tokens_cached",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "vllm_prefix_cache"
+    },
+    {
+      "family": "kv_offload_transfer",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "vllm_simple_cpu_offload"
+    },
+    {
+      "family": "simple_cpu_pool",
+      "required_when": "always",
+      "status": "missing",
+      "surface": "vllm_simple_cpu_offload"
+    },
+    {
+      "family": "mp_http_api",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_http"
+    },
+    {
+      "family": "storage_lct",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_trace_recording"
+    },
+    {
+      "family": "replay_outputs",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_trace_replay"
+    },
+    {
+      "family": "lookup_hash_jsonl",
+      "required_when": "optional",
+      "status": "missing",
+      "surface": "lmcache_lookup_hash"
+    }
+  ],
+  "detected_engines": [
+    "vllm"
+  ],
+  "detected_lmcache_mode": "embedded_cacheblend",
+  "engine_source": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/engine_metrics_loaded.prom",
+  "expect_lmcache_mode": "auto",
+  "expected_engine": "vllm",
+  "families": [
+    {
+      "applicable": true,
+      "family": "request_latency",
+      "matched_metrics": [
+        "vllm:e2e_request_latency_seconds_bucket",
+        "vllm:e2e_request_latency_seconds_count",
+        "vllm:e2e_request_latency_seconds_sum",
+        "vllm:inter_token_latency_seconds_bucket",
+        "vllm:inter_token_latency_seconds_count",
+        "vllm:inter_token_latency_seconds_sum",
+        "vllm:time_per_output_token_seconds_bucket",
+        "vllm:time_per_output_token_seconds_count",
+        "vllm:time_per_output_token_seconds_sum",
+        "vllm:time_to_first_token_seconds_bucket",
+        "vllm:time_to_first_token_seconds_count",
+        "vllm:time_to_first_token_seconds_sum"
+      ],
+      "patterns": [
+        "vllm:time_to_first_token_seconds*",
+        "vllm:time_per_output_token_seconds*",
+        "vllm:inter_token_latency_seconds*",
+        "vllm:e2e_request_latency_seconds*"
+      ],
+      "populated_series_count": 12,
+      "required_when": "always",
+      "series_count": 12,
+      "status": "populated",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "prefill_decode_queue",
+      "matched_metrics": [
+        "vllm:num_requests_running",
+        "vllm:num_requests_waiting",
+        "vllm:request_decode_time_seconds_bucket",
+        "vllm:request_decode_time_seconds_count",
+        "vllm:request_decode_time_seconds_sum",
+        "vllm:request_prefill_time_seconds_bucket",
+        "vllm:request_prefill_time_seconds_count",
+        "vllm:request_prefill_time_seconds_sum",
+        "vllm:request_queue_time_seconds_bucket",
+        "vllm:request_queue_time_seconds_count",
+        "vllm:request_queue_time_seconds_sum"
+      ],
+      "patterns": [
+        "vllm:request_prefill_time_seconds*",
+        "vllm:request_decode_time_seconds*",
+        "vllm:request_queue_time_seconds*",
+        "vllm:num_requests_running",
+        "vllm:num_requests_waiting"
+      ],
+      "populated_series_count": 9,
+      "required_when": "always",
+      "series_count": 11,
+      "status": "populated",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "token_throughput",
+      "matched_metrics": [
+        "vllm:generation_tokens_total",
+        "vllm:prompt_tokens_total",
+        "vllm:request_generation_tokens_bucket",
+        "vllm:request_generation_tokens_count",
+        "vllm:request_generation_tokens_sum",
+        "vllm:request_prompt_tokens_bucket",
+        "vllm:request_prompt_tokens_count",
+        "vllm:request_prompt_tokens_sum",
+        "vllm:request_success_total"
+      ],
+      "patterns": [
+        "vllm:prompt_tokens_total",
+        "vllm:generation_tokens_total",
+        "vllm:request_prompt_tokens*",
+        "vllm:request_generation_tokens*",
+        "vllm:request_success_total"
+      ],
+      "populated_series_count": 9,
+      "required_when": "always",
+      "series_count": 9,
+      "status": "populated",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "kv_cache",
+      "matched_metrics": [
+        "vllm:cache_config_info",
+        "vllm:gpu_cache_usage_perc",
+        "vllm:kv_cache_usage_perc"
+      ],
+      "patterns": [
+        "vllm:kv_cache_usage_perc",
+        "vllm:gpu_cache_usage_perc",
+        "vllm:cache_config_info"
+      ],
+      "populated_series_count": 1,
+      "required_when": "always",
+      "series_count": 3,
+      "status": "populated",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "prefix_cache",
+      "matched_metrics": [
+        "vllm:prefix_cache_hits_total",
+        "vllm:prefix_cache_queries_total"
+      ],
+      "patterns": [
+        "vllm:prefix_cache_queries*",
+        "vllm:prefix_cache_hits*"
+      ],
+      "populated_series_count": 2,
+      "required_when": "always",
+      "series_count": 2,
+      "status": "populated",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "external_prefix_cache",
+      "matched_metrics": [],
+      "patterns": [
+        "vllm:external_prefix_cache_queries*",
+        "vllm:external_prefix_cache_hits*"
+      ],
+      "populated_series_count": 0,
+      "required_when": "external_cache_configured",
+      "series_count": 0,
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "prompt_tokens_by_source",
+      "matched_metrics": [],
+      "patterns": [
+        "vllm:prompt_tokens_by_source*",
+        "vllm:prompt_tokens_cached*"
+      ],
+      "populated_series_count": 0,
+      "required_when": "external_cache_configured",
+      "series_count": 0,
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "applicable": false,
+      "family": "cpu_offload",
+      "matched_metrics": [],
+      "patterns": [
+        "vllm:kv_offload_total_bytes*",
+        "vllm:kv_offload_total_time*",
+        "vllm:kv_offload_size",
+        "vllm:simple_cpu_offload_*"
+      ],
+      "populated_series_count": 0,
+      "required_when": "cpu_offload_configured",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "kv_block_lifecycle",
+      "matched_metrics": [],
+      "patterns": [
+        "vllm:kv_block_lifetime_seconds*",
+        "vllm:kv_block_idle_before_evict_seconds*",
+        "vllm:kv_block_reuse_gap_seconds*"
+      ],
+      "populated_series_count": 0,
+      "required_when": "sampled",
+      "series_count": 0,
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "applicable": true,
+      "family": "kv_transfer",
+      "matched_metrics": [],
+      "patterns": [
+        "vllm:kv_transfer_sent_bytes_total",
+        "vllm:kv_transfer_recv_bytes_total",
+        "vllm:kv_transfer_errors_total"
+      ],
+      "populated_series_count": 0,
+      "required_when": "disaggregated_or_external_cache",
+      "series_count": 0,
+      "status": "missing",
+      "surface": "vllm"
+    },
+    {
+      "applicable": false,
+      "family": "request_latency",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:time_to_first_token_seconds*",
+        "sglang:time_per_output_token_seconds*",
+        "sglang:e2e_request_latency_seconds*",
+        "sglang:func_latency_seconds*"
+      ],
+      "populated_series_count": 0,
+      "required_when": "always",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "token_throughput",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:prompt_tokens_total",
+        "sglang:generation_tokens_total",
+        "sglang:gen_throughput"
+      ],
+      "populated_series_count": 0,
+      "required_when": "always",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "queue",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:num_running_reqs",
+        "sglang:num_queue_reqs"
+      ],
+      "populated_series_count": 0,
+      "required_when": "always",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "prefix_cache",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:cache_hit_rate"
+      ],
+      "populated_series_count": 0,
+      "required_when": "always",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "kv_cache",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:token_usage",
+        "sglang:num_used_tokens"
+      ],
+      "populated_series_count": 0,
+      "required_when": "always",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "kv_transfer",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:kv_transfer_sent_bytes_total",
+        "sglang:kv_transfer_recv_bytes_total",
+        "sglang:kv_transfer_errors_total"
+      ],
+      "populated_series_count": 0,
+      "required_when": "disaggregated_or_external_cache",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    },
+    {
+      "applicable": false,
+      "family": "flops",
+      "matched_metrics": [],
+      "patterns": [
+        "sglang:estimated_flops_per_gpu_total"
+      ],
+      "populated_series_count": 0,
+      "required_when": "optional",
+      "series_count": 0,
+      "status": "not_applicable",
+      "surface": "sglang"
+    }
+  ],
+  "kv_cache_offload": {
+    "lmcache_mp_l0_l1_kv_transfer": {
+      "cpu_to_gpu_load_throughput_gbs": null,
+      "gpu_to_cpu_store_throughput_gbs": null,
+      "interpretation": "LMCache MP GPU<->CPU KV transfer throughput; this is the offload lane that proves LMCache moved KV between L0 GPU blocks and L1 CPU memory.",
+      "metric_source": "standalone LMCache MP /metrics",
+      "status": "missing"
+    },
+    "purpose": "Profile KV cache movement between GPU memory and CPU/host memory for long-context runs.",
+    "schema_version": "inferguard-kv-cache-offload/v1",
+    "vllm_native_cpu_offload": {
+      "cpu_to_gpu_bytes": 0,
+      "cpu_to_gpu_seconds": 0,
+      "gpu_to_cpu_bytes": 0,
+      "gpu_to_cpu_seconds": 0,
+      "interpretation": "Native vLLM CPU offload metrics; useful for offload pressure, but not proof that LMCache is serving KV.",
+      "metric_source": "vllm /metrics",
+      "simple_cpu_offload_pending_loads": null,
+      "simple_cpu_offload_pending_stores": null,
+      "simple_cpu_offload_usage_perc": null,
+      "simple_cpu_offload_used_blocks": null,
+      "status": "missing"
+    }
+  },
+  "lmcache_compat": {
+    "detected_architecture": {
+      "cache_labels": [],
+      "claim_status": "measured",
+      "connector_labels": [],
+      "label": "vllm_embedded_cacheblend",
+      "offload_backend_labels": [],
+      "signals": {
+        "lmcache_cacheblend_metrics": true,
+        "lmcache_embedded_metrics": true,
+        "lmcache_mp_connector_label": false,
+        "lmcache_mp_metrics": false,
+        "sglang_enable_lmcache_label": false,
+        "sglang_hicache_metrics": false,
+        "sglang_lmcache_connector_label": false,
+        "sglang_lmcradix_cache_label": false,
+        "sglang_metrics": false,
+        "stale_lmcache_connector_label": false,
+        "vllm_embedded_connector_label": false,
+        "vllm_lmcache_offload_backend_label": false,
+        "vllm_metrics": true
+      }
+    },
+    "detected_mode": "embedded_cacheblend",
+    "diagnostic_findings": [
+      {
+        "code": "lmcache_log_p2p_transfer_failure",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+        "metrics": {
+          "category": "p2p_transfer_failure",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "warning"
+      },
+      {
+        "code": "lmcache_log_pd_stall",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain disaggregated prefill/decode stall or timeout hints.",
+        "metrics": {
+          "category": "pd_stall",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "warning"
+      },
+      {
+        "code": "lmcache_log_nixl_proxy_indicator",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain NIXL proxy indicators.",
+        "metrics": {
+          "category": "nixl_proxy",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "info"
+      }
+    ],
+    "engine_source": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/engine_metrics_loaded.prom",
+    "expect_mode": "auto",
+    "failure_reasons": [],
+    "families": [
+      {
+        "applicable": true,
+        "family": "legacy_lookup",
+        "matched_metrics": [
+          "lmcache:lookup_0_hit_requests_total",
+          "lmcache:lookup_hit_rate"
+        ],
+        "patterns": [
+          "lmcache:lookup_*",
+          "lmcache_lookup_*"
+        ],
+        "populated_series_count": 2,
+        "required_when": "always",
+        "series_count": 2,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "legacy_retrieve",
+        "matched_metrics": [
+          "lmcache:retrieve_hit_rate"
+        ],
+        "patterns": [
+          "lmcache:retrieve_*",
+          "lmcache_retrieve_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 1,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_requests",
+        "matched_metrics": [
+          "lmcache:num_lookup_requests_total",
+          "lmcache:num_remote_read_requests_total",
+          "lmcache:num_remote_write_requests_total",
+          "lmcache:num_retrieve_requests_total",
+          "lmcache:num_store_requests_total"
+        ],
+        "patterns": [
+          "lmcache:num_*_requests*",
+          "lmcache_num_*_requests*"
+        ],
+        "populated_series_count": 3,
+        "required_when": "always",
+        "series_count": 5,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_tokens",
+        "matched_metrics": [
+          "lmcache:num_hit_tokens_total",
+          "lmcache:num_lookup_tokens_total",
+          "lmcache:num_prompt_tokens_total",
+          "lmcache:num_requested_tokens_total",
+          "lmcache:num_stored_tokens_total",
+          "lmcache:num_vllm_hit_tokens_total"
+        ],
+        "patterns": [
+          "lmcache:num_*tokens*",
+          "lmcache_num_*tokens*"
+        ],
+        "populated_series_count": 5,
+        "required_when": "always",
+        "series_count": 6,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_hit_rate",
+        "matched_metrics": [
+          "lmcache:lookup_0_hit_requests_total",
+          "lmcache:lookup_hit_rate",
+          "lmcache:request_cache_hit_rate_bucket",
+          "lmcache:request_cache_hit_rate_count",
+          "lmcache:request_cache_hit_rate_sum",
+          "lmcache:retrieve_hit_rate"
+        ],
+        "patterns": [
+          "lmcache:*hit_rate*",
+          "lmcache_*hit_rate*",
+          "lmcache:lookup_0_hit_requests*",
+          "lmcache_lookup_0_hit_requests*"
+        ],
+        "populated_series_count": 5,
+        "required_when": "always",
+        "series_count": 6,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_latency_performance",
+        "matched_metrics": [
+          "lmcache:num_slow_retrieval_by_speed_total",
+          "lmcache:num_slow_retrieval_by_time_total",
+          "lmcache:store_speed_bucket",
+          "lmcache:store_speed_count",
+          "lmcache:store_speed_sum",
+          "lmcache:time_to_lookup_bucket",
+          "lmcache:time_to_lookup_count",
+          "lmcache:time_to_lookup_sum",
+          "lmcache:time_to_retrieve_bucket",
+          "lmcache:time_to_retrieve_count",
+          "lmcache:time_to_retrieve_sum",
+          "lmcache:time_to_store_bucket",
+          "lmcache:time_to_store_count",
+          "lmcache:time_to_store_sum"
+        ],
+        "patterns": [
+          "lmcache:time_to_*",
+          "lmcache_time_to_*",
+          "lmcache:retrieve_speed*",
+          "lmcache_retrieve_speed*",
+          "lmcache:store_speed*",
+          "lmcache_store_speed*",
+          "lmcache:num_slow_retrieval_by_*",
+          "lmcache_num_slow_retrieval_by_*"
+        ],
+        "populated_series_count": 12,
+        "required_when": "always",
+        "series_count": 14,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_detailed_profiling",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:*_process_tokens_time*",
+          "lmcache_*_process_tokens_time*",
+          "lmcache:retrieve_broadcast_time*",
+          "lmcache_retrieve_broadcast_time*",
+          "lmcache:retrieve_to_gpu_time*",
+          "lmcache_retrieve_to_gpu_time*",
+          "lmcache:store_from_gpu_time*",
+          "lmcache_store_from_gpu_time*",
+          "lmcache:store_put_time*",
+          "lmcache_store_put_time*",
+          "lmcache:remote_backend_batched_get_blocking_time*",
+          "lmcache_remote_backend_batched_get_blocking_time*",
+          "lmcache:instrumented_connector_batched_get_time*",
+          "lmcache_instrumented_connector_batched_get_time*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_cache_usage_lifecycle",
+        "matched_metrics": [
+          "lmcache:local_cache_usage",
+          "lmcache:local_storage_usage",
+          "lmcache:remote_cache_usage",
+          "lmcache:request_cache_lifespan_bucket",
+          "lmcache:request_cache_lifespan_count",
+          "lmcache:request_cache_lifespan_sum"
+        ],
+        "patterns": [
+          "lmcache:*cache_usage*",
+          "lmcache_*cache_usage*",
+          "lmcache:local_storage_usage*",
+          "lmcache_local_storage_usage*",
+          "lmcache:request_cache_lifespan*",
+          "lmcache_request_cache_lifespan*"
+        ],
+        "populated_series_count": 3,
+        "required_when": "always",
+        "series_count": 6,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_remote_backend_network",
+        "matched_metrics": [
+          "lmcache:num_remote_read_bytes_total",
+          "lmcache:num_remote_read_requests_total",
+          "lmcache:num_remote_write_bytes_total",
+          "lmcache:num_remote_write_requests_total",
+          "lmcache:remote_ping_error_code",
+          "lmcache:remote_ping_errors_total",
+          "lmcache:remote_ping_latency",
+          "lmcache:remote_ping_successes_total"
+        ],
+        "patterns": [
+          "lmcache:num_remote_*",
+          "lmcache_num_remote_*",
+          "lmcache:remote_time_to_*",
+          "lmcache_remote_time_to_*",
+          "lmcache:remote_ping_*",
+          "lmcache_remote_ping_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 8,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_local_cpu_backend",
+        "matched_metrics": [
+          "lmcache:local_cpu_evict_count_total",
+          "lmcache:local_cpu_evict_failed_count_total",
+          "lmcache:local_cpu_evict_keys_count_total"
+        ],
+        "patterns": [
+          "lmcache:local_cpu_*",
+          "lmcache_local_cpu_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 3,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_memory_management",
+        "matched_metrics": [
+          "lmcache:active_memory_objs_count",
+          "lmcache:forced_unpin_count_total",
+          "lmcache:pinned_memory_objs_count"
+        ],
+        "patterns": [
+          "lmcache:*memory_objs_count*",
+          "lmcache_*memory_objs_count*",
+          "lmcache:forced_unpin_count*",
+          "lmcache_forced_unpin_count*",
+          "lmcache:pin_monitor_pinned_objects_count*",
+          "lmcache_pin_monitor_pinned_objects_count*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 3,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "legacy_local_cpu",
+        "matched_metrics": [
+          "lmcache:local_cpu_evict_count_total",
+          "lmcache:local_cpu_evict_failed_count_total",
+          "lmcache:local_cpu_evict_keys_count_total"
+        ],
+        "patterns": [
+          "lmcache:local_cpu_*",
+          "lmcache_local_cpu_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 3,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "legacy_tier_usage",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:tier_usage*",
+          "lmcache_tier_usage*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_p2p",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:*p2p*",
+          "lmcache_*p2p*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_health",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:is_healthy",
+          "lmcache:lmcache_is_healthy",
+          "lmcache_is_healthy",
+          "lmcache_lmcache_is_healthy"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_failures",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:get_blocking_failed_count*",
+          "lmcache_get_blocking_failed_count*",
+          "lmcache:put_failed_count*",
+          "lmcache_put_failed_count*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_health_internal",
+        "matched_metrics": [
+          "lmcache:storage_events_done_count",
+          "lmcache:storage_events_not_found_count",
+          "lmcache:storage_events_ongoing_count"
+        ],
+        "patterns": [
+          "lmcache:lmcache_is_healthy",
+          "lmcache_lmcache_is_healthy",
+          "lmcache:is_healthy",
+          "lmcache_is_healthy",
+          "lmcache:interval_get_blocking_failed_count*",
+          "lmcache_interval_get_blocking_failed_count*",
+          "lmcache:kv_msg_queue_size",
+          "lmcache_kv_msg_queue_size",
+          "lmcache:remote_put_task_num",
+          "lmcache_remote_put_task_num",
+          "lmcache:storage_events_*_count*",
+          "lmcache_storage_events_*_count*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 3,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_storage_events",
+        "matched_metrics": [
+          "lmcache:storage_events_done_count",
+          "lmcache:storage_events_not_found_count",
+          "lmcache:storage_events_ongoing_count"
+        ],
+        "patterns": [
+          "lmcache:storage_events_*_count*",
+          "lmcache_storage_events_*_count*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 3,
+        "status": "zero",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "chunk_stats",
+        "matched_metrics": [
+          "lmcache_blend_retrieve_chunks_total"
+        ],
+        "patterns": [
+          "lmcache:*chunk*",
+          "lmcache_*chunk*",
+          "lmcache:chunk_statistics_*",
+          "lmcache_chunk_statistics_*"
+        ],
+        "populated_series_count": 1,
+        "required_when": "optional",
+        "series_count": 1,
+        "status": "populated",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": true,
+        "family": "production_connector_metrics",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache:scheduler_unfinished_requests_count",
+          "lmcache_scheduler_unfinished_requests_count",
+          "lmcache:connector_*_count",
+          "lmcache_connector_*_count"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_embedded"
+      },
+      {
+        "applicable": false,
+        "family": "storage_manager",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_sm_*",
+          "lmcache_mp.sm_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "lookup_tokens",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_lookup_*_tokens*",
+          "lmcache_mp.lookup_*_tokens*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l1_counters",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l1_*_keys*",
+          "lmcache_mp.l1_*_keys*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l1_memory",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l1_memory_usage_bytes",
+          "lmcache_mp.l1_memory_usage_bytes"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l1_failures",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l1_*_failure*",
+          "lmcache_mp.l1_*_failure*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l1_lifecycle",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l1_chunk_*_seconds*",
+          "lmcache_mp.l1_chunk_*_seconds*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "sampled",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l0_lifecycle",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l0_block_*_seconds*",
+          "lmcache_mp_l0_block_*_total",
+          "lmcache_mp.l0_block_*_seconds*",
+          "lmcache_mp.l0_block_*_total"
+        ],
+        "populated_series_count": 0,
+        "required_when": "sampled",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "real_reuse",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_real_reuse_gap_*",
+          "lmcache_mp.real_reuse_gap_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "sampled",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l2_counters",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l2_store_*",
+          "lmcache_mp_l2_prefetch_*",
+          "lmcache_mp_l2_load_completed*",
+          "lmcache_mp.l2_store_*",
+          "lmcache_mp.l2_prefetch_*",
+          "lmcache_mp.l2_load_completed*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "l2_configured",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l2_failures",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l2_*_failure*",
+          "lmcache_mp.l2_*_failure*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l2_throughput",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l2_store_throughput_gbs*",
+          "lmcache_mp_l2_load_throughput_gbs*",
+          "lmcache_mp.l2_store_throughput_gbs*",
+          "lmcache_mp.l2_load_throughput_gbs*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "l2_configured",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l0_l1_throughput",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_l0_l1_*_throughput_gbs*",
+          "lmcache_mp.l0_l1_*_throughput_gbs*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "sampled",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "engine_counters",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_num_chunks_loaded*",
+          "lmcache_mp.num_chunks_loaded*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "gauges",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_active_prefetch_jobs",
+          "lmcache_mp_num_inflight_l2_*",
+          "lmcache_mp_inflight_load_memory_usage_bytes",
+          "lmcache_mp.active_prefetch_jobs",
+          "lmcache_mp.num_inflight_l2_*",
+          "lmcache_mp.inflight_load_memory_usage_bytes"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "l2_inflight_gauges",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_active_prefetch_jobs",
+          "lmcache_mp_num_inflight_l2_*",
+          "lmcache_mp_inflight_load_memory_usage_bytes",
+          "lmcache_mp.active_prefetch_jobs",
+          "lmcache_mp.num_inflight_l2_*",
+          "lmcache_mp.inflight_load_memory_usage_bytes"
+        ],
+        "populated_series_count": 0,
+        "required_when": "l2_configured",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": false,
+        "family": "event_bus",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_mp_event_bus_*",
+          "lmcache_mp.event_bus.*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "not_applicable",
+        "surface": "lmcache_mp"
+      },
+      {
+        "applicable": true,
+        "family": "lookup",
+        "matched_metrics": [
+          "lmcache_blend_lookup_requests_total"
+        ],
+        "patterns": [
+          "lmcache_blend_lookup_requests*",
+          "lmcache_blend_lookup_fingerprint_hits*",
+          "lmcache_blend_lookup_storage_hits*"
+        ],
+        "populated_series_count": 1,
+        "required_when": "cacheblend_observed",
+        "series_count": 1,
+        "status": "populated",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "retrieve",
+        "matched_metrics": [
+          "lmcache_blend_retrieve_chunks_total",
+          "lmcache_blend_retrieve_requests_total"
+        ],
+        "patterns": [
+          "lmcache_blend_retrieve_requests*",
+          "lmcache_blend_retrieve_chunks*"
+        ],
+        "populated_series_count": 2,
+        "required_when": "cacheblend_observed",
+        "series_count": 2,
+        "status": "populated",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "store_pre_computed",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_store_pre_computed_requests*",
+          "lmcache_blend_store_pre_computed_chunks*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "store_final",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_store_final_requests*",
+          "lmcache_blend_store_final_chunks*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "fingerprint",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_fingerprints_registered*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "evict",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_chunks_evicted*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "failure",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_retrieve_failures*",
+          "lmcache_blend_store_pre_computed_failures*",
+          "lmcache_blend_store_final_failures*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "no_gpu_context",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_lookup_no_gpu_context_errors*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "stale",
+        "matched_metrics": [],
+        "patterns": [
+          "lmcache_blend_lookup_stale_chunks*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_cacheblend"
+      },
+      {
+        "applicable": true,
+        "family": "local_prefix",
+        "matched_metrics": [
+          "vllm:prefix_cache_hits_total",
+          "vllm:prefix_cache_queries_total"
+        ],
+        "patterns": [
+          "vllm:prefix_cache_*"
+        ],
+        "populated_series_count": 2,
+        "required_when": "always",
+        "series_count": 2,
+        "status": "populated",
+        "surface": "vllm_prefix_cache"
+      },
+      {
+        "applicable": true,
+        "family": "external_prefix",
+        "matched_metrics": [],
+        "patterns": [
+          "vllm:external_prefix_cache_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "vllm_prefix_cache"
+      },
+      {
+        "applicable": true,
+        "family": "prompt_tokens_by_source",
+        "matched_metrics": [],
+        "patterns": [
+          "vllm:prompt_tokens_by_source*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "vllm_prefix_cache"
+      },
+      {
+        "applicable": true,
+        "family": "prompt_tokens_cached",
+        "matched_metrics": [],
+        "patterns": [
+          "vllm:prompt_tokens_cached*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "vllm_prefix_cache"
+      },
+      {
+        "applicable": true,
+        "family": "kv_offload_transfer",
+        "matched_metrics": [],
+        "patterns": [
+          "vllm:kv_offload_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "vllm_simple_cpu_offload"
+      },
+      {
+        "applicable": true,
+        "family": "simple_cpu_pool",
+        "matched_metrics": [],
+        "patterns": [
+          "vllm:simple_cpu_offload_*"
+        ],
+        "populated_series_count": 0,
+        "required_when": "always",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "vllm_simple_cpu_offload"
+      },
+      {
+        "applicable": true,
+        "family": "mp_http_api",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_http"
+      },
+      {
+        "applicable": true,
+        "family": "lifecycle_logs",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 1,
+        "required_when": "optional",
+        "series_count": 1,
+        "status": "populated",
+        "surface": "lmcache_logs"
+      },
+      {
+        "applicable": true,
+        "family": "storage_lct",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_trace_recording"
+      },
+      {
+        "applicable": true,
+        "family": "mp_spans",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 1,
+        "required_when": "optional",
+        "series_count": 1,
+        "status": "populated",
+        "surface": "lmcache_otel"
+      },
+      {
+        "applicable": true,
+        "family": "cacheblend_spans",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 1,
+        "required_when": "optional",
+        "series_count": 1,
+        "status": "populated",
+        "surface": "lmcache_otel"
+      },
+      {
+        "applicable": true,
+        "family": "replay_outputs",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_trace_replay"
+      },
+      {
+        "applicable": true,
+        "family": "lookup_hash_jsonl",
+        "matched_metrics": [],
+        "patterns": [],
+        "populated_series_count": 0,
+        "required_when": "optional",
+        "series_count": 0,
+        "status": "missing",
+        "surface": "lmcache_lookup_hash"
+      }
+    ],
+    "l2_configured": false,
+    "lmcache_cacheblend_summary": {
+      "chunks_evicted": 0,
+      "failures": 0,
+      "fingerprints_registered": 0,
+      "lookup_fingerprint_hit_rate": 0.0,
+      "lookup_fingerprint_hits": 0,
+      "lookup_no_gpu_context_errors": 0,
+      "lookup_requests": 16.0,
+      "lookup_stale_chunks": 0,
+      "lookup_storage_hit_rate": 0.0,
+      "lookup_storage_hits": 0,
+      "observed": true,
+      "retrieve_chunks": 96.0,
+      "retrieve_requests": 16.0,
+      "store_final_requests": 0,
+      "store_pre_computed_requests": 0
+    },
+    "lmcache_http_evidence": null,
+    "lmcache_l2_summary": {
+      "active_prefetch_jobs": 0,
+      "inflight_load_memory_usage_bytes": 0,
+      "load_backlog": false,
+      "load_completed": 0,
+      "load_throughput_gbs": null,
+      "num_inflight_l2_loads": 0,
+      "num_inflight_l2_stores": 0,
+      "observed": false,
+      "prefetch_failed_keys": 0,
+      "prefetch_failures": 0,
+      "prefetch_load_tasks": 0,
+      "prefetch_loaded_keys": 0,
+      "store_backlog": false,
+      "store_completed": 0,
+      "store_failed_keys": 0,
+      "store_tasks": 0,
+      "store_throughput_gbs": null
+    },
+    "lmcache_log_evidence": {
+      "booleans": {
+        "has_config_hints": true,
+        "has_health_startup": true,
+        "has_nixl_proxy": true,
+        "has_nixl_request": false,
+        "has_p2p_peer": false,
+        "has_p2p_transfer": true,
+        "has_p2p_transfer_failure": true,
+        "has_p2p_transfer_speed": false,
+        "has_pd_receiver": true,
+        "has_pd_role_mismatch": false,
+        "has_pd_sender": false,
+        "has_pd_stall": true,
+        "has_prefetch_complete": false,
+        "has_retrieve": true,
+        "has_stale_lmcache_connector": true,
+        "has_store": true
+      },
+      "config": {
+        "connectors": [
+          "LMCacheConnector",
+          "LMCacheConnectorV1"
+        ],
+        "enable_async_loading": null,
+        "enable_p2p": null,
+        "enable_pd": null,
+        "pythonhashseed_seen": false,
+        "pythonhashseed_values": [],
+        "stale_lmcache_connector_seen": true
+      },
+      "event_counts": {
+        "health_startup": 7,
+        "nixl_proxy": 1,
+        "nixl_request": 0,
+        "p2p_peer": 0,
+        "p2p_transfer": 1,
+        "p2p_transfer_failure": 1,
+        "p2p_transfer_speed": 0,
+        "pd_receiver": 3,
+        "pd_role_mismatch": 0,
+        "pd_sender": 0,
+        "pd_stall": 1,
+        "prefetch_complete": 0,
+        "retrieve": 29,
+        "store": 15
+      },
+      "findings": [
+        {
+          "category": "p2p_transfer_failure",
+          "code": "lmcache_log_p2p_transfer_failure",
+          "event_count": 1,
+          "evidence_status": "parser_only",
+          "message": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+          "severity": "warning",
+          "snippets": [
+            "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+          ]
+        },
+        {
+          "category": "pd_stall",
+          "code": "lmcache_log_pd_stall",
+          "event_count": 1,
+          "evidence_status": "parser_only",
+          "message": "LMCache logs contain disaggregated prefill/decode stall or timeout hints.",
+          "severity": "warning",
+          "snippets": [
+            "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+          ]
+        },
+        {
+          "category": "nixl_proxy",
+          "code": "lmcache_log_nixl_proxy_indicator",
+          "event_count": 1,
+          "evidence_status": "parser_only",
+          "message": "LMCache logs contain NIXL proxy indicators.",
+          "severity": "info",
+          "snippets": [
+            "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+          ]
+        }
+      ],
+      "line_count": 335,
+      "mode_candidates": [
+        "disaggregated_prefill",
+        "embedded",
+        "p2p"
+      ],
+      "numeric_hints": {
+        "p2p_transfer_speed": []
+      },
+      "schema_version": "inferguard-lmcache-logs/v1",
+      "snippets": {
+        "health_startup": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,233] LMCache INFO:\u001b[0m Started PeriodicThread: PinMonitor-thread (level=critical, interval=30.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,234] LMCache INFO:\u001b[0m PinMonitor started \u001b[3m(pin_monitor.py:212:lmcache.v1.pin_monitor)\u001b[0m",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,597] LMCache INFO:\u001b[0m lmcache lookup server started \u001b[3m(lmcache_lookup_client.py:259:lmcache.v1.lookup_client.lmcache_lookup_client)\u001b[0m",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:05,823] LMCache INFO:\u001b[0m No active health checks to monitor, skipping monitor thread \u001b[3m(base.py:520:lmcache.v1.health_monitor.base)\u001b[0m",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:05,823] LMCache INFO:\u001b[0m Health monitor initialized and started \u001b[3m(base_service_factory.py:126:lmcache.integration.base_service_factory)\u001b[0m",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[31;20m[2026-05-10 22:13:50,849] LMCache ERROR:\u001b[0m PrometheusLogger instance already created with different metadata. This should not happen except in test \u001b[3m(observability.py:..."
+        ],
+        "nixl_proxy": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+        ],
+        "nixl_request": [],
+        "p2p_peer": [],
+        "p2p_transfer": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+        ],
+        "p2p_transfer_failure": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+        ],
+        "p2p_transfer_speed": [],
+        "pd_receiver": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m File \"/usr/local/lib/python3.11/json/decoder.py\", line 337, in decode",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m File \"/usr/local/lib/python3.11/json/decoder.py\", line 355, in raw_decode",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+        ],
+        "pd_role_mismatch": [],
+        "pd_sender": [],
+        "pd_stall": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+        ],
+        "prefetch_complete": [],
+        "retrieve": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:58,796] LMCache INFO:\u001b[0m Reqid: cmpl-95e04cfe9f3244c8a8258305f00db2b2-0, Total tokens 1908, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:00,269] LMCache INFO:\u001b[0m Reqid: cmpl-67941cadf78940d59924913c9d292a0b-0, Total tokens 1908, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:01,673] LMCache INFO:\u001b[0m Reqid: cmpl-dfc9297b6467444982288aff0fa488f5-0, Total tokens 1908, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:03,078] LMCache INFO:\u001b[0m Reqid: cmpl-7f9fa3b6816145708fccd8a5854d852c-0, Total tokens 1908, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:04,483] LMCache INFO:\u001b[0m Reqid: cmpl-a0a5d0bf4e57475b908f9903a9ea700f-0, Total tokens 1908, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n..."
+        ],
+        "store": [
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[33;20m[2026-05-10 22:13:02,352] LMCache WARNING:\u001b[0m Automatically setting save_unfull_chunk=True because enable_blending=True \u001b[3m(config.py:574:lmcache.v1.config)\u001b[0m",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,229] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:03,601] LMCache INFO:\u001b[0m Initialize storage manager on rank 0, use layerwise: True,save only first rank: False \u001b[3m(cache_engine.py:295:lmcache.v1.cache_...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:13:58,890] LMCache INFO:\u001b[0m [req_id=cmpl-95e04cfe9f3244c8a8258305f00db2b2-0] Stored 1908 out of total 1908 tokens. size: 0.2038 GB, cost 51.8820 ms, through...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:00,311] LMCache INFO:\u001b[0m [req_id=cmpl-67941cadf78940d59924913c9d292a0b-0] Stored 1908 out of total 1908 tokens. size: 0.2038 GB, cost 33.3980 ms, through...",
+          "\u001b[1;36m(EngineCore_DP0 pid=95)\u001b[0;0m \u001b[32;20m[2026-05-10 22:14:01,714] LMCache INFO:\u001b[0m [req_id=cmpl-dfc9297b6467444982288aff0fa488f5-0] Stored 1908 out of total 1908 tokens. size: 0.2038 GB, cost 32.7285 ms, through..."
+        ]
+      }
+    },
+    "lmcache_lookup_hash_evidence": null,
+    "lmcache_mp_observability": {
+      "adapter_indices": [],
+      "cache_salt_cardinality": 0,
+      "cache_salt_cardinality_risk": false,
+      "cache_salt_values": [],
+      "config": {
+        "event_bus_queue_size": 10000,
+        "logging_disabled": false,
+        "metrics_disabled": false,
+        "metrics_sample_rate": 0.01,
+        "observability_disabled": false,
+        "prometheus_port": 9090,
+        "trace_recording_enabled": false,
+        "tracing_enabled": false
+      },
+      "event_bus_metric_names": [],
+      "event_bus_taildrop_risk": false,
+      "l2_names": [],
+      "sampled_histogram_names": [],
+      "sampled_histogram_sparse": false,
+      "service_instance_id_source": "missing",
+      "service_instance_ids": []
+    },
+    "lmcache_otel_evidence": {
+      "attribute_keys": [
+        "hit_rate",
+        "hit_tokens",
+        "num_chunks",
+        "num_tokens",
+        "requested_tokens",
+        "session_id"
+      ],
+      "cacheblend_point_span_count": 0,
+      "cacheblend_span_count": 24,
+      "claim_status": "measured",
+      "latency_seconds": {
+        "cb.lookup": {
+          "avg": 0.0,
+          "count": 8.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "cb.request": {
+          "avg": 0.0,
+          "count": 8.0,
+          "max": 0.0,
+          "min": 0.0
+        },
+        "cb.retrieve": {
+          "avg": 0.022903296,
+          "count": 8.0,
+          "max": 0.037159168,
+          "min": 0.020030208
+        }
+      },
+      "lmcache_span_count": 24,
+      "mp_span_count": 0,
+      "parse_errors": [
+        "json: Extra data"
+      ],
+      "present": true,
+      "request_attributes": {},
+      "request_span_count": 0,
+      "schema_version": "inferguard-lmcache-otel-evidence/v1",
+      "span_count": 41,
+      "span_counts": {
+        "cb.lookup": 8,
+        "cb.request": 8,
+        "cb.retrieve": 8
+      },
+      "span_groups": {
+        "cacheblend": {
+          "count": 24,
+          "span_counts": {
+            "cb.lookup": 8,
+            "cb.request": 8,
+            "cb.retrieve": 8
+          }
+        },
+        "cacheblend_point": {
+          "count": 0,
+          "span_counts": {}
+        },
+        "mp": {
+          "count": 0,
+          "span_counts": {}
+        },
+        "request": {
+          "count": 0,
+          "span_counts": {}
+        }
+      }
+    },
+    "lmcache_source": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/lmcache_blend_metrics.prom",
+    "lmcache_trace_evidence": null,
+    "lmcache_trace_replay_evidence": null,
+    "locked_metrics": {
+      "lmcache": [
+        "lmcache:num_hit_tokens",
+        "lmcache:num_lookup_hits",
+        "lmcache:num_retrieve_requests",
+        "lmcache:num_store_requests",
+        "lmcache:num_lookup_requests",
+        "lmcache:num_requested_tokens",
+        "lmcache:num_lookup_tokens",
+        "lmcache:is_healthy",
+        "lmcache:num_p2p_requests",
+        "lmcache:num_p2p_transferred_tokens",
+        "lmcache:p2p_time_to_transfer",
+        "lmcache:p2p_transfer_speed",
+        "lmcache:chunk_stats_enabled",
+        "lmcache:total_chunk_requests",
+        "lmcache:total_chunks",
+        "lmcache:unique_chunks",
+        "lmcache:retrieve_hit_rate",
+        "lmcache:lookup_hit_rate",
+        "lmcache:lookup_0_hit_requests",
+        "lmcache:local_cpu_evict_count",
+        "lmcache:local_cpu_evict_keys_count",
+        "lmcache:local_cpu_evict_failed_count",
+        "lmcache:local_cache_usage",
+        "lmcache:remote_cache_usage",
+        "lmcache:local_storage_usage",
+        "lmcache:local_cpu_hot_cache_count",
+        "lmcache_mp_lookup_requested_tokens_total",
+        "lmcache_mp_lookup_hit_tokens_total",
+        "lmcache_mp_sm_read_requests_total",
+        "lmcache_mp_sm_read_succeed_keys_total",
+        "lmcache_mp_sm_read_failed_keys_total",
+        "lmcache_mp_sm_write_requests_total",
+        "lmcache_mp_sm_write_succeed_keys_total",
+        "lmcache_mp_sm_write_failed_keys_total",
+        "lmcache_mp_l1_read_keys_total",
+        "lmcache_mp_l1_write_keys_total",
+        "lmcache_mp_l1_evicted_keys_total",
+        "lmcache_mp_l1_memory_usage_bytes",
+        "lmcache_mp_l1_chunk_lifetime_seconds",
+        "lmcache_mp_l1_chunk_idle_before_evict_seconds",
+        "lmcache_mp_l1_chunk_reuse_gap_seconds",
+        "lmcache_mp_l1_chunk_evict_reuse_gap_seconds",
+        "lmcache_mp_l0_block_lifetime_seconds",
+        "lmcache_mp_l0_block_idle_before_evict_seconds",
+        "lmcache_mp_l0_block_reuse_gap_seconds",
+        "lmcache_mp_real_reuse_gap_seconds",
+        "lmcache_mp_real_reuse_gap_chunks",
+        "lmcache_mp_l2_store_tasks_total",
+        "lmcache_mp_l2_store_keys_total",
+        "lmcache_mp_l2_store_completed_total",
+        "lmcache_mp_l2_store_succeeded_keys_total",
+        "lmcache_mp_l2_store_failed_keys_total",
+        "lmcache_mp_l2_prefetch_lookups_total",
+        "lmcache_mp_l2_prefetch_lookup_keys_total",
+        "lmcache_mp_l2_prefetch_hit_keys_total",
+        "lmcache_mp_l2_prefetch_load_tasks_total",
+        "lmcache_mp_l2_prefetch_load_keys_total",
+        "lmcache_mp_l2_prefetch_loaded_keys_total",
+        "lmcache_mp_l2_prefetch_failed_keys_total",
+        "lmcache_mp_l2_load_completed_total",
+        "lmcache_mp_l2_store_throughput_gbs",
+        "lmcache_mp_l2_load_throughput_gbs",
+        "lmcache_mp_l0_l1_store_throughput_gbs",
+        "lmcache_mp_l0_l1_load_throughput_gbs",
+        "lmcache_mp_num_chunks_loaded_total",
+        "lmcache_mp_active_prefetch_jobs",
+        "lmcache_mp_num_inflight_l2_stores",
+        "lmcache_mp_num_inflight_l2_loads",
+        "lmcache_mp_inflight_load_memory_usage_bytes",
+        "lmcache_mp_event_bus_queue_depth",
+        "lmcache_mp_event_bus_drain_lag_seconds",
+        "lmcache_mp_event_bus_dropped_events_total",
+        "lmcache_mp_event_bus_subscriber_exceptions_total"
+      ],
+      "vllm": [
+        "vllm:time_to_first_token_seconds",
+        "vllm:time_per_output_token_seconds",
+        "vllm:inter_token_latency_seconds",
+        "vllm:e2e_request_latency_seconds",
+        "vllm:request_queue_time_seconds",
+        "vllm:request_prefill_time_seconds",
+        "vllm:request_decode_time_seconds",
+        "vllm:request_prompt_tokens",
+        "vllm:request_generation_tokens",
+        "vllm:prompt_tokens_total",
+        "vllm:generation_tokens_total",
+        "vllm:request_success_total",
+        "vllm:prefix_cache_queries",
+        "vllm:prefix_cache_hits",
+        "vllm:external_prefix_cache_queries",
+        "vllm:external_prefix_cache_hits",
+        "vllm:prompt_tokens_by_source",
+        "vllm:prompt_tokens_cached",
+        "vllm:num_requests_running",
+        "vllm:num_requests_waiting",
+        "vllm:gpu_cache_usage_perc",
+        "vllm:kv_cache_usage_perc",
+        "vllm:cache_config_info",
+        "vllm:kv_block_lifetime_seconds",
+        "vllm:kv_block_idle_before_evict_seconds",
+        "vllm:kv_block_reuse_gap_seconds",
+        "vllm:kv_offload_total_bytes",
+        "vllm:kv_offload_total_time",
+        "vllm:kv_offload_size",
+        "vllm:simple_cpu_offload_total_blocks",
+        "vllm:simple_cpu_offload_free_blocks",
+        "vllm:simple_cpu_offload_used_blocks",
+        "vllm:simple_cpu_offload_usage_perc",
+        "vllm:simple_cpu_offload_pending_loads",
+        "vllm:simple_cpu_offload_pending_stores"
+      ]
+    },
+    "observed": {
+      "lmcache_cacheblend": true,
+      "lmcache_cacheblend_evidence": true,
+      "lmcache_cacheblend_metrics": true,
+      "lmcache_embedded": true,
+      "lmcache_mp": false,
+      "lmcache_mp_evidence": false,
+      "lmcache_mp_metrics_prometheus_unavailable": false,
+      "populated_nonzero_series": 95,
+      "total_series": 124,
+      "vllm": true
+    },
+    "schema_version": "inferguard-observability-compat/v1",
+    "surfaces": {
+      "lmcache_cacheblend": {
+        "family_count": 9,
+        "missing": 7,
+        "not_applicable": 0,
+        "populated": 2,
+        "status": "partial",
+        "zero": 0
+      },
+      "lmcache_embedded": {
+        "family_count": 20,
+        "missing": 6,
+        "not_applicable": 0,
+        "populated": 7,
+        "status": "partial",
+        "zero": 7
+      },
+      "lmcache_http": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_logs": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_lookup_hash": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_mp": {
+        "family_count": 16,
+        "missing": 0,
+        "not_applicable": 16,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_otel": {
+        "family_count": 2,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 2,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_trace_recording": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_trace_replay": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "vllm_prefix_cache": {
+        "family_count": 4,
+        "missing": 3,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "partial",
+        "zero": 0
+      },
+      "vllm_simple_cpu_offload": {
+        "family_count": 2,
+        "missing": 2,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      }
+    },
+    "upstream_questions": []
+  },
+  "lmcache_source": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/lmcache_blend_metrics.prom",
+  "observed": {
+    "populated_nonzero_series": 95,
+    "total_series": 124
+  },
+  "schema_version": "inferguard-observability-coverage/v1",
+  "surfaces": {
+    "lmcache_cacheblend": {
+      "family_count": 9,
+      "missing": 7,
+      "not_applicable": 0,
+      "populated": 2,
+      "status": "partial",
+      "zero": 0
+    },
+    "lmcache_embedded": {
+      "family_count": 20,
+      "missing": 6,
+      "not_applicable": 0,
+      "populated": 7,
+      "status": "partial",
+      "zero": 7
+    },
+    "lmcache_http": {
+      "family_count": 1,
+      "missing": 1,
+      "not_applicable": 0,
+      "populated": 0,
+      "status": "missing",
+      "zero": 0
+    },
+    "lmcache_logs": {
+      "family_count": 1,
+      "missing": 0,
+      "not_applicable": 0,
+      "populated": 1,
+      "status": "complete",
+      "zero": 0
+    },
+    "lmcache_lookup_hash": {
+      "family_count": 1,
+      "missing": 1,
+      "not_applicable": 0,
+      "populated": 0,
+      "status": "missing",
+      "zero": 0
+    },
+    "lmcache_mp": {
+      "family_count": 16,
+      "missing": 0,
+      "not_applicable": 16,
+      "populated": 0,
+      "status": "not_applicable",
+      "zero": 0
+    },
+    "lmcache_otel": {
+      "family_count": 2,
+      "missing": 0,
+      "not_applicable": 0,
+      "populated": 2,
+      "status": "complete",
+      "zero": 0
+    },
+    "lmcache_trace_recording": {
+      "family_count": 1,
+      "missing": 1,
+      "not_applicable": 0,
+      "populated": 0,
+      "status": "missing",
+      "zero": 0
+    },
+    "lmcache_trace_replay": {
+      "family_count": 1,
+      "missing": 1,
+      "not_applicable": 0,
+      "populated": 0,
+      "status": "missing",
+      "zero": 0
+    },
+    "sglang": {
+      "family_count": 7,
+      "missing": 0,
+      "not_applicable": 7,
+      "populated": 0,
+      "status": "not_applicable",
+      "zero": 0
+    },
+    "vllm": {
+      "family_count": 10,
+      "missing": 4,
+      "not_applicable": 1,
+      "populated": 5,
+      "status": "partial",
+      "zero": 0
+    },
+    "vllm_prefix_cache": {
+      "family_count": 4,
+      "missing": 3,
+      "not_applicable": 0,
+      "populated": 1,
+      "status": "partial",
+      "zero": 0
+    },
+    "vllm_simple_cpu_offload": {
+      "family_count": 2,
+      "missing": 2,
+      "not_applicable": 0,
+      "populated": 0,
+      "status": "missing",
+      "zero": 0
+    }
+  }
+}

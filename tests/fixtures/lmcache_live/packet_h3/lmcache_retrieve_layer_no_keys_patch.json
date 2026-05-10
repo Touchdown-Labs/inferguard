@@ -1,0 +1,8 @@
+{
+  "applied": true,
+  "behavior": "initialize mem_obj_consumer/to_count_down before the if keys branch and synchronize/unpin only when a GPU consumer was created; do not catch exceptions from real keyed retrieval.",
+  "changed": true,
+  "patch_target": "/opt/lmcache/lmcache/v1/cache_engine.py",
+  "schema_version": "inferguard-h3-lmcache-retrieve-layer-no-keys-patch/v1",
+  "source_basis": "LMCache retrieve_layer no-key path yielded per-layer None values, then unconditionally called next(mem_obj_consumer) even though mem_obj_consumer is assigned only inside if keys; H3 CacheBlend artifact 20260510T214803Z reached that path and raised UnboundLocalError before report generation."
+}
