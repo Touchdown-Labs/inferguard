@@ -890,6 +890,8 @@ class LMCacheEngine:
     assert "mem_obj_consumer = None" in patched
     assert "to_count_down = []" in patched
     assert "if mem_obj_consumer is not None:" in patched
+    assert patched.index("mem_obj_consumer = None") < patched.index("if keys:")
+    assert patched.index("to_count_down = []") < patched.index("if keys:")
     assert "do not catch exceptions from real keyed retrieval" in patch["behavior"]
 
     namespace: dict[str, object] = {}
