@@ -750,9 +750,50 @@ def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
         r'''
 import importlib
 import os
+import sys
+import types
 
 
 _INFERGUARD_PENDING_CACHEBLEND = {}
+
+
+def _inferguard_patch_lmcache_attention_utils():
+    """Keep H3 CacheBlend on LMCache's non-sparse FlashAttention path.
+
+    LMCache's source supports non-sparse CacheBlend by dispatching
+    FlashAttentionImpl + enable_sparse=False to LMCFlashAttnBackend. Its
+    attention.utils module imports flash_infer_sparse eagerly, though, which
+    requires the optional flashinfer package even when sparse attention is not
+    enabled. This H3-only runtime patch preserves the supported non-sparse path
+    and imports flash_infer_sparse only when enable_sparse=True.
+    """
+    module_name = "lmcache.v1.compute.attention.utils"
+    existing = sys.modules.get(module_name)
+    if existing is not None and getattr(existing, "_inferguard_non_flashinfer_patched", False):
+        return True
+    try:
+        flash_attn_module = importlib.import_module("lmcache.v1.compute.attention.flash_attn")
+    except ImportError:
+        return False
+
+    module = types.ModuleType(module_name)
+    module.__dict__["__package__"] = "lmcache.v1.compute.attention"
+    module.__dict__["_inferguard_non_flashinfer_patched"] = True
+
+    def infer_attn_backend_from_vllm(vllm_attn, enable_sparse=False):
+        attn_name = type(vllm_attn.impl).__name__
+        if attn_name == "FlashInferImpl" and enable_sparse:
+            from lmcache.v1.compute.attention.flash_infer_sparse import LMCFlashInferSparseBackend
+
+            return LMCFlashInferSparseBackend(vllm_attn)
+        elif attn_name == "FlashAttentionImpl" and not enable_sparse:
+            return flash_attn_module.LMCFlashAttnBackend(vllm_attn)
+        else:
+            raise ValueError(f"Attention backend {attn_name} is not supported in LMCache.")
+
+    module.infer_attn_backend_from_vllm = infer_attn_backend_from_vllm
+    sys.modules[module_name] = module
+    return True
 
 
 def _inferguard_import_gpu_model_runner():
@@ -801,6 +842,7 @@ class _InferGuardDeferredLMCBlender:
 
 
 if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
+    _inferguard_patch_lmcache_attention_utils()
     GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
     LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
     if LMCBlenderBuilder is not None and not getattr(
@@ -862,7 +904,8 @@ if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
                 "patch_target": str(sitecustomize_path),
                 "engine_name": "vllm-instance",
                 "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
-                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME.",
+                "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras.",
                 "applied": True,
             },
             indent=2,

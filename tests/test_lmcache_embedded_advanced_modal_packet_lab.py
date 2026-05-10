@@ -330,6 +330,87 @@ def test_h2_sglang_command_uses_enable_lmcache_and_layerwise_evidence(tmp_path: 
     assert any("LMCacheLayerwiseConnector" in item for item in proof["required_live_proof"])
 
 
+def test_h3_cacheblend_uses_non_sparse_attention_without_flashinfer_dependency(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    patch_log = lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+    patch = json.loads(patch_log.read_text(encoding="utf-8"))
+    sitecustomize_text = sitecustomize.read_text(encoding="utf-8")
+
+    assert patch["attention_backend"] == "lazy non-sparse FlashAttention path for CacheBlend"
+    assert "flashinfer" not in lab.BASE_MODAL_PIP_PACKAGES
+    assert "flashinfer" not in lab.LMCACHE_RUNTIME_DEP_PACKAGES
+    assert "LMCACHE_EXTRA_CONFIG" not in lab._build_runner_env(tmp_path, lab.PACKETS["h3-cacheblend"])
+    assert "enable_sparse" not in json.dumps(
+        lab._build_runner_env(tmp_path, lab.PACKETS["h3-cacheblend"])
+    )
+    assert "def _inferguard_patch_lmcache_attention_utils" in sitecustomize_text
+    assert "from lmcache.v1.compute.attention.flash_infer_sparse import" in sitecustomize_text
+    assert "if attn_name == \"FlashInferImpl\" and enable_sparse" in sitecustomize_text
+    assert "elif attn_name == \"FlashAttentionImpl\" and not enable_sparse" in sitecustomize_text
+
+
+def test_h3_cacheblend_lazy_attention_patch_avoids_importing_flashinfer_for_flashattention(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lab = _load_lab_module()
+    lab._patch_vllm_cacheblend_model_tracker(tmp_path)
+    sitecustomize = tmp_path / "sitecustomize.py"
+
+    created_modules: list[str] = []
+
+    def install_module(name: str) -> types.ModuleType:
+        module = types.ModuleType(name)
+        if "." not in name:
+            module.__path__ = []
+        sys.modules[name] = module
+        created_modules.append(name)
+        return module
+
+    for package in (
+        "lmcache",
+        "lmcache.v1",
+        "lmcache.v1.compute",
+        "lmcache.v1.compute.attention",
+    ):
+        module = install_module(package)
+        module.__path__ = []
+
+    flash_attn_module = install_module("lmcache.v1.compute.attention.flash_attn")
+
+    class LMCFlashAttnBackend:
+        def __init__(self, vllm_attn):
+            self.vllm_attn = vllm_attn
+
+    flash_attn_module.LMCFlashAttnBackend = LMCFlashAttnBackend
+
+    def fail_on_flashinfer(name, *args, **kwargs):
+        if name.startswith("flashinfer") or name == "lmcache.v1.compute.attention.flash_infer_sparse":
+            raise AssertionError(f"unexpected FlashInfer import: {name}")
+        return original_import_module(name, *args, **kwargs)
+
+    original_import_module = importlib.import_module
+    monkeypatch.setattr(importlib, "import_module", fail_on_flashinfer)
+    monkeypatch.setenv("INFERGUARD_H3_REGISTER_VLLM_MODEL", "1")
+    namespace = {"__name__": "sitecustomize"}
+    try:
+        exec(sitecustomize.read_text(encoding="utf-8"), namespace)
+
+        class FlashAttentionImpl:
+            pass
+
+        vllm_attn = types.SimpleNamespace(impl=FlashAttentionImpl())
+        attention_utils = sys.modules["lmcache.v1.compute.attention.utils"]
+        backend = attention_utils.infer_attn_backend_from_vllm(vllm_attn, enable_sparse=False)
+
+        assert isinstance(backend, LMCFlashAttnBackend)
+        assert backend.vllm_attn is vllm_attn
+    finally:
+        for name in reversed(created_modules):
+            sys.modules.pop(name, None)
+        sys.modules.pop("lmcache.v1.compute.attention.utils", None)
+
+
 def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["h3-cacheblend"]
