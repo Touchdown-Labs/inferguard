@@ -23,11 +23,23 @@ Status meanings:
 The active upstream tracker is
 `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
 It supersedes docs 188/189/190. Original vLLM + LMCache + InferGuard CLI
-coverage is release-ready when the I1 local docs/test gates pass. Accepted
-runtime evidence covers Packet A-F MP, G1 diagnostics, H1 embedded vLLM, and H3
-embedded CacheBlend/vLLM. H2/SGLang, Mooncake, P2P/PD expansion, and DLM/llm-d
-are paused backend-expansion lanes, not blockers for the original vLLM + LMCache
-CLI finish line.
+coverage is release-ready after the I1 local docs/test gates and the final real
+H100 smoke passed. Accepted runtime evidence covers Packet A-F MP, G1
+diagnostics, H1 embedded vLLM, and H3 embedded CacheBlend/vLLM. The final H100
+receipts are Packet B / LC1 at
+`/Users/chen/Projects/inferguard/modal-out/pulls/20260510T230559Z` and Packet H3
+at `/Users/chen/Projects/inferguard/modal-out/pulls/20260510T232009Z`. H2/SGLang,
+Mooncake, P2P/PD expansion, and DLM/llm-d are paused backend-expansion lanes, not
+blockers for the original vLLM + LMCache CLI finish line.
+
+Coverage accounting is split deliberately:
+
+| Scope | Current state | Evidence | Missing proof |
+| --- | --- | --- | --- |
+| Original vLLM + LMCache + InferGuard CLI | `release_ready` / 100/100 | accepted fixtures, local gates, final Packet B and H3 H100 receipts | none for original scope |
+| LMCache MP observability with vLLM | `release_ready` | Packet A-F fixtures plus Packet B H100 receipt with `detected_mode=mp`, `failure_reasons=[]`, and required lifecycle/lookup/reuse families populated | none for original MP acceptance scope |
+| embedded CacheBlend / vLLM | `live_validated` | Packet H3 H100 receipt with `detected_mode=embedded_cacheblend`, `cb.*` spans, and `lmcache_blend_*` metrics | none for H3 acceptance scope |
+| continuous low-level GPU hardware telemetry | `not_proven` | H100 identity captured by `nvidia-smi`; application telemetry captured | DCGM/NVML sampler evidence for GPU util, HBM, NVLink, PCIe, and sustained power |
 
 Keep accepted live fixtures pinned under `tests/fixtures/lmcache_live/` and run
 the I1 local gate before updating release claims:
@@ -100,7 +112,7 @@ reach 100/100. The states intentionally use the stricter SDLC taxonomy.
 
 | Lane | Current state | Required evidence | Missing proof | Exact next command |
 | --- | --- | --- | --- | --- |
-| MP architecture | live_validated | `LMCacheMPConnector` launch/config, standalone `lmcache server`, ZMQ config, vLLM `/metrics`, LMCache HTTP and `/metrics` | Keep Packet A fixture green; no current blocker. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
+| MP architecture | release_ready | `LMCacheMPConnector` launch/config, standalone `lmcache server`, ZMQ config, vLLM `/metrics`, LMCache HTTP and `/metrics`, final Packet B real-H100 receipt | No missing proof for the original MP acceptance scope; keep fixtures and Packet B receipt auditable. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
 | MP HTTP safe endpoints | parser_only / fixture_backed mixed | `/`, `/api/healthcheck`, `/api/status`, `/conf`, `/version`, `/lmc_version`, `/commit_id`, `/api/quota`, `/threads`, `/periodic-threads`, `/periodic-threads/{thread_name}`, `/periodic-threads-health` | Live endpoint packet; `/env` and `/loglevel` opt-in redaction/safety policy. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
 | MP destructive endpoint guard | destructive_skipped | `POST /api/clear-cache`, `POST /metrics/reset`, quota mutation routes recorded but not called | Packet manifest row proving skipped status. | `printf '%s\n' 'POST /api/clear-cache destructive_skipped' >> "$PACKET_DIR/skipped_endpoints.txt"` |
 | MP Prometheus metric families | fixture_backed / parser_only mixed | StorageManager, L1, L1 failures, L1 lifecycle, real reuse, L2, L2 failures, lookup hit rate, L0 lifecycle, L0-L1 throughput, L1-L2 throughput, engine counter, observable gauges, EventBus, CacheBlend | Packet A is accepted for the L1-only MP baseline; live nonzero lookup, L2, sampled lifecycle/throughput, EventBus clean/failure, and CacheBlend packets remain. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-mode mp` |
@@ -118,10 +130,10 @@ reach 100/100. The states intentionally use the stricter SDLC taxonomy.
 
 | Source | Family coverage required | Current state | Missing proof | Exact next command |
 | --- | --- | --- | --- | --- |
-| LMCache MP observability | StorageManager, L1, lifecycle, real reuse, L2, lookup, L0, throughput, engine, gauges | fixture_backed / parser_only mixed | Live MP packet plus L2 and sampled histogram packets. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/observability_coverage.json" --expect-lmcache-mode mp` |
+| LMCache MP observability | StorageManager, L1, lifecycle, real reuse, L2, lookup, L0, throughput, engine, gauges | release_ready for original vLLM+LMCache CLI MP acceptance; backend-expansion surfaces remain separate | No missing proof for original MP acceptance; separate L2/EventBus/failure/p2p expansion packets are optional backend-expansion work. | `inferguard observability-coverage --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/observability_coverage.json" --expect-lmcache-mode mp` |
 | LMCache MP source additions | EventBus, L1 allocation/read failure, L2 prefetch failure, CacheBlend counters | fixture_backed | Clean/failure EventBus, L1/L2 failure, and CacheBlend live packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_eventbus.prom" --output "$PACKET_DIR/eventbus_report.json" --expect-mode mp` |
 | LMCache production metrics | Core request, token, hit rate, performance/latency, profiling, cache usage/lifecycle, remote/backend/network, local CPU, memory, P2P, health/internal, chunk statistics | fixture_backed / parser_only mixed | Live embedded and backend/P2P/chunk-stat fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
-| vLLM bridge | local prefix, external prefix, prompt-token source, KV CPU offload caveat, connector identity | supported structurally | Live vLLM + LMCache MP connector packet and mismatch detector. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
+| vLLM bridge | local prefix, external prefix, prompt-token source, KV CPU offload caveat, connector identity | release_ready for original vLLM+LMCache CLI bridge | Packet B H100 proves the vLLM + LMCache MP connector path for the acceptance scope; native vLLM CPU offload remains a caveat, not LMCache proof. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
 | SGLang bridge | queue/cache/HiCache/KV-transfer plus embedded LMCache adapter evidence | partial | Live SGLang `--enable-lmcache`; source-backed MP contract before MP scoring. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
 
 ## Current Fixture Coverage

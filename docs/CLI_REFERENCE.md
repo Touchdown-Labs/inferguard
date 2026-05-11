@@ -46,6 +46,24 @@ Accepted evidence packets:
 | H1 | embedded vLLM `LMCacheConnectorV1` | `tests/fixtures/lmcache_live/packet_h1/` | strict compat detects `embedded` with no failures |
 | H3 | embedded CacheBlend / vLLM | `tests/fixtures/lmcache_live/packet_h3/` | strict compat detects `embedded_cacheblend` / `vllm_embedded_cacheblend` with no MP-family requirement |
 
+Final real-H100 smoke receipts:
+
+| Packet | Runtime family | Modal run | Local artifact | Auditable result |
+| --- | --- | --- | --- | --- |
+| B / LC1 | vLLM + standalone LMCache MP | `https://modal.com/apps/ocwc22/main/ap-i3clSmO9WG4fwZQJlF5FLx` | `/Users/chen/Projects/inferguard/modal-out/pulls/20260510T230559Z` | `detected_mode=mp`, `failure_reasons=[]`, `packet-b-lifecycle-evidence.json` has `claim_status=measured` and `missing_required_families=[]`. |
+| H3 | embedded CacheBlend / vLLM | `https://modal.com/apps/ocwc22/main/ap-3OmReCOzyoAFB4qD88me8g` | `/Users/chen/Projects/inferguard/modal-out/pulls/20260510T232009Z` | `detected_mode=embedded_cacheblend`, `detected_architecture.label=vllm_embedded_cacheblend`, `failure_reasons=[]`, non-empty `lmcache_otel.jsonl`, `24` `cb.*` spans, populated `lmcache_blend_*` metrics. |
+
+Precise coverage answer: yes, LMCache MP observability with vLLM is 100% covered for the InferGuard CLI acceptance scope. That does not mean continuous DCGM/NVML hardware telemetry is covered. The H100 receipts prove H100 identity plus LMCache/vLLM/OTel/Prometheus application telemetry; they do not prove sustained GPU utilization, HBM bandwidth, NVLink, PCIe, or power because no accepted DCGM/NVML sampler samples exist.
+
+Hardware telemetry caveat:
+
+| Surface | Current status | What would upgrade it |
+| --- | --- | --- |
+| H100 identity from `nvidia-smi` | `measured` | Already captured in Packet B and H3 receipts. |
+| LMCache MP L0/L1 lifecycle, lookup, reuse, eviction | `measured` | Already captured in Packet B H100 receipt. |
+| embedded CacheBlend lookup/retrieve metrics and `cb.*` spans | `measured` | Already captured in Packet H3 H100 receipt. |
+| GPU util, HBM, NVLink, PCIe, sustained power | `not_proven` | Add DCGM or NVML sampler to the Modal H100 runner and rerun one focused smoke. |
+
 Recommended MP evidence packet:
 
 ```bash
