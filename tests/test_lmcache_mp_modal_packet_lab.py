@@ -130,6 +130,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
         "lmcache_mp_lookup_hit_tokens_total",
         "lmcache_mp_l1_memory_usage_bytes",
     )
+    assert lab.LMCACHE_HEALTH_URL == "http://127.0.0.1:8080/healthcheck"
     assert lab.LMCACHE_METRICS_URL == "http://127.0.0.1:8080/metrics"
     assert lab.LMCACHE_METRICS_URLS == (
         "http://127.0.0.1:8080/metrics",
@@ -832,8 +833,24 @@ def test_packet_a_collect_command_uses_saved_safe_http_and_optional_outputs(tmp_
     (tmp_path / "trace-replay").mkdir()
     (tmp_path / "lookup_hashes").mkdir()
 
+    captured: list[tuple[str, Path]] = []
+
+    def fake_curl_to_file(url, path, log_path, *, timeout=30):
+        captured.append((url, path))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+        return True
+
+    lab._curl_to_file = fake_curl_to_file
+
+    capture = lab._capture_safe_http(tmp_path)
     cmd = lab._build_collect_lmcache_cmd(tmp_path)
 
+    assert capture["healthcheck.json"]["path"] == "/healthcheck"
+    assert capture["status.json"]["path"] == "/status"
+    assert capture["quota.json"]["path"] == "/api/quota"
+    assert (lab.LMCACHE_HTTP_BASE_URL + "/healthcheck", tmp_path / "http" / "healthcheck.json") in captured
+    assert (lab.LMCACHE_HTTP_BASE_URL + "/status", tmp_path / "http" / "status.json") in captured
     assert "--lmcache-http-base-url" in cmd
     assert cmd[cmd.index("--lmcache-health-file") + 1] == str(tmp_path / "http" / "healthcheck.json")
     assert cmd[cmd.index("--lmcache-status-file") + 1] == str(tmp_path / "http" / "status.json")

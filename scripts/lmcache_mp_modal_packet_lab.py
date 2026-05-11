@@ -50,7 +50,7 @@ VLLM_BASE_URL = f"http://127.0.0.1:{VLLM_PORT}"
 VLLM_HEALTH_URL = f"{VLLM_BASE_URL}/health"
 VLLM_METRICS_URL = f"{VLLM_BASE_URL}/metrics"
 LMCACHE_HTTP_BASE_URL = f"http://127.0.0.1:{LMCACHE_HTTP_PORT}"
-LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/api/healthcheck"
+LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/healthcheck"
 LMCACHE_HTTP_METRICS_URL = f"{LMCACHE_HTTP_BASE_URL}/metrics"
 LMCACHE_STANDALONE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
 LMCACHE_METRICS_URLS = (LMCACHE_HTTP_METRICS_URL, LMCACHE_STANDALONE_METRICS_URL)
@@ -957,8 +957,8 @@ def _capture_safe_http(run_dir: Path) -> dict[str, dict[str, object]]:
     log_path = run_dir / "capture.log"
     endpoints = {
         "root.txt": "/",
-        "healthcheck.json": "/api/healthcheck",
-        "status.json": "/api/status",
+        "healthcheck.json": "/healthcheck",
+        "status.json": "/status",
         "conf.json": "/conf",
         "version.txt": "/version",
         "lmc_version.txt": "/lmc_version",

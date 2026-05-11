@@ -22,7 +22,7 @@ The LMCache and vLLM heads match the post-rebase review prompt expectations. vLL
 ## Delta since rebase review
 
 - Local focused InferGuard gates passed before any H100 launch.
-- Packet B / standalone LMCache MP launched on Modal H100 but failed before health, so no new accepted Packet B release-smoke artifact was produced.
+- Packet B / standalone LMCache MP was rerun after the InferGuard runner health/status route patch and is now green for the post-rebase release smoke.
 - Packet H3 / embedded CacheBlend launched on Modal H100, completed, was pulled locally, and passed the existing InferGuard compatibility/report path.
 - No fixture was imported. The new H3 artifact is a release-smoke receipt only; it does not supersede the prior accepted fixture.
 
@@ -58,18 +58,19 @@ cd /Users/chen/Projects/inferguard
 INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py --packet b
 ```
 
-- Modal run URL: `https://modal.com/apps/ocwc22/main/ap-YPfI7S59z2PU0TW1mNOJxJ`
-- Result: `blocked`
-- Blocking error:
+- Initial blocked Modal run URL: `https://modal.com/apps/ocwc22/main/ap-YPfI7S59z2PU0TW1mNOJxJ` (`/api/healthcheck` stale-route blocker).
+- Fixed rerun Modal run URL: `https://modal.com/apps/ocwc22/main/ap-N4iIP7A8tie46P75qKYd16`
+- Result: `live_validated`
+- Modal output path: `/out/packet-b-lifecycle-reuse-eviction/20260511T053256Z`
+- Pull command:
 
-```text
-RuntimeError: LMCache HTTP did not become healthy at http://127.0.0.1:8080/api/healthcheck
+```bash
+modal volume get --force lmcache-mp-lab /packet-b-lifecycle-reuse-eviction/20260511T053256Z modal-out/pulls
 ```
 
-- Modal output path: not printed before the runner failed.
-- Local artifact path: none for this run.
-- Fixture decision: not imported because the runner failed before a compatible release-smoke artifact existed.
-- Required Packet B assertions were not re-verified for this run: `detected_mode=mp`, `failure_reasons=[]`, and populated `lmcache_mp_l0_block_*`/L0 lifecycle evidence remain `not_proven` for this post-rebase smoke.
+- Local artifact path: `/Users/chen/Projects/inferguard/modal-out/pulls/20260511T053256Z`
+- Fixture decision: not imported because this was a release-smoke receipt, not a scoring exercise.
+- Required Packet B assertions verified from the pulled artifact: `packet-b-lifecycle-evidence.json` has `claim_status=measured`, `acceptance_status=candidate_measured`, and `missing_required_families=[]`; `lmcache_compat_report.json` has `failure_reasons=[]`; `http/capture_manifest.json` records `healthcheck.json` at `/healthcheck` and `status.json` at `/status`.
 
 Observed launch/build context before failure:
 
@@ -142,7 +143,7 @@ diagnose-bottleneck/bottleneck_diagnosis.json: claim_status=measured
 | Lane | Post-rebase smoke state | Evidence |
 | --- | --- | --- |
 | Local gates | `release_ready` | All required pytest gates and mkdocs build passed before Modal. |
-| Packet B / standalone LMCache MP | `blocked` | Modal run `ap-YPfI7S59z2PU0TW1mNOJxJ` failed waiting for LMCache HTTP health. |
+| Packet B / standalone LMCache MP | `live_validated` | Modal run `ap-N4iIP7A8tie46P75qKYd16`, local pull `/Users/chen/Projects/inferguard/modal-out/pulls/20260511T053256Z`, lifecycle evidence `claim_status=measured`, `missing_required_families=[]`, `failure_reasons=[]`. |
 | Packet H3 / embedded CacheBlend | `live_validated` | Modal run `ap-Tlw2V883uj6vbcVT3tAsnm`, local pull `/Users/chen/Projects/inferguard/modal-out/pulls/20260511T051119Z`, `failure_reasons=[]`. |
 | Fixture import | `not_applicable` | Release-smoke receipt only; no new fixture imported. |
 | Hardware telemetry | `not_proven` | `nvidia-smi` identity exists, but continuous DCGM/NVML GPU utilization, HBM bandwidth, NVLink, PCIe, and sustained power telemetry were not sampled. |
@@ -153,12 +154,12 @@ This smoke does not prove continuous DCGM/NVML hardware telemetry, HBM bandwidth
 
 ## Remaining work / blockers
 
-1. Packet B is blocked post-rebase by LMCache HTTP health not becoming ready at `http://127.0.0.1:8080/api/healthcheck` in `ap-YPfI7S59z2PU0TW1mNOJxJ`.
-2. Re-run Packet B only after diagnosing the LMCache MP server health failure in the existing runner path.
-3. Keep H3 as a release-smoke receipt; no fixture replacement is needed unless a future run improves or supersedes accepted evidence.
+1. Packet B stale-route blocker is resolved by updating the InferGuard runner to current LMCache MP routes: `/healthcheck` and `/status`.
+2. Keep Packet B and H3 as release-smoke receipts; no fixture replacement is needed unless a future run improves or supersedes accepted evidence.
+3. Hardware telemetry remains outside this smoke's proof scope.
 
 ## Next PR implications
 
-- InferGuard: no code change made in this task. The existing H3 runner remains valid; Packet B needs blocker triage before claiming post-rebase release-smoke parity.
-- LMCache: investigate whether the rebased `f2a6a037` local source changed standalone MP HTTP health startup behavior or dependency/runtime expectations.
-- vLLM: no H3 regression observed with vLLM package `0.10.2`; Packet B used the local connector overlay from the rebased vLLM checkout but failed before compatibility evidence was produced.
+- InferGuard: runner route contract patched and verified locally with `uv run pytest tests/test_lmcache_mp_modal_packet_lab.py -q` (`28 passed in 0.46s`); Packet B post-rebase release-smoke parity is restored.
+- LMCache: no source change required for this blocker; current routes are `/healthcheck` and `/status`.
+- vLLM: no H3 regression observed with vLLM package `0.10.2`; Packet B used the local connector overlay from the rebased vLLM checkout and produced green compatibility evidence.
