@@ -110,8 +110,7 @@ if ! curl --fail --show-error --silent --max-time 20 "$ENDPOINT_MODELS_URL" > "$
 fi
 
 phase "ISB-1 workload replay sweep"
-declare -A STATUS_BY_CLASS=()
-declare -A CAPTURED_BY_CLASS=()
+SUMMARY_ROWS=()
 artifact_classes=0
 
 for workload_class in "${WORKLOAD_CLASSES[@]}"; do
@@ -123,7 +122,8 @@ for workload_class in "${WORKLOAD_CLASSES[@]}"; do
   fi
 
   phase "Replay $workload_class"
-  if "$INFERGUARD_BIN" bench replay \
+  status="ok"
+  if ! "$INFERGUARD_BIN" bench replay \
     --endpoint "$ENDPOINT_URL" \
     --model "$MODEL_NAME" \
     --trace-dir "$class_trace_dir" \
@@ -134,16 +134,15 @@ for workload_class in "${WORKLOAD_CLASSES[@]}"; do
     --timeout "$TIMEOUT" \
     --output-dir "$class_output_dir" \
     "${redact_args[@]}"; then
-    STATUS_BY_CLASS["$workload_class"]="ok"
-  else
-    STATUS_BY_CLASS["$workload_class"]="failed"
+    status="failed"
     echo "WARNING: workload failed; continuing: $workload_class" >&2
   fi
 
   if has_artifacts "$class_output_dir"; then
     artifact_classes=$((artifact_classes + 1))
   fi
-  CAPTURED_BY_CLASS["$workload_class"]="$(count_captured_cells "$class_output_dir/summary.json")"
+  captured_cells="$(count_captured_cells "$class_output_dir/summary.json")"
+  SUMMARY_ROWS+=("$workload_class|$status|$captured_cells")
 done
 
 phase "Analyze consolidated results"
@@ -156,11 +155,12 @@ report_path="$RESULTS_ROOT/inferguard_report/report.md"
 echo "Global report: $report_path"
 printf '\n| Workload class | Status | Cells captured | Cells expected |\n'
 printf '|---|---|---:|---:|\n'
-for workload_class in "${WORKLOAD_CLASSES[@]}"; do
+for row in "${SUMMARY_ROWS[@]}"; do
+  IFS='|' read -r workload_class status captured_cells <<< "$row"
   printf '| %s | %s | %s | %s |\n' \
     "$workload_class" \
-    "${STATUS_BY_CLASS[$workload_class]}" \
-    "${CAPTURED_BY_CLASS[$workload_class]}" \
+    "$status" \
+    "$captured_cells" \
     "$EXPECTED_CELLS"
 done
 

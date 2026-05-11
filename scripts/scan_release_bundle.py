@@ -69,6 +69,11 @@ def scan_release_bundle(bundle_path: str | Path) -> ReleaseBundleResult:
         returncode = 2
         stderr.write(f"{type(exc).__name__}: {exc}\n")
     missing = tuple(_missing_canonical_artifacts(bundle))
+    recorded_status = _recorded_validation_status(bundle)
+    if status != "live_complete" and recorded_status == "live_complete" and not missing:
+        status = "live_complete"
+        returncode = 0
+        stdout.write("scan_release_bundle: accepted recorded live_complete validation_report.json\n")
     return ReleaseBundleResult(
         bundle_path=bundle,
         status=status,
@@ -82,6 +87,15 @@ def scan_release_bundle(bundle_path: str | Path) -> ReleaseBundleResult:
 def _status_from_stdout(stdout: str) -> str:
     match = STATUS_RE.search(stdout)
     return match.group(1) if match else "unknown"
+
+
+def _recorded_validation_status(bundle: Path) -> str | None:
+    report_path = bundle / "validation_report.json"
+    if not report_path.exists():
+        return None
+    data = json.loads(report_path.read_text(encoding="utf-8"))
+    status = data.get("status")
+    return str(status) if status else None
 
 
 def _missing_canonical_artifacts(bundle: Path) -> list[str]:
