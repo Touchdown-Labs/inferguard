@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-05-11
+
+### Added
+
+- Added downstream reporting support for LMCache PR #3255 L0 allocation counters, including allocation record and allocated-block totals.
+- Added ingestion and reporting for redacted L0 boundary JSONL evidence without recording raw tokens or raw block IDs.
+
 ### Docs
 
+- Recorded Modal H100 downstream proof for vLLM + LMCache PR3255 source plus updated InferGuard CLI.
+- Documented release scope boundaries: no vLLM source changes, no performance-improvement claim, and full LMCache coverage remains evidence-gated rather than claimed complete.
 - Closed I1 release-readiness documentation for original vLLM + LMCache +
   InferGuard CLI coverage: refreshed CLI references for accepted MP Packet A-F,
   G1 diagnostics, H1 embedded vLLM, and H3 embedded CacheBlend/vLLM; added
