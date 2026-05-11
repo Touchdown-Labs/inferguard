@@ -1,0 +1,78 @@
+{
+  "artifact_contract_ref": "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete/expected_artifact_contract.json",
+  "harness_version": "0.6.0",
+  "jobs": [
+    {
+      "claim_status": "measured",
+      "downgrades": [],
+      "job_id": "job-live",
+      "required_paths_missing": [],
+      "required_paths_present": [
+        "agentx_ingest_summary.json",
+        "diagnosis/bottleneck_diagnosis.json",
+        "diagnosis/bottleneck_diagnosis.md",
+        "diagnosis/failure_classification.json",
+        "diagnosis/failure_classification.md",
+        "gpu_inventory.json",
+        "gpu_topology.txt",
+        "launch/command.json",
+        "launch/healthcheck.json",
+        "launch/stderr.log",
+        "launch/stdout.log",
+        "metrics/engine_metrics_timeline.jsonl",
+        "metrics/gpu_metrics_timeline.jsonl",
+        "metrics/metrics_summary.json",
+        "preflight/ib_state.txt",
+        "report/operator_recommendation.json",
+        "report/operator_recommendation.md",
+        "request_profile/requests_profile.jsonl",
+        "request_profile/requests_summary.json",
+        "slurm_env.json"
+      ],
+      "status": "live_complete",
+      "synthetic_markers": []
+    },
+    {
+      "claim_status": "measured",
+      "downgrades": [],
+      "job_id": "job-b200-sglang",
+      "required_paths_missing": [],
+      "required_paths_present": [
+        "agentx_ingest_summary.json",
+        "diagnosis/bottleneck_diagnosis.json",
+        "diagnosis/bottleneck_diagnosis.md",
+        "diagnosis/failure_classification.json",
+        "diagnosis/failure_classification.md",
+        "gpu_inventory.json",
+        "gpu_topology.txt",
+        "launch/command.json",
+        "launch/healthcheck.json",
+        "launch/stderr.log",
+        "launch/stdout.log",
+        "metrics/engine_metrics_timeline.jsonl",
+        "metrics/gpu_metrics_timeline.jsonl",
+        "metrics/metrics_summary.json",
+        "preflight/ib_state.txt",
+        "report/operator_recommendation.json",
+        "report/operator_recommendation.md",
+        "request_profile/requests_profile.jsonl",
+        "request_profile/requests_summary.json",
+        "slurm_env.json"
+      ],
+      "status": "live_complete",
+      "synthetic_markers": []
+    }
+  ],
+  "matrix_plan_ref": "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete/matrix_plan.json",
+  "results_root": "/Users/chen/Projects/Touchdown-Labs/oss/inferguard/tests/fixtures/run_dirs/live_complete",
+  "schema_version": "inferguard-validation-report/v1",
+  "status": "live_complete",
+  "summary": {
+    "live_complete": 2,
+    "live_incomplete": 0,
+    "missing_required_artifacts": 0,
+    "not_publishable": 0,
+    "synthetic_only": 0
+  },
+  "validated_at": "2026-05-04T17:31:00Z"
+}

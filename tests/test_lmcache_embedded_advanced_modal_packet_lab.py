@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
+import tempfile
 import types
 from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
+
+_LOCAL_SOURCE_TMP = tempfile.TemporaryDirectory()
+_LOCAL_SOURCE_ROOT = Path(_LOCAL_SOURCE_TMP.name)
+_FAKE_LMCACHE_SOURCE = _LOCAL_SOURCE_ROOT / "LMCache"
+_FAKE_SGLANG_SOURCE = _LOCAL_SOURCE_ROOT / "sglang"
+_FAKE_LMCACHE_SOURCE.mkdir(parents=True, exist_ok=True)
+(_FAKE_SGLANG_SOURCE / "python").mkdir(parents=True, exist_ok=True)
 
 
 def _load_lab_module():
@@ -75,6 +84,9 @@ def _load_lab_module():
 
     fake_modal = types.SimpleNamespace(Image=_FakeImage, Volume=_FakeVolume, App=_FakeApp)
     sys.modules["modal"] = fake_modal
+
+    os.environ.setdefault("INFERGUARD_H_LMCACHE_LOCAL_SOURCE", str(_FAKE_LMCACHE_SOURCE))
+    os.environ.setdefault("INFERGUARD_H_SGLANG_LOCAL_SOURCE", str(_FAKE_SGLANG_SOURCE))
 
     path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_embedded_advanced_modal_packet_lab.py"
     spec = importlib.util.spec_from_file_location(module_name, path)

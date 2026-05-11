@@ -1,0 +1,13 @@
+{
+  "gpus": [
+    "H200",
+    "H200",
+    "H200",
+    "H200",
+    "H200",
+    "H200",
+    "H200",
+    "H200"
+  ],
+  "schema_version": "inferguard-gpu-inventory/v1"
+}

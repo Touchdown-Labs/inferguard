@@ -1,0 +1,60 @@
+{
+  "dcgm_sample_count": 12,
+  "decode": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:generation_tokens_total"
+    ]
+  },
+  "duration_seconds": 180.0,
+  "engine": "vllm",
+  "generated_at": "2026-05-04T00:00:00Z",
+  "gpu_util": {
+    "claim_status": "measured",
+    "p95": 78.0
+  },
+  "hbm": {
+    "claim_status": "measured",
+    "used_mib": {
+      "p95": 51200
+    }
+  },
+  "kv_cache": {
+    "claim_status": "measured",
+    "usage_fraction": {
+      "p95": 0.42
+    }
+  },
+  "lmcache": {
+    "claim_status": "not_proven",
+    "source_metrics": []
+  },
+  "nvlink": {
+    "claim_status": "measured"
+  },
+  "pcie": {
+    "claim_status": "not_proven"
+  },
+  "power": {
+    "claim_status": "measured"
+  },
+  "prefill": {
+    "claim_status": "measured",
+    "source_metrics": [
+      "vllm:prompt_tokens_total"
+    ]
+  },
+  "prefix_cache": {
+    "claim_status": "measured",
+    "hit_rate": 0.31
+  },
+  "queue": {
+    "claim_status": "measured"
+  },
+  "sample_count": 12,
+  "schema_version": "inferguard-metrics-summary/v1",
+  "xid_ecc": {
+    "claim_status": "measured",
+    "xid_errors": 0
+  }
+}

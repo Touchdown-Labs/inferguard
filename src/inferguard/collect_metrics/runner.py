@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
 from inferguard.disagg.adapters import scrape
 from inferguard.disagg.types import EngineName
 from inferguard.io import (

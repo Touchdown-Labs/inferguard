@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,31 +52,29 @@ class ReleaseBundleResult:
 def scan_release_bundle(bundle_path: str | Path) -> ReleaseBundleResult:
     """Run the strict validator and canonical artifact checks for one proof bundle."""
     bundle = Path(bundle_path).resolve()
-    repo_root = Path(__file__).resolve().parents[3]
-    runner = repo_root / "scripts" / "run_neocloud_nvidia_profile.py"
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(runner),
-            "validate-completed",
-            "--results-root",
-            str(bundle),
-            "--strict",
-            "--json-only",
-        ],
-        cwd=repo_root,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    status = _status_from_stdout(completed.stdout)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    returncode = 0
+    try:
+        from inferguard.validate import validate_run
+
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            report = validate_run(bundle)
+        status = report.status
+        if status != "live_complete":
+            returncode = 1
+        stdout.write(f"inferguard validate-completed: status={status}\n")
+    except Exception as exc:  # pragma: no cover - defensive CLI diagnostics
+        status = "unknown"
+        returncode = 2
+        stderr.write(f"{type(exc).__name__}: {exc}\n")
     missing = tuple(_missing_canonical_artifacts(bundle))
     return ReleaseBundleResult(
         bundle_path=bundle,
         status=status,
-        validator_returncode=completed.returncode,
-        validator_stdout=completed.stdout,
-        validator_stderr=completed.stderr,
+        validator_returncode=returncode,
+        validator_stdout=stdout.getvalue(),
+        validator_stderr=stderr.getvalue(),
         missing_artifacts=missing,
     )
 

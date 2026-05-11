@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from inferguard.compat import build_compat_report, _read_l0_boundary_evidence
+from inferguard.compat import _read_l0_boundary_evidence, build_compat_report
 from inferguard.io import atomic_write_json
 from inferguard.metrics_core import parse_labeled_prometheus_text
 

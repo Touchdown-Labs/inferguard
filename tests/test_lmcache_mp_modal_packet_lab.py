@@ -4,8 +4,24 @@ import importlib.util
 import json
 import os
 import sys
+import tempfile
 import types
 from pathlib import Path
+
+_LOCAL_SOURCE_TMP = tempfile.TemporaryDirectory()
+_LOCAL_SOURCE_ROOT = Path(_LOCAL_SOURCE_TMP.name)
+_FAKE_VLLM_SOURCE = _LOCAL_SOURCE_ROOT / "vllm"
+_FAKE_VLLM_CONNECTOR = (
+    _FAKE_VLLM_SOURCE
+    / "vllm"
+    / "distributed"
+    / "kv_transfer"
+    / "kv_connector"
+    / "v1"
+    / "lmcache_mp_connector.py"
+)
+_FAKE_VLLM_CONNECTOR.parent.mkdir(parents=True, exist_ok=True)
+_FAKE_VLLM_CONNECTOR.write_text("# fake local connector\n", encoding="utf-8")
 
 _LMCACHE_SOURCE_ENV_KEYS = (
     "INFERGUARD_LMCACHE_LOCAL_SOURCE",
@@ -95,6 +111,8 @@ def _load_lab_module(env: dict[str, str] | None = None):
         os.environ.pop(key, None)
     if env:
         os.environ.update(env)
+    if not env or "INFERGUARD_VLLM_LOCAL_SOURCE" not in env:
+        os.environ["INFERGUARD_VLLM_LOCAL_SOURCE"] = str(_FAKE_VLLM_SOURCE)
 
     path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_mp_modal_packet_lab.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -164,7 +182,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
     assert add_local_dirs == [
         {
-            "local_path": str(lab.DEFAULT_VLLM_LOCAL_SOURCE / "vllm"),
+            "local_path": str(_FAKE_VLLM_SOURCE / "vllm"),
             "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
             "copy": True,
         },
@@ -220,7 +238,7 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
         "copy": True,
     }
     assert add_local_dirs[1] == {
-        "local_path": str(lab.DEFAULT_VLLM_LOCAL_SOURCE / "vllm"),
+        "local_path": str(_FAKE_VLLM_SOURCE / "vllm"),
         "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
         "copy": True,
     }
@@ -455,12 +473,17 @@ def test_vllm_overlay_plan_defaults_to_sibling_private_fork() -> None:
 
     plan = lab._select_vllm_overlay_plan({})
 
-    assert plan.source_kind == "local_connector_overlay"
-    assert plan.local_source == lab.DEFAULT_VLLM_LOCAL_SOURCE
-    assert plan.source_ref == str(lab.DEFAULT_VLLM_LOCAL_SOURCE)
-    assert len(plan.run_commands) == 1
-    assert "/opt/vllm/vllm" in plan.run_commands[0]
-    assert "lmcache_mp_connector.py" in plan.run_commands[0]
+    if lab.DEFAULT_VLLM_LOCAL_SOURCE.exists():
+        assert plan.source_kind == "local_connector_overlay"
+        assert plan.local_source == lab.DEFAULT_VLLM_LOCAL_SOURCE
+        assert plan.source_ref == str(lab.DEFAULT_VLLM_LOCAL_SOURCE)
+        assert len(plan.run_commands) == 1
+        assert "/opt/vllm/vllm" in plan.run_commands[0]
+        assert "lmcache_mp_connector.py" in plan.run_commands[0]
+    else:
+        assert plan.source_kind == "pypi"
+        assert plan.local_source is None
+        assert plan.run_commands == ()
 
 
 def test_runtime_vllm_overlay_plan_preserves_image_build_env(monkeypatch) -> None:

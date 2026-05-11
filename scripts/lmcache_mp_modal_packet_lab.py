@@ -875,7 +875,6 @@ def _write_l2_config(run_dir: Path, spec: PacketSpec) -> Path | None:
 def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[str, str]:
     spec = spec or PACKETS["a"]
     env: dict[str, str] = {}
-    l2_config_path = run_dir / L2_CONFIG_FILE
     if spec.enable_otel:
         endpoint = f"http://127.0.0.1:{OTLP_HTTP_PORT}"
         env.update(
