@@ -1525,6 +1525,10 @@ def lmcache_compat_cmd(
         Path | None,
         typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
     ] = None,
+    lmcache_l0_boundary_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-l0-boundary-evidence-file", help="Optional LMCache PR3255 L0 block boundary JSONL or summary JSON."),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", help="Optional JSON report path."),
@@ -1625,6 +1629,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -1661,6 +1666,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
         )
     else:
         report = build_compat_report_from_paths(
@@ -1675,6 +1681,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
         )
     if output is not None:
         write_compat_report(report, output)
@@ -2121,6 +2128,10 @@ def observability_coverage_cmd(
         Path | None,
         typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
     ] = None,
+    lmcache_l0_boundary_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-l0-boundary-evidence-file", help="Optional LMCache PR3255 L0 block boundary JSONL or summary JSON."),
+    ] = None,
     expected_engine: Annotated[
         str,
         typer.Option("--expected-engine", help="Expected engine: auto, vllm, or sglang."),
@@ -2187,6 +2198,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -2212,6 +2224,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
             **kwargs,
         )
     else:
@@ -2224,6 +2237,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
             **kwargs,
         )
     if output is not None:

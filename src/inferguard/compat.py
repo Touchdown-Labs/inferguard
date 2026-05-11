@@ -14,6 +14,16 @@ from inferguard.collect_metrics.normalize import LMCACHE_LOCKED_METRICS, VLLM_LO
 from inferguard.metrics_core import LabeledSample, parse_labeled_prometheus_text
 
 SCHEMA_VERSION = "inferguard-observability-compat/v1"
+L0_BOUNDARY_SCHEMA_VERSION = "inferguard-l0-block-boundary-event/v1"
+L0_BOUNDARY_FORBIDDEN_FIELDS = (
+    "token_ids",
+    "tokens",
+    "raw_tokens",
+    "raw_token_ids",
+    "block_ids",
+    "raw_block_ids",
+    "gpu_block_ids",
+)
 
 
 class ExpectMode(StrEnum):
@@ -224,6 +234,21 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     ),
     MetricFamilySpec(
         "lmcache_mp",
+        "l0_allocation_counters",
+        (
+            "lmcache_mp_l0_block_allocation_records",
+            "lmcache_mp_l0_block_allocation_records_total",
+            "lmcache_mp_l0_block_allocated_blocks",
+            "lmcache_mp_l0_block_allocated_blocks_total",
+            "lmcache_mp.l0_block_allocation_records",
+            "lmcache_mp.l0_block_allocation_records_total",
+            "lmcache_mp.l0_block_allocated_blocks",
+            "lmcache_mp.l0_block_allocated_blocks_total",
+        ),
+        required_when="sampled",
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
         "real_reuse",
         ("lmcache_mp_real_reuse_gap_*", "lmcache_mp.real_reuse_gap_*"),
         required_when="sampled",
@@ -388,6 +413,7 @@ def build_compat_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
@@ -405,6 +431,7 @@ def build_compat_report(
         lmcache_http_evidence=lmcache_http_evidence,
         lmcache_log_evidence=lmcache_log_evidence,
         lmcache_otel_evidence=lmcache_otel_evidence,
+        lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
     )
     observed_lmcache_cacheblend_evidence = _has_measured_cacheblend_evidence(
         lmcache_otel_evidence=lmcache_otel_evidence,
@@ -447,6 +474,7 @@ def build_compat_report(
             lmcache_otel_evidence=lmcache_otel_evidence,
             lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
             lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
         )
     )
     diagnostic_findings = _diagnostic_findings(
@@ -485,6 +513,7 @@ def build_compat_report(
             lmcache_http_evidence=lmcache_http_evidence,
             lmcache_trace_evidence=lmcache_trace_evidence,
             lmcache_otel_evidence=lmcache_otel_evidence,
+            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
             mp_observability=mp_observability_report,
         )
     )
@@ -522,6 +551,7 @@ def build_compat_report(
         "lmcache_otel_evidence": lmcache_otel_evidence,
         "lmcache_trace_replay_evidence": lmcache_trace_replay_evidence,
         "lmcache_lookup_hash_evidence": lmcache_lookup_hash_evidence,
+        "lmcache_l0_boundary_evidence": lmcache_l0_boundary_evidence,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -544,6 +574,7 @@ def build_compat_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -563,6 +594,7 @@ def build_compat_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
     )
 
 
@@ -580,6 +612,7 @@ def build_compat_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -595,6 +628,7 @@ def build_compat_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
     )
 
 
@@ -688,6 +722,7 @@ def _evidence_family_rows(
     lmcache_otel_evidence: dict[str, Any] | None,
     lmcache_trace_replay_evidence: dict[str, Any] | None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     return [
         _evidence_family_row("lmcache_http", "mp_http_api", lmcache_http_evidence),
@@ -697,6 +732,7 @@ def _evidence_family_rows(
         _evidence_family_row("lmcache_otel", "cacheblend_spans", lmcache_otel_evidence),
         _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
         _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
+        _evidence_family_row("lmcache_l0_boundary", "redacted_jsonl", lmcache_l0_boundary_evidence),
     ]
 
 
@@ -711,7 +747,8 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
             evidence.get("claim_status") == "measured"
             or evidence.get("booleans", {}).get("is_healthy")
             or evidence.get("record_count", 0)
-            or evidence.get("row_count", 0)
+            or evidence.get("accepted_count", 0)
+            or evidence.get("row_count", 0) and evidence.get("claim_status") != "blocked"
             or evidence.get("total_records", 0)
             or any(int(value or 0) > 0 for value in event_counts.values())
         ):
@@ -737,13 +774,15 @@ def _has_measured_mp_evidence(
     lmcache_http_evidence: dict[str, Any] | None,
     lmcache_log_evidence: dict[str, Any] | None,
     lmcache_otel_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
 ) -> bool:
     status = (lmcache_http_evidence or {}).get("endpoints", {}).get("status", {})
     status_fields = status.get("fields") if isinstance(status, dict) else {}
     engine_type = status_fields.get("engine_type") if isinstance(status_fields, dict) else None
     log_modes = (lmcache_log_evidence or {}).get("mode_candidates") or []
     otel_mp_spans = (lmcache_otel_evidence or {}).get("mp_span_count") or 0
-    return engine_type == "MPCacheEngine" or "mp" in log_modes or float(otel_mp_spans) > 0
+    l0_boundary_measured = (lmcache_l0_boundary_evidence or {}).get("claim_status") == "measured"
+    return engine_type == "MPCacheEngine" or "mp" in log_modes or float(otel_mp_spans) > 0 or l0_boundary_measured
 
 
 def _has_measured_cacheblend_evidence(*, lmcache_otel_evidence: dict[str, Any] | None) -> bool:
@@ -1615,11 +1654,69 @@ def _read_json_object(path: Path | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _read_l0_boundary_evidence(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    if path.suffix == ".json":
+        payload = _read_json_object(path)
+        return payload if payload else None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {"present": False, "claim_status": "blocked", "failure_reasons": [{"code": "lmcache_l0_boundary_file_unreadable", "message": f"Could not read {path}"}]}
+    stage_counts: dict[str, int] = {}
+    accepted = 0
+    rejected = 0
+    failures: list[dict[str, str]] = []
+    raw_tokens = False
+    raw_block_ids = False
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            rejected += 1
+            failures.append({"code": "lmcache_l0_boundary_malformed_json", "message": "Boundary evidence JSONL contained malformed JSON."})
+            continue
+        if not isinstance(event, dict):
+            rejected += 1
+            failures.append({"code": "lmcache_l0_boundary_malformed_event", "message": "Boundary evidence row was not a JSON object."})
+            continue
+        schema = event.get("schema_version") or event.get("schema") or event.get("event_schema")
+        forbidden = sorted(set(event) & set(L0_BOUNDARY_FORBIDDEN_FIELDS))
+        raw_tokens = raw_tokens or any(name in event for name in ("token_ids", "tokens", "raw_tokens", "raw_token_ids"))
+        raw_block_ids = raw_block_ids or any(name in event for name in ("block_ids", "raw_block_ids", "gpu_block_ids"))
+        if schema != L0_BOUNDARY_SCHEMA_VERSION or forbidden:
+            rejected += 1
+            code = "lmcache_l0_boundary_forbidden_raw_fields" if forbidden else "lmcache_l0_boundary_schema_mismatch"
+            failures.append({"code": code, "message": "Boundary evidence row failed schema or redaction validation."})
+            continue
+        stage = str(event.get("stage") or event.get("boundary_stage") or "unknown")
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        accepted += 1
+    row_count = accepted + rejected
+    blocked = bool(rejected and not accepted) or raw_tokens or raw_block_ids
+    return {
+        "present": row_count > 0,
+        "claim_status": "blocked" if blocked else ("measured" if accepted else "not_proven"),
+        "schema_version": L0_BOUNDARY_SCHEMA_VERSION,
+        "row_count": row_count,
+        "accepted_count": accepted,
+        "rejected_count": rejected,
+        "stage_counts": stage_counts,
+        "raw_tokens_recorded": raw_tokens,
+        "raw_block_ids_recorded": raw_block_ids,
+        "failure_reasons": failures,
+    }
+
+
 def _evidence_failures(
     *,
     lmcache_http_evidence: dict[str, Any] | None,
     lmcache_trace_evidence: dict[str, Any] | None,
     lmcache_otel_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None,
     mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     failures: list[dict[str, Any]] = []
@@ -1629,6 +1726,14 @@ def _evidence_failures(
                 {
                     "code": item.get("code") or "lmcache_http_unhealthy",
                     "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy",
+                }
+            )
+    for item in (lmcache_l0_boundary_evidence or {}).get("failure_reasons", []) or []:
+        if isinstance(item, dict):
+            failures.append(
+                {
+                    "code": item.get("code") or "lmcache_l0_boundary_invalid",
+                    "message": item.get("message") or "LMCache L0 block boundary evidence was invalid.",
                 }
             )
     if (mp_observability.get("config") or {}).get("trace_recording_enabled") and not (

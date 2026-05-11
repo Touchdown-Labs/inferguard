@@ -421,6 +421,75 @@ lmcache_mp_event_bus_dropped_events_total 1
         assert any(item["code"] == "lmcache_mp_l2_failures" for item in report["diagnostic_findings"])
 
 
+def test_lmcache_pr3255_l0_allocation_counters_are_first_class() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+# HELP lmcache_mp_l0_block_allocation_records Total vLLM block allocation records processed by the L0 lifecycle subscriber.
+# TYPE lmcache_mp_l0_block_allocation_records counter
+lmcache_mp_l0_block_allocation_records{model_name="Qwen/Qwen3-8B"} 3
+# HELP lmcache_mp_l0_block_allocated_blocks Total vLLM GPU KV cache blocks processed by the L0 lifecycle subscriber.
+# TYPE lmcache_mp_l0_block_allocated_blocks counter
+lmcache_mp_l0_block_allocated_blocks{model_name="Qwen/Qwen3-8B"} 128
+""",
+        expect_mode="mp",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    allocation = families[("lmcache_mp", "l0_allocation_counters")]
+    assert allocation["status"] == "populated"
+    assert allocation["matched_metrics"] == [
+        "lmcache_mp_l0_block_allocated_blocks",
+        "lmcache_mp_l0_block_allocation_records",
+    ]
+    assert report["detected_mode"] == "mp"
+
+
+def test_lmcache_pr3255_boundary_evidence_accepts_redacted_jsonl_schema() -> None:
+    evidence = {
+        "present": True,
+        "claim_status": "measured",
+        "schema_version": "inferguard-l0-block-boundary-event/v1",
+        "row_count": 3,
+        "accepted_count": 3,
+        "rejected_count": 0,
+        "stage_counts": {
+            "vllm_adapter_before_queue_submit": 1,
+            "lmcache_server_receive": 1,
+            "l0_lifecycle_subscriber_process": 1,
+        },
+        "raw_tokens_recorded": False,
+        "raw_block_ids_recorded": False,
+    }
+    report = build_compat_report(lmcache_l0_boundary_evidence=evidence, expect_mode="mp")
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_l0_boundary", "redacted_jsonl")]["status"] == "populated"
+    assert report["lmcache_l0_boundary_evidence"]["claim_status"] == "measured"
+    assert report["detected_mode"] == "mp"
+    assert report["failure_reasons"] == []
+
+
+def test_lmcache_pr3255_boundary_evidence_flags_forbidden_raw_fields() -> None:
+    evidence = {
+        "present": True,
+        "claim_status": "blocked",
+        "schema_version": "inferguard-l0-block-boundary-event/v1",
+        "row_count": 1,
+        "accepted_count": 0,
+        "rejected_count": 1,
+        "raw_tokens_recorded": True,
+        "raw_block_ids_recorded": True,
+        "failure_reasons": [
+            {"code": "lmcache_l0_boundary_forbidden_raw_fields", "message": "raw token or block identifiers were present"}
+        ],
+    }
+    report = build_compat_report(lmcache_l0_boundary_evidence=evidence, expect_mode="mp")
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_l0_boundary", "redacted_jsonl")]["status"] == "zero"
+    assert any(item["code"] == "lmcache_l0_boundary_forbidden_raw_fields" for item in report["failure_reasons"])
+
+
 def test_lmcache_otel_push_mode_uses_live_evidence_when_prometheus_mp_metrics_are_unavailable() -> None:
     report = build_compat_report(
         engine_text="vllm:request_success_total{finished_reason=\"stop\"} 1\n",

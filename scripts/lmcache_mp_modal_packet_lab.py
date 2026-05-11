@@ -1723,6 +1723,8 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    if spec.packet_id == "b":
+        _maybe_add_existing(cmd, "--lmcache-l0-boundary-evidence-file", run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     return cmd
 
 
@@ -1756,6 +1758,8 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    if spec.packet_id == "b":
+        _maybe_add_existing(cmd, "--lmcache-l0-boundary-evidence-file", run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     return cmd
 
 

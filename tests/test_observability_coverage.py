@@ -178,6 +178,54 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     assert payload["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
 
 
+def test_observability_coverage_cli_accepts_pr3255_l0_boundary_jsonl(tmp_path: Path) -> None:
+    boundary = tmp_path / "l0_boundary.jsonl"
+    boundary.write_text(
+        "\n".join(
+            [
+                json.dumps({
+                    "schema_version": "inferguard-l0-block-boundary-event/v1",
+                    "source_component": "vllm_adapter",
+                    "stage": "vllm_adapter_before_queue_submit",
+                    "timestamp": "2026-05-11T00:00:00Z",
+                    "request_id": "redacted-request-1",
+                    "block_count": 64,
+                    "metric_update_count": 1,
+                }),
+                json.dumps({
+                    "schema_version": "inferguard-l0-block-boundary-event/v1",
+                    "source_component": "lmcache_server",
+                    "stage": "lmcache_server_receive",
+                    "timestamp": "2026-05-11T00:00:01Z",
+                    "request_id": "redacted-request-1",
+                    "block_count": 64,
+                    "metric_update_count": 1,
+                }),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "observability-coverage",
+            "--lmcache-l0-boundary-evidence-file",
+            str(boundary),
+            "--expect-lmcache-mode",
+            "mp",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["detected_lmcache_mode"] == "mp"
+    assert payload["surfaces"]["lmcache_l0_boundary"]["status"] == "complete"
+    assert payload["lmcache_compat"]["lmcache_l0_boundary_evidence"]["accepted_count"] == 2
+
+
 def test_observability_coverage_cli_accepts_new_lmcache_evidence_files(tmp_path: Path) -> None:
     log = tmp_path / "log.json"
     trace_replay = tmp_path / "trace_replay.json"
