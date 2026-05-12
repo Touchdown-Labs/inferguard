@@ -1899,6 +1899,18 @@ def collect_lmcache_cmd(
             help="Optional lookup_hashes_*.jsonl file or lookup-hash directory to copy and parse if supported.",
         ),
     ] = None,
+    lmcache_l0_boundary_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--lmcache-l0-boundary-evidence-file", help="Optional LMCache PR3255 L0 block boundary JSONL or summary JSON."),
+    ] = None,
+    sglang_kv_events_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--sglang-kv-events-evidence-file", help="Optional SGLang KV-events JSON/JSONL evidence; raw token/hash fields are redacted."),
+    ] = None,
+    expected_engine: Annotated[
+        str,
+        typer.Option("--expected-engine", help="Expected serving engine: auto, vllm, or sglang."),
+    ] = "auto",
     expect_mode: Annotated[
         str,
         typer.Option("--expect-mode", help="Expected LMCache mode: auto, mp, or embedded."),
@@ -1906,6 +1918,21 @@ def collect_lmcache_cmd(
     l2_configured: Annotated[
         bool,
         typer.Option("--l2-configured", help="Treat MP L2 metric families as expected."),
+    ] = False,
+    external_cache_configured: Annotated[
+        bool,
+        typer.Option("--external-cache-configured", help="Require external prefix/KV cache families in the coverage report."),
+    ] = False,
+    cpu_offload_configured: Annotated[
+        bool,
+        typer.Option("--cpu-offload-configured", help="Require vLLM CPU offload metric families in the coverage report."),
+    ] = False,
+    disaggregated_or_external_cache: Annotated[
+        bool,
+        typer.Option(
+            "--disaggregated-or-external-cache",
+            help="Require KV transfer families for disaggregated/external-cache paths in the coverage report.",
+        ),
     ] = False,
     timeout_seconds: Annotated[
         float,
@@ -1971,8 +1998,11 @@ def collect_lmcache_cmd(
     from inferguard.lmcache_packet import LmcachePacketOptions, collect_lmcache_packet
 
     valid_modes = {"auto", "mp", "embedded"}
+    valid_engines = {"auto", "vllm", "sglang"}
     if expect_mode not in valid_modes:
         raise typer.BadParameter("--expect-mode must be one of auto|mp|embedded")
+    if expected_engine not in valid_engines:
+        raise typer.BadParameter("--expected-engine must be one of auto|vllm|sglang")
     if timeout_seconds <= 0:
         raise typer.BadParameter("--timeout-seconds must be positive")
     if mp_metrics_sample_rate is not None and not (0 < mp_metrics_sample_rate <= 1.0):
@@ -2016,6 +2046,8 @@ def collect_lmcache_cmd(
             lmcache_otel_file,
             lmcache_trace_replay_output,
             lmcache_lookup_hash_path,
+            lmcache_l0_boundary_evidence_file,
+            sglang_kv_events_evidence_file,
         ]
     ):
         raise typer.BadParameter("pass at least one URL or file input to collect")
@@ -2056,8 +2088,14 @@ def collect_lmcache_cmd(
             lmcache_otel_file=lmcache_otel_file,
             lmcache_trace_replay_output=lmcache_trace_replay_output,
             lmcache_lookup_hash_path=lmcache_lookup_hash_path,
+            lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
+            sglang_kv_events_evidence_file=sglang_kv_events_evidence_file,
+            expected_engine=expected_engine,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
+            external_cache_configured=external_cache_configured,
+            cpu_offload_configured=cpu_offload_configured,
+            disaggregated_or_external_cache=disaggregated_or_external_cache,
             timeout_seconds=timeout_seconds,
             mp_observability={
                 "prometheus_port": mp_prometheus_port,
@@ -2079,6 +2117,8 @@ def collect_lmcache_cmd(
             "inferguard collect-lmcache: "
             f"detected_mode={manifest.get('detected_mode')} "
             f"claim_status={manifest.get('claim_status')} "
+            f"expected_engine={manifest.get('expected_engine')} "
+            f"detected_engines={','.join(manifest.get('detected_engines') or []) or 'none'} "
             f"artifacts={len(manifest.get('artifacts') or {})} "
             f"errors={len(manifest.get('scrape_errors') or [])} "
             f"output_dir={output_dir}"

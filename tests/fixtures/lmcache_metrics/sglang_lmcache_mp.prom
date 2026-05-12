@@ -4,6 +4,16 @@ lmcache_mp_sm_read_requests_total 1
 lmcache_mp_sm_write_requests_total 1
 lmcache_mp_l1_read_keys_total 1
 lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_memory_usage_bytes 4096
+lmcache_mp_l1_read_failure_total 1
+lmcache_mp_l1_chunk_store_seconds_count 1
+lmcache_mp_l0_block_store_seconds_count 1
+lmcache_mp_l0_block_allocation_records_total 1
+lmcache_mp_real_reuse_gap_seconds_count 1
+lmcache_mp_l2_store_failure_total 1
+lmcache_mp_num_chunks_loaded_total 1
+lmcache_mp_active_prefetch_jobs 1
+lmcache_mp_event_bus_queue_size 1
 lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 100
 lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 50
 lmcache_mp_l0_l1_store_throughput_gbs_sum 12
