@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from inferguard.cli import app
 from inferguard.launch_engine.sglang import (
     DEFAULT_SGLANG_CHUNKED_PREFILL_SIZE,
     build_sglang_command,
@@ -46,6 +48,25 @@ def test_sglang_lmcache_and_kv_events_flags_are_source_backed() -> None:
     assert argv[argv.index("--kv-events-config") + 1] == config
 
 
+def test_sglang_lmcache_mp_flags_are_source_backed() -> None:
+    config = '{"publisher": "zmq", "topic": "kv-events"}'
+    argv = build_sglang_command(
+        "Qwen/Qwen2.5-1.5B-Instruct",
+        host="127.0.0.1",
+        port=30000,
+        enable_lmcache=True,
+        lmcache_mp_host="127.0.0.1",
+        lmcache_mp_port=5556,
+        kv_events_config=config,
+    )
+
+    assert "--enable-lmcache" in argv
+    assert argv[argv.index("--lmcache-mp-host") + 1] == "127.0.0.1"
+    assert argv[argv.index("--lmcache-mp-port") + 1] == "5556"
+    assert argv[argv.index("--kv-events-config") + 1] == config
+    assert "--lmcache-mp-enable" not in argv
+
+
 def test_b200_fp8_chunked_prefill_always_explicit() -> None:
     argv = build_sglang_command(
         "deepseek-ai/DeepSeek-V4-Pro",
@@ -70,6 +91,40 @@ def test_b200_fp8_cannot_disable_chunked_prefill() -> None:
             quantization="fp8",
             chunked_prefill_size=-1,
         )
+
+
+def test_launch_engine_cli_records_sglang_lmcache_mp_flags(tmp_path: Path) -> None:
+    server = start_mock_sglang_server()
+    try:
+        result = CliRunner().invoke(
+            app,
+            [
+                "launch-engine",
+                "--output-dir",
+                str(tmp_path),
+                "--engine",
+                "sglang",
+                "--external-launch",
+                "--endpoint-url",
+                server.base_url,
+                "--model-path",
+                "mock-sglang",
+                "--enable-lmcache",
+                "--lmcache-mp-host",
+                "127.0.0.1",
+                "--lmcache-mp-port",
+                "5556",
+            ],
+        )
+    finally:
+        server.teardown()
+
+    assert result.exit_code == 0, result.output
+    command = json.loads((tmp_path / "launch" / "command.json").read_text(encoding="utf-8"))
+    argv = command["argv"]
+    assert "--enable-lmcache" in argv
+    assert argv[argv.index("--lmcache-mp-host") + 1] == "127.0.0.1"
+    assert argv[argv.index("--lmcache-mp-port") + 1] == "5556"
 
 
 def test_launch_command_records_b200_fp8_warning(tmp_path: Path) -> None:

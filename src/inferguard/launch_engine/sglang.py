@@ -23,6 +23,8 @@ def build_sglang_command(
     enable_metrics: bool = False,
     enable_cache_report: bool = True,
     enable_lmcache: bool = False,
+    lmcache_mp_host: str | None = None,
+    lmcache_mp_port: int | None = None,
     kv_events_config: str | None = None,
     chunked_prefill_size: int | None = None,
     hardware: str | None = None,
@@ -59,6 +61,10 @@ def build_sglang_command(
         argv.append("--enable-cache-report")
     if enable_lmcache:
         argv.append("--enable-lmcache")
+    if lmcache_mp_host:
+        argv.extend(["--lmcache-mp-host", lmcache_mp_host])
+    if lmcache_mp_port is not None:
+        argv.extend(["--lmcache-mp-port", str(lmcache_mp_port)])
     if kv_events_config:
         argv.extend(["--kv-events-config", kv_events_config])
     if resolved_chunked_prefill_size is not None:

@@ -445,11 +445,13 @@ def build_compat_report(
         observed_lmcache_embedded,
         cacheblend_observed,
     )
+    mp_launch_evidence = _sglang_lmcache_mp_launch_evidence(samples, mp_observability or {})
     architecture = _architecture_detection(
         samples,
         observed_lmcache_mp=observed_lmcache_mp,
         observed_lmcache_cacheblend=observed_lmcache_cacheblend,
         observed_lmcache_embedded=observed_lmcache_embedded,
+        sglang_lmcache_mp_launch_evidence=mp_launch_evidence,
     )
     mp_observability_report = _mp_observability_report(
         samples,
@@ -806,12 +808,46 @@ def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool, o
     return "unknown"
 
 
+def _sglang_lmcache_mp_launch_evidence(
+    samples: list[LabeledSample], explicit: dict[str, Any]
+) -> dict[str, Any]:
+    host_values = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"lmcache_mp_host", "sglang_lmcache_mp_host"} and value
+        }
+    )
+    port_values = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"lmcache_mp_port", "sglang_lmcache_mp_port"} and value
+        }
+    )
+    source_fields = explicit.get("source_fields") if isinstance(explicit.get("source_fields"), dict) else {}
+    if source_fields:
+        if source_fields.get("lmcache_mp_host"):
+            host_values.append(str(source_fields["lmcache_mp_host"]))
+        if source_fields.get("lmcache_mp_port"):
+            port_values.append(str(source_fields["lmcache_mp_port"]))
+    present = bool(host_values and port_values)
+    return {
+        "present": present,
+        "lmcache_mp_host_values": sorted(set(host_values)),
+        "lmcache_mp_port_values": sorted(set(port_values)),
+    }
+
+
 def _architecture_detection(
     samples: list[LabeledSample],
     *,
     observed_lmcache_mp: bool,
     observed_lmcache_cacheblend: bool,
     observed_lmcache_embedded: bool,
+    sglang_lmcache_mp_launch_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     names = {sample.name for sample in samples}
     has_vllm = any(name.startswith("vllm:") for name in names)
@@ -877,13 +913,16 @@ def _architecture_detection(
         connector in {"LMCacheLayerwiseConnector", "LMCacheConnector"}
         for connector in connector_labels
     )
+    has_sglang_mp_lmcache_connector = "LMCacheMPLayerwiseConnector" in connector_labels
     has_sglang_lmcradix_cache = "LMCRadixCache" in cache_labels
     has_sglang_enable_lmcache = any(
         value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels
     ) or "sglang:lmcache_enabled" in names
     has_sglang_hicache_metrics = any(name.startswith("sglang:hicache_") for name in names)
+    has_sglang_lmcache_mp_launch = bool((sglang_lmcache_mp_launch_evidence or {}).get("present"))
     has_sglang_lmcache_signal = (
         has_sglang_lmcache_connector
+        or has_sglang_mp_lmcache_connector
         or has_sglang_lmcradix_cache
         or has_sglang_enable_lmcache
     )
@@ -903,6 +942,9 @@ def _architecture_detection(
     ):
         label = "vllm_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
+    elif has_sglang and observed_mp_like and has_sglang_lmcache_mp_launch:
+        label = "sglang_mp_lmcache_observability"
+        confidence = "fixture_tested"
     elif has_sglang and observed_mp_like:
         label = "sglang_mp_lmcache_candidate"
         confidence = "inferred"
@@ -928,6 +970,8 @@ def _architecture_detection(
         "vllm_embedded_connector_label": has_vllm_embedded_connector,
         "vllm_lmcache_offload_backend_label": has_vllm_lmcache_offload_backend,
         "sglang_lmcache_connector_label": has_sglang_lmcache_connector,
+        "sglang_mp_lmcache_connector_label": has_sglang_mp_lmcache_connector,
+        "sglang_lmcache_mp_launch_evidence": has_sglang_lmcache_mp_launch,
         "sglang_enable_lmcache_label": has_sglang_enable_lmcache,
         "sglang_lmcradix_cache_label": has_sglang_lmcradix_cache,
         "sglang_hicache_metrics": has_sglang_hicache_metrics,

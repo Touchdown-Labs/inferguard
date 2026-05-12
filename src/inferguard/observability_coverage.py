@@ -234,6 +234,7 @@ def build_observability_coverage_report(
     surfaces["sglang_kv_events"] = sglang_kv_row
     gaps = _coverage_gaps(engine_families, lmcache_report)
     kv_cache_offload = _kv_cache_offload_report(samples)
+    sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(lmcache_report)
     return {
         "schema_version": SCHEMA_VERSION,
         "engine_source": engine_source,
@@ -256,6 +257,7 @@ def build_observability_coverage_report(
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
+        "sglang_lmcache_mp_observability": sglang_lmcache_mp,
         "sglang_kv_events_evidence": sglang_kv_events_evidence,
         "coverage_gaps": gaps,
     }
@@ -331,6 +333,32 @@ def build_observability_coverage_report_from_urls(
 def write_observability_coverage_report(report: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(output, report)
+
+
+def _sglang_lmcache_mp_observability_report(lmcache_report: dict[str, Any]) -> dict[str, Any]:
+    architecture = lmcache_report.get("detected_architecture") or {}
+    classification = str(architecture.get("label") or "unknown")
+    claim_status = "fixture_tested" if classification == "sglang_mp_lmcache_observability" else "not_proven"
+    return {
+        "support_status": "source_backed_fixture_tested",
+        "classification": classification,
+        "claim_status": claim_status,
+        "upstream_state": "open_prs_not_merged",
+        "sglang_pr": "https://github.com/sgl-project/sglang/pull/24089",
+        "lmcache_pr": "https://github.com/LMCache/LMCache/pull/3166",
+        "live_validation": "pending",
+        "required_launch_flags": [
+            "--enable-lmcache",
+            "--lmcache-mp-host",
+            "--lmcache-mp-port",
+        ],
+        "non_claims": [
+            "not live validated",
+            "not merged upstream",
+            "not performance validated",
+            "not production support",
+        ],
+    }
 
 
 def _family_row(

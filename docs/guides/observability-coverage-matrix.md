@@ -84,6 +84,15 @@ KV event path uses LMCache `enable_kv_events: true` plus SGLang
 `--kv-events-config '{"publisher": "zmq", "topic": "kv-events"}'`. InferGuard
 redacts raw token IDs and block hashes from normalized/report artifacts.
 
+SGLang + LMCache MP observability is tracked separately from embedded SGLang
+LMCache. It is source-backed by open upstream PRs
+<https://github.com/sgl-project/sglang/pull/24089> and
+<https://github.com/LMCache/LMCache/pull/3166>, and fixture-tested in InferGuard
+only. The PR-backed SGLang launch evidence is `--enable-lmcache` plus
+`--lmcache-mp-host` and `--lmcache-mp-port`; InferGuard does not invent an MP
+enable flag. This lane is not live validated, not merged upstream, not
+performance validated, and not production support.
+
 InferGuard is source-available under `BUSL-1.1`; parser support below is not a
 hosted-service license grant or a performance/customer-readiness claim.
 
@@ -117,7 +126,7 @@ the parser or collector path exists and is fixture-tested, not that the lane is
 | SGLang | Prometheus KV transfer, if present | supported | `engine_metrics_timeline.jsonl`, `metrics_summary.json`, `observability_coverage.json` | `_parse_sglang`, connector label detection on `sglang:kv_transfer_*`, `observability-coverage --disaggregated-or-external-cache` | Live SGLang deployments using Mooncake/NIXL labels. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_kv_transfer.prom" --expected-engine sglang --disaggregated-or-external-cache --output "$PACKET_DIR/sglang_kv_transfer_coverage.json"` |
 | SGLang | Embedded LMCache evidence | partial | `engine_metrics_timeline.jsonl`, `metrics_summary.json`, `observability_coverage.json`, optional LMCache packet artifacts | `normalize_engine_sample("sglang", ...)`, `_parse_sglang`, LMCache embedded metric parser, `launch-engine` argv support for documented `--enable-lmcache` | Source-backed and fixture-tested for documented embedded mode; pending live validation. Demo `chunk_size: 8` values from docs remain demo-only, not recommended production defaults. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
 | SGLang | KV events via LMCache `enable_kv_events` | partial | `sglang_kv_events_evidence`, `observability_coverage.json` | `observability-coverage --sglang-kv-events-evidence-file` redacts raw `token_ids`, `block_hashes`, and parent hashes while retaining counts. | Source-backed and parser-tested; pending live SGLang/LMCache KV-event capture. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang.prom" --sglang-kv-events-evidence-file "$PACKET_DIR/sglang-kv-events.jsonl" --expected-engine sglang --output "$PACKET_DIR/sglang_kv_events_coverage.json"` |
-| SGLang | LMCache MP evidence | missing | none | none yet | Current-mainline SGLang MP connector/launch contract plus live proof. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_mp_candidate_coverage.json" --expect-lmcache-mode mp` |
+| SGLang | LMCache MP observability evidence | partial | `launch/command.json`, `observability_coverage.json`, `lmcache_compat_report.json`, `lmcache_metrics.prom` | `launch-engine` argv support for PR-backed `--enable-lmcache --lmcache-mp-host --lmcache-mp-port`; `observability-coverage` emits `sglang_lmcache_mp_observability` with `source_backed_fixture_tested` support status when SGLang metrics, LMCache MP metrics, and MP launch/source evidence are present. | Live SGLang + LMCache MP GPU run artifacts; upstream PRs #24089/#3166 remain open and unmerged, so no production/performance claim. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_mp_candidate_coverage.json" --expect-lmcache-mode mp` |
 
 ## 100% Checklist Matrix
 
@@ -148,7 +157,7 @@ reach 100/100. The states intentionally use the stricter SDLC taxonomy.
 | LMCache MP source additions | EventBus, L1 allocation/read failure, L2 prefetch failure, CacheBlend counters | fixture_backed | Clean/failure EventBus, L1/L2 failure, and CacheBlend live packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache_eventbus.prom" --output "$PACKET_DIR/eventbus_report.json" --expect-mode mp` |
 | LMCache production metrics | Core request, token, hit rate, performance/latency, profiling, cache usage/lifecycle, remote/backend/network, local CPU, memory, P2P, health/internal, chunk statistics | fixture_backed / parser_only mixed | Live embedded and backend/P2P/chunk-stat fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
 | vLLM bridge | local prefix, external prefix, prompt-token source, KV CPU offload caveat, connector identity | release_ready for original vLLM+LMCache CLI bridge | Packet B H100 proves the vLLM + LMCache MP connector path for the acceptance scope; native vLLM CPU offload remains a caveat, not LMCache proof. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
-| SGLang bridge | queue/cache/HiCache/KV-transfer plus embedded LMCache adapter evidence | partial | Live SGLang `--enable-lmcache`; source-backed MP contract before MP scoring. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
+| SGLang bridge | queue/cache/HiCache/KV-transfer plus embedded LMCache adapter evidence and MP observability candidate classification | partial | Live SGLang `--enable-lmcache`; live SGLang + LMCache MP artifacts for the PR #24089/#3166 host/port path before any `live_validated` claim. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
 
 ## Current Fixture Coverage
 

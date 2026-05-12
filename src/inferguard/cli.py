@@ -2430,6 +2430,22 @@ def launch_engine_cmd(
         bool,
         typer.Option("--enable-metrics", help="Enable engine metrics flags."),
     ] = False,
+    enable_lmcache: Annotated[
+        bool,
+        typer.Option("--enable-lmcache", help="Enable SGLang LMCache integration."),
+    ] = False,
+    lmcache_mp_host: Annotated[
+        str | None,
+        typer.Option("--lmcache-mp-host", help="SGLang LMCache MP server host."),
+    ] = None,
+    lmcache_mp_port: Annotated[
+        int | None,
+        typer.Option("--lmcache-mp-port", help="SGLang LMCache MP server port."),
+    ] = None,
+    kv_events_config: Annotated[
+        str | None,
+        typer.Option("--kv-events-config", help="SGLang KV events config JSON/string."),
+    ] = None,
     kv_cache_dtype: Annotated[
         str | None,
         typer.Option("--kv-cache-dtype", help="KV cache dtype."),
@@ -2501,6 +2517,10 @@ def launch_engine_cmd(
         chunked_prefill_size=chunked_prefill_size,
         enable_cache_report=enable_cache_report,
         enable_metrics=enable_metrics,
+        enable_lmcache=enable_lmcache,
+        lmcache_mp_host=lmcache_mp_host,
+        lmcache_mp_port=lmcache_mp_port,
+        kv_events_config=kv_events_config,
         kv_cache_dtype=kv_cache_dtype,
         quantization=quantization,
         hardware=hardware,

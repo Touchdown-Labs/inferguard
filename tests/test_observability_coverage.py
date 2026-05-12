@@ -83,6 +83,67 @@ lmcache_mp_lookup_hit_tokens_total 50
     assert report["surfaces"]["vllm"]["status"] == "not_applicable"
 
 
+def test_sglang_lmcache_mp_observability_is_fixture_tested_pending_live_validation() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text=_lmcache_fixture("sglang_lmcache_mp.prom"),
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_mp_observability"]
+    assert architecture["label"] == "sglang_mp_lmcache_observability"
+    assert architecture["claim_status"] == "fixture_tested"
+    assert support["support_status"] == "source_backed_fixture_tested"
+    assert support["claim_status"] == "fixture_tested"
+    assert support["upstream_state"] == "open_prs_not_merged"
+    assert support["live_validation"] == "pending"
+    assert support["required_launch_flags"] == [
+        "--enable-lmcache",
+        "--lmcache-mp-host",
+        "--lmcache-mp-port",
+    ]
+    assert "not live validated" in support["non_claims"]
+    assert "not merged upstream" in support["non_claims"]
+
+
+def test_sglang_lmcache_mp_without_launch_evidence_stays_candidate() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text=_lmcache_fixture("sglang_lmcache_mp.prom"),
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_mp_observability"]
+    assert architecture["label"] == "sglang_mp_lmcache_candidate"
+    assert architecture["claim_status"] == "inferred"
+    assert support["classification"] == "sglang_mp_lmcache_candidate"
+    assert support["claim_status"] == "not_proven"
+    assert support["live_validation"] == "pending"
+
+
 def test_observability_coverage_cli_writes_report(tmp_path: Path) -> None:
     metrics = tmp_path / "vllm.prom"
     metrics.write_text(

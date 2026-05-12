@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added source-backed, fixture-tested SGLang backend-expansion support for native metrics, documented embedded LMCache launch flags, and redacted KV-event evidence parsing. SGLang embedded LMCache and KV events remain pending live validation; SGLang LMCache MP remains unsupported/missing.
+- Added source-backed, fixture-tested SGLang backend-expansion support for native metrics, documented embedded LMCache launch flags, and redacted KV-event evidence parsing. SGLang embedded LMCache and KV events remain pending live validation.
+- Added source-backed, fixture-tested SGLang + LMCache MP observability classification and launch-command plumbing for the open PR-backed `--enable-lmcache`, `--lmcache-mp-host`, and `--lmcache-mp-port` path. SGLang LMCache MP remains pending live validation, not merged upstream, not performance validated, and not production support.
 
 ## [0.7.4] - 2026-05-11
 
