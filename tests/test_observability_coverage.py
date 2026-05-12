@@ -214,6 +214,35 @@ sglang:token_usage 0.7
     assert "not merged upstream" in support["non_claims"]
 
 
+def test_sglang_lmcache_mp_observability_marks_accepted_h100_artifact_measured() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="6555",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text=_lmcache_fixture("sglang_lmcache_mp.prom"),
+        engine_source="/artifacts/ocwc22_lmcache_mp/20260512T095222Z/sglang_metrics.prom",
+        lmcache_source="/artifacts/ocwc22_lmcache_mp/20260512T095222Z/lmcache_metrics.prom",
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    support = report["sglang_lmcache_mp_observability"]
+    assert support["claim_status"] == "measured"
+    assert support["acceptance_state"] == "complete"
+    assert support["live_validation"] == "modal_h100_artifact_present"
+    assert "not live validated" not in support["non_claims"]
+    assert "not merged upstream" in support["non_claims"]
+    assert "not production support" in support["non_claims"]
+
+
 def test_sglang_lmcache_mp_without_launch_evidence_stays_candidate() -> None:
     report = build_observability_coverage_report(
         engine_text="""

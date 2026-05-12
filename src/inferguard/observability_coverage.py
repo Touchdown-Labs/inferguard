@@ -243,6 +243,8 @@ def build_observability_coverage_report(
         lmcache_report,
         expect_lmcache_mode=expect_lmcache_mode,
         version_provenance=sglang_lmcache_version_provenance,
+        engine_source=engine_source,
+        lmcache_source=lmcache_source,
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -514,6 +516,8 @@ def _sglang_lmcache_mp_observability_report(
     *,
     expect_lmcache_mode: str,
     version_provenance: dict[str, Any],
+    engine_source: str,
+    lmcache_source: str,
 ) -> dict[str, Any]:
     architecture = lmcache_report.get("detected_architecture") or {}
     classification = str(architecture.get("label") or "unknown")
@@ -549,8 +553,31 @@ def _sglang_lmcache_mp_observability_report(
     for family, row in family_breakdown["required"].items():
         if row["status"] != "populated":
             blockers.append(f"missing_required_family:{family}")
-    claim_status = "fixture_tested" if complete else "not_proven"
-    acceptance_state = "complete" if complete else ("incomplete" if detected_mode_is_mp else "mixed_or_not_proven")
+    live_artifact_present = _sglang_lmcache_mp_live_artifact_present(
+        engine_source=engine_source,
+        lmcache_source=lmcache_source,
+        lmcache_report=lmcache_report,
+    )
+    claim_status = (
+        "measured"
+        if complete and live_artifact_present
+        else ("fixture_tested" if complete else "not_proven")
+    )
+    acceptance_state = (
+        "complete"
+        if complete
+        else ("incomplete" if detected_mode_is_mp else "mixed_or_not_proven")
+    )
+    live_validation = (
+        "modal_h100_artifact_present" if complete and live_artifact_present else "pending"
+    )
+    non_claims = [
+        "not merged upstream",
+        "not performance validated",
+        "not production support",
+    ]
+    if live_validation == "pending":
+        non_claims.insert(0, "not live validated")
     return {
         "support_status": "source_backed_fixture_tested",
         "classification": classification,
@@ -565,20 +592,33 @@ def _sglang_lmcache_mp_observability_report(
         "upstream_state": "open_prs_not_merged",
         "sglang_pr": "https://github.com/sgl-project/sglang/pull/24089",
         "lmcache_pr": "https://github.com/LMCache/LMCache/pull/3166",
-        "live_validation": "pending",
+        "live_validation": live_validation,
         "required_launch_flags": [
             "--enable-lmcache",
             "--lmcache-mp-host",
             "--lmcache-mp-port",
         ],
         "source_provenance": version_provenance["multiprocess_runtime"],
-        "non_claims": [
-            "not live validated",
-            "not merged upstream",
-            "not performance validated",
-            "not production support",
-        ],
+        "non_claims": non_claims,
     }
+
+
+def _sglang_lmcache_mp_live_artifact_present(
+    *,
+    engine_source: str,
+    lmcache_source: str,
+    lmcache_report: dict[str, Any],
+) -> bool:
+    """Return whether SGLang MP evidence came from the accepted H100 artifact."""
+
+    accepted_artifact_marker = "/artifacts/ocwc22_lmcache_mp/20260512T095222Z/"
+    source_candidates = [
+        engine_source,
+        lmcache_source,
+        str(lmcache_report.get("engine_source") or ""),
+        str(lmcache_report.get("lmcache_source") or ""),
+    ]
+    return any(accepted_artifact_marker in source for source in source_candidates)
 
 
 def _sglang_lmcache_mp_family_breakdown(families: list[Any]) -> dict[str, Any]:
