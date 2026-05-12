@@ -3,7 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/inferguard.svg)](https://pypi.org/project/inferguard/)
 [![Python](https://img.shields.io/pypi/pyversions/inferguard.svg)](https://pypi.org/project/inferguard/)
 [![License](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
-[![CodeQL](https://github.com/OCWC22/inferguard/actions/workflows/codeql.yml/badge.svg)](https://github.com/OCWC22/inferguard/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/Touchdown-Labs/inferguard/actions/workflows/codeql.yml/badge.svg)](https://github.com/Touchdown-Labs/inferguard/actions/workflows/codeql.yml)
 
 > Read-only disaggregated-serving diagnostics for vLLM, SGLang, Dynamo, and llm-d.
 
@@ -13,10 +13,30 @@ InferGuard is a source-available CLI and MCP server for validating inference ben
 
 InferGuard is distributed under the Business Source License 1.1 (`BUSL-1.1`). The Additional Use Grant allows teams to use InferGuard in their own source repositories, CI/CD, staging, internal tools, and internal production environments to benchmark, monitor, diagnose, validate, or optimize inference workloads they own, operate, or are authorized to evaluate. Offering InferGuard as a paid or hosted observability, benchmarking, diagnostics, optimization, inference operations, managed service, SaaS, or substantially similar competing commercial product requires a separate commercial license from Touchdown Labs. Each covered version converts to Apache-2.0 on the Change Date specified in `LICENSE`, or earlier if required by the BSL 1.1 terms.
 
+## Current release: 0.7.4
+
+`inferguard==0.7.4` is the LMCache PR #3255 downstream-observability release.
+It adds InferGuard parser/report support for the new LMCache MP L0 GPU KV block
+allocation counters and redacted boundary evidence:
+
+- `lmcache_mp_l0_block_allocation_records_total`
+- `lmcache_mp_l0_block_allocated_blocks_total`
+- optional `inferguard-l0-block-boundary-event/v1` JSONL evidence proving the
+  adapter → server → lifecycle-subscriber path without storing raw tokens or raw
+  block IDs
+
+The release is source-backed by a Modal H100 Packet B run using vLLM plus local
+LMCache source containing PR #3255 and the updated InferGuard CLI. Scope remains
+conservative: no vLLM source changes, no LMCache performance-improvement claim,
+and no DCGM/NVML hardware telemetry claim are made by this release. See
+[`CHANGELOG.md`](CHANGELOG.md),
+[`docs/sdlc/pr3255-packet-b-downstream-h100-measured-report-v0.1.md`](docs/sdlc/pr3255-packet-b-downstream-h100-measured-report-v0.1.md),
+and [`release_proofs/v0.7.4/README.md`](release_proofs/v0.7.4/README.md).
+
 ## Quick start (60 seconds)
 
 ```bash
-pip install inferguard
+pip install inferguard==0.7.4
 
 # Generate a local synthetic GPU bundle for smoke testing.
 inferguard simulate-gpu --results-root /tmp/inferguard-smoke --hardware b200 --engine vllm
@@ -152,8 +172,8 @@ If you use InferGuard in academic work, please cite:
   author = {Chen, William},
   title = {InferGuard: Read-only disaggregated-serving diagnostics for vLLM, SGLang, Dynamo, and llm-d},
   year = {2026},
-  url = {https://github.com/OCWC22/inferguard},
-  version = {0.7.1}
+  url = {https://github.com/Touchdown-Labs/inferguard},
+  version = {0.7.4}
 }
 ```
 

@@ -40,6 +40,28 @@ original vLLM + LMCache finish line.
 | Trace recording `.lct` | MP `--trace-level storage` binary trace recording | parsed as LMCache trace evidence; malformed traces are recorded without aborting packet creation | Partial |
 | Trace replay metadata | `lmcache trace info` / replay JSON, JSONL, and CSV summaries | replay info, JSON, JSONL, and `trace_replay_ops.csv` evidence can be parsed and surfaced in packet/report/diagnosis flows | Parser/report partial; live proof missing |
 
+## PR3255 L0 Allocation Evidence in 0.7.4
+
+InferGuard `0.7.4` consumes the LMCache PR #3255 MP observability surface. When
+LMCache exports the new counters, `lmcache-compat` and
+`observability-coverage` report the L0 allocation boundary instead of treating it
+as generic unknown Prometheus text:
+
+- `lmcache_mp_l0_block_allocation_records_total`: allocation records processed
+  by LMCache MP;
+- `lmcache_mp_l0_block_allocated_blocks_total`: total GPU KV blocks observed in
+  those allocation records;
+- optional `inferguard-l0-block-boundary-event/v1` JSONL evidence: redacted
+  boundary events for adapter submit, LMCache server receive, and L0 lifecycle
+  subscriber processing.
+
+The accepted Modal H100 Packet B proof for this release is documented in
+`docs/sdlc/pr3255-packet-b-downstream-h100-measured-report-v0.1.md`. That proof
+uses vLLM plus local LMCache source containing PR #3255 and the updated
+InferGuard CLI. It is a measured observability proof for PR3255 downstream
+consumption. It is not a performance-improvement claim, and it does not require
+or claim vLLM source changes.
+
 ## What `lmcache-compat` Does Today
 
 `inferguard lmcache-compat` compares available Prometheus text against known LMCache and vLLM metric families. It reports whether each family is:

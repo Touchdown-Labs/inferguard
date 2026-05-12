@@ -6,10 +6,10 @@ authors:
     given-names: William
     affiliation: Touchdown Labs
 type: software
-version: 0.7.1
-date-released: 2026-05-04
-url: https://github.com/OCWC22/inferguard
-license: Apache-2.0
+version: 0.7.4
+date-released: 2026-05-11
+url: https://github.com/Touchdown-Labs/inferguard
+license: BUSL-1.1
 keywords:
   - llm-inference
   - benchmarking
