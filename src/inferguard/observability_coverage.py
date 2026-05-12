@@ -234,8 +234,15 @@ def build_observability_coverage_report(
     surfaces["sglang_kv_events"] = sglang_kv_row
     gaps = _coverage_gaps(engine_families, lmcache_report)
     kv_cache_offload = _kv_cache_offload_report(samples)
-    sglang_lmcache_embedded = _sglang_lmcache_embedded_support_report(lmcache_report)
-    sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(lmcache_report)
+    sglang_lmcache_version_provenance = _sglang_lmcache_version_provenance()
+    sglang_lmcache_embedded = _sglang_lmcache_embedded_support_report(
+        lmcache_report,
+        version_provenance=sglang_lmcache_version_provenance,
+    )
+    sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(
+        lmcache_report,
+        version_provenance=sglang_lmcache_version_provenance,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "engine_source": engine_source,
@@ -258,6 +265,7 @@ def build_observability_coverage_report(
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
+        "sglang_lmcache_version_provenance": sglang_lmcache_version_provenance,
         "sglang_lmcache_embedded_support": sglang_lmcache_embedded,
         "sglang_lmcache_mp_observability": sglang_lmcache_mp,
         "sglang_kv_events_evidence": sglang_kv_events_evidence,
@@ -337,7 +345,134 @@ def write_observability_coverage_report(report: dict[str, Any], output: Path) ->
     atomic_write_json(output, report)
 
 
-def _sglang_lmcache_embedded_support_report(lmcache_report: dict[str, Any]) -> dict[str, Any]:
+def _sglang_lmcache_version_provenance() -> dict[str, Any]:
+    """Source-backed provenance for SGLang + LMCache support claims.
+
+    This is intentionally static source ledger metadata, not a live GitHub poll.
+    Update it only after re-checking upstream PR/issue/source state.
+    """
+
+    return {
+        "schema_version": "inferguard-sglang-lmcache-version-provenance/v1",
+        "checked_at": "2026-05-12",
+        "embedded_runtime": {
+            "claim_status": "source_backed",
+            "upstream_state": "documented_existing_embedded_support",
+            "minimum_observed_code_lineage": {
+                "lmcache_sglang_config": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/utils.py",
+                    "introduced_commit": "f3bba133",
+                    "author": "Yuwei An",
+                    "date": "2025-06-23",
+                    "evidence": "lmcache_get_config reads LMCACHE_CONFIG_FILE or environment variables for SGLang.",
+                },
+                "lmcache_sglang_adapter": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/sglang_adapter.py",
+                    "introduced_commit": "f3bba133",
+                    "author": "Yuwei An",
+                    "date": "2025-06-23",
+                    "evidence": "init_lmcache_engine and LMCacheConnector initialize LMCacheEngine for SGLang.",
+                },
+                "lmcache_layerwise_runtime_calls": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/sglang_adapter.py",
+                    "introduced_commit": "b72bdfd",
+                    "author": "Yuwei An",
+                    "date": "2025-08-30",
+                    "evidence": "start_load_kv/store_kv call LMCache lookup, retrieve_layer, store_layer, and lookup_unpin.",
+                },
+                "sglang_enable_lmcache_flag": {
+                    "repo": "sgl-project/sglang",
+                    "path": "python/sglang/srt/server_args.py",
+                    "introduced_commit": "9a7ced4",
+                    "author": "Yuwei An",
+                    "date": "2025-09-06",
+                    "evidence": "ServerArgs exposes enable_lmcache and scheduler selects LMCRadixCache when enabled.",
+                },
+                "lmcache_env_validation_fix": {
+                    "repo": "LMCache/LMCache",
+                    "pull_request": "https://github.com/LMCache/LMCache/pull/3002",
+                    "state": "merged",
+                    "opened_at": "2026-04-11T11:08:04Z",
+                    "merged_at": "2026-05-11T14:39:19Z",
+                    "author": "rebel-jinhwan",
+                    "commit": "9985125f",
+                    "evidence": "Env-only config path now validates config used by vLLM/SGLang integrations.",
+                },
+            },
+            "required_launch_flags": ["--enable-lmcache"],
+            "required_environment": ["LMCACHE_CONFIG_FILE or LMCache environment configuration"],
+        },
+        "multiprocess_runtime": {
+            "claim_status": "not_proven",
+            "upstream_state": "open_prs_not_merged",
+            "prs": [
+                {
+                    "repo": "sgl-project/sglang",
+                    "number": 24089,
+                    "url": "https://github.com/sgl-project/sglang/pull/24089",
+                    "title": "[Feat][LMCache] Support LMCache mp mode",
+                    "state": "open",
+                    "merged": False,
+                    "opened_at": "2026-04-29T21:01:46Z",
+                    "updated_at": "2026-05-07T22:40:59Z",
+                    "author": "Shaoting-Feng",
+                    "head_sha": "bcaa2854288b1332a5645450af61f73cbf805472",
+                    "evidence": "Adds SGLang-side --lmcache-mp-host/--lmcache-mp-port wiring for LMCache MP mode.",
+                },
+                {
+                    "repo": "LMCache/LMCache",
+                    "number": 3166,
+                    "url": "https://github.com/LMCache/LMCache/pull/3166",
+                    "title": "[Feat] Add mp support for sglang",
+                    "state": "open",
+                    "merged": False,
+                    "opened_at": "2026-04-29T21:03:17Z",
+                    "updated_at": "2026-05-07T22:40:55Z",
+                    "author": "Shaoting-Feng",
+                    "head_sha": "d298d5807fc16aaf896347c1d927383e24c0195f",
+                    "evidence": "Adds LMCache-side SGLang MP support and documents abort/liveness follow-up work.",
+                },
+            ],
+            "required_launch_flags": ["--enable-lmcache", "--lmcache-mp-host", "--lmcache-mp-port"],
+            "known_open_gaps": [
+                {
+                    "repo": "LMCache/LMCache",
+                    "number": 3192,
+                    "url": "https://github.com/LMCache/LMCache/issues/3192",
+                    "title": "SGLang integration: LMCache doesn't support MLA models (DeepSeek V3/R1)",
+                    "state": "open",
+                    "opened_at": "2026-05-04T20:33:28Z",
+                    "author": "andyluo7",
+                },
+                {
+                    "repo": "sgl-project/sglang",
+                    "number": 24549,
+                    "url": "https://github.com/sgl-project/sglang/pull/24549",
+                    "title": "[Bugfix] support MLA models for LMCache Radix Cache.",
+                    "state": "open",
+                    "opened_at": "2026-05-06T20:10:33Z",
+                    "author": "Shaoting-Feng",
+                },
+            ],
+        },
+        "non_claims": [
+            "Embedded SGLang + LMCache provenance does not prove SGLang + LMCache MP support.",
+            "Open PR metadata does not prove merged upstream support.",
+            "InferGuard reports classify observed evidence; InferGuard does not enable LMCache runtime behavior.",
+            "Synthetic fixtures do not prove live performance or production readiness.",
+        ],
+    }
+
+
+
+def _sglang_lmcache_embedded_support_report(
+    lmcache_report: dict[str, Any],
+    *,
+    version_provenance: dict[str, Any],
+) -> dict[str, Any]:
     architecture = lmcache_report.get("detected_architecture") or {}
     classification = str(architecture.get("label") or "unknown")
     observed = lmcache_report.get("observed") if isinstance(lmcache_report.get("observed"), dict) else {}
@@ -362,6 +497,7 @@ def _sglang_lmcache_embedded_support_report(lmcache_report: dict[str, Any]) -> d
             "The SGLang LMCache adapter initializes an LMCacheEngine for EngineType.SGLANG.",
             "The adapter calls LMCache lookup/retrieve and store paths during prefill/store lifecycle.",
         ],
+        "source_provenance": version_provenance["embedded_runtime"],
         "non_claims": [
             "not LMCache MP support",
             "not performance validated",
@@ -372,7 +508,11 @@ def _sglang_lmcache_embedded_support_report(lmcache_report: dict[str, Any]) -> d
 
 
 
-def _sglang_lmcache_mp_observability_report(lmcache_report: dict[str, Any]) -> dict[str, Any]:
+def _sglang_lmcache_mp_observability_report(
+    lmcache_report: dict[str, Any],
+    *,
+    version_provenance: dict[str, Any],
+) -> dict[str, Any]:
     architecture = lmcache_report.get("detected_architecture") or {}
     classification = str(architecture.get("label") or "unknown")
     claim_status = "fixture_tested" if classification == "sglang_mp_lmcache_observability" else "not_proven"
@@ -389,6 +529,7 @@ def _sglang_lmcache_mp_observability_report(lmcache_report: dict[str, Any]) -> d
             "--lmcache-mp-host",
             "--lmcache-mp-port",
         ],
+        "source_provenance": version_provenance["multiprocess_runtime"],
         "non_claims": [
             "not live validated",
             "not merged upstream",

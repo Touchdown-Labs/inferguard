@@ -110,6 +110,15 @@ lmcache:local_cpu_cache_usage 0.25
 
     architecture = report["lmcache_compat"]["detected_architecture"]
     support = report["sglang_lmcache_embedded_support"]
+    provenance = report["sglang_lmcache_version_provenance"]
+    embedded_lineage = provenance["embedded_runtime"]["minimum_observed_code_lineage"]
+    assert provenance["schema_version"] == "inferguard-sglang-lmcache-version-provenance/v1"
+    assert provenance["embedded_runtime"]["upstream_state"] == "documented_existing_embedded_support"
+    assert embedded_lineage["lmcache_sglang_config"]["introduced_commit"] == "f3bba133"
+    assert embedded_lineage["lmcache_sglang_config"]["date"] == "2025-06-23"
+    assert embedded_lineage["sglang_enable_lmcache_flag"]["introduced_commit"] == "9a7ced4"
+    assert embedded_lineage["sglang_enable_lmcache_flag"]["date"] == "2025-09-06"
+    assert embedded_lineage["lmcache_env_validation_fix"]["pull_request"].endswith("/3002")
     assert report["detected_engines"] == ["sglang"]
     assert report["detected_lmcache_mode"] == "embedded"
     assert architecture["label"] == "sglang_embedded_lmcache"
@@ -117,6 +126,15 @@ lmcache:local_cpu_cache_usage 0.25
     assert support["support_status"] == "source_backed"
     assert support["claim_status"] == "measured"
     assert support["upstream_state"] == "documented_existing_embedded_support"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_layerwise_runtime_calls"][
+        "introduced_commit"
+    ] == "b72bdfd"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_layerwise_runtime_calls"][
+        "date"
+    ] == "2025-08-30"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_env_validation_fix"][
+        "merged_at"
+    ] == "2026-05-11T14:39:19Z"
     assert support["required_launch_flags"] == ["--enable-lmcache"]
     assert "not LMCache MP support" in support["non_claims"]
     assert "InferGuard does not enable runtime cache behavior; it only captures and classifies evidence" in support[
@@ -164,11 +182,19 @@ sglang:token_usage 0.7
 
     architecture = report["lmcache_compat"]["detected_architecture"]
     support = report["sglang_lmcache_mp_observability"]
+    provenance = report["sglang_lmcache_version_provenance"]["multiprocess_runtime"]
     assert architecture["label"] == "sglang_mp_lmcache_observability"
     assert architecture["claim_status"] == "fixture_tested"
     assert support["support_status"] == "source_backed_fixture_tested"
     assert support["claim_status"] == "fixture_tested"
     assert support["upstream_state"] == "open_prs_not_merged"
+    assert provenance["prs"][0]["number"] == 24089
+    assert provenance["prs"][0]["opened_at"] == "2026-04-29T21:01:46Z"
+    assert provenance["prs"][0]["author"] == "Shaoting-Feng"
+    assert provenance["prs"][1]["number"] == 3166
+    assert provenance["prs"][1]["opened_at"] == "2026-04-29T21:03:17Z"
+    assert provenance["prs"][1]["author"] == "Shaoting-Feng"
+    assert support["source_provenance"]["upstream_state"] == "open_prs_not_merged"
     assert support["live_validation"] == "pending"
     assert support["required_launch_flags"] == [
         "--enable-lmcache",

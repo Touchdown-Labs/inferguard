@@ -25,6 +25,47 @@ SGLang + LMCache MP is separate. Current public GitHub evidence keeps MP in the 
 - S13: LMCache PR #3212, <https://github.com/LMCache/LMCache/pull/3212>, closed/unmerged draft, documents a layerwise retriever cleanup/deadlock concern in the SGLang adapter path.
 - S14: LMCache issue #1949, <https://github.com/LMCache/LMCache/issues/1949>, closed RFC describing LMCache's serving-engine-agnostic integration direction.
 
+## Version / edit provenance ledger
+
+- Embedded LMCache config path:
+  - Repo: `LMCache/LMCache`
+  - File: `lmcache/integration/sglang/utils.py`
+  - Introduced: `f3bba133`
+  - Author/date: Yuwei An, 2025-06-23
+  - Code evidence: `lmcache_get_config()` reads `LMCACHE_CONFIG_FILE` or LMCache environment variables for SGLang.
+
+- Embedded LMCache adapter path:
+  - Repo: `LMCache/LMCache`
+  - File: `lmcache/integration/sglang/sglang_adapter.py`
+  - Introduced: `f3bba133`
+  - Author/date: Yuwei An, 2025-06-23
+  - Code evidence: `init_lmcache_engine()` and `LMCacheConnector` initialize the LMCache engine for SGLang.
+
+- Embedded layerwise runtime calls:
+  - Repo: `LMCache/LMCache`
+  - File: `lmcache/integration/sglang/sglang_adapter.py`
+  - Introduced/refined: `b72bdfd`, Yuwei An, 2025-08-30; lookup-pin/unpin refined by `9946f1b`, Yuwei An, 2025-10-13 and `ad92d02`, Ziqi Fan, 2025-10-30.
+  - Code evidence: `start_load_kv()` calls `lookup()` and `retrieve_layer()`; `store_kv()` calls `lookup()`, `store_layer()`, and `lookup_unpin()`.
+
+- SGLang launch surface:
+  - Repo: `sgl-project/sglang`
+  - Files: `python/sglang/srt/server_args.py`, `python/sglang/srt/managers/scheduler.py`, `python/sglang/srt/mem_cache/storage/lmcache/lmc_radix_cache.py`
+  - Introduced: `9a7ced4`
+  - Author/date: Yuwei An, 2025-09-06
+  - Code evidence: `enable_lmcache` flag exists; scheduler selects `LMCRadixCache` when `server_args.enable_lmcache` is true; SGLang imports LMCache connector classes.
+
+- Env-only config validation fix:
+  - Repo: `LMCache/LMCache`
+  - PR: #3002, <https://github.com/LMCache/LMCache/pull/3002>
+  - Opened/merged: 2026-04-11T11:08:04Z / 2026-05-11T14:39:19Z
+  - Author: `rebel-jinhwan`
+  - Local lineage: `9985125f`, Jinhwan Suk, 2026-05-11
+  - Code evidence: `config.validate()` now runs in the SGLang/vLLM env-only config path.
+
+- SGLang + LMCache MP PRs:
+  - SGLang PR #24089, <https://github.com/sgl-project/sglang/pull/24089>, opened 2026-04-29T21:01:46Z by `Shaoting-Feng`, open/unmerged, head `bcaa2854288b1332a5645450af61f73cbf805472`.
+  - LMCache PR #3166, <https://github.com/LMCache/LMCache/pull/3166>, opened 2026-04-29T21:03:17Z by `Shaoting-Feng`, open/unmerged, head `d298d5807fc16aaf896347c1d927383e24c0195f`.
+
 ## Claim ledger
 
 - Claim: SGLang can use LMCache without InferGuard in embedded/in-process mode.

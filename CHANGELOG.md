@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `sglang_lmcache_version_provenance` to observability coverage reports so SGLang + LMCache embedded and MP claims carry source/version evidence: LMCache adapter/config lineage (`f3bba133`, 2025-06-23), SGLang `--enable-lmcache` launch lineage (`9a7ced4`, 2025-09-06), merged LMCache config validation fix PR #3002, and open/unmerged MP PRs SGLang #24089 / LMCache #3166.
 - Added `sglang_lmcache_embedded_support` to observability coverage reports so existing documented SGLang + LMCache embedded support is separated from SGLang + LMCache MP observability. The report records `--enable-lmcache`, `LMCACHE_CONFIG_FILE`/environment configuration, and explicit non-claims that InferGuard only captures/classifies evidence and does not enable the runtime cache path.
 - Added source-backed, fixture-tested SGLang backend-expansion support for native metrics, documented embedded LMCache launch flags, and redacted KV-event evidence parsing. SGLang embedded LMCache and KV events remain pending live validation.
 - Added source-backed, fixture-tested SGLang + LMCache MP observability classification and launch-command plumbing for the open PR-backed `--enable-lmcache`, `--lmcache-mp-host`, and `--lmcache-mp-port` path. SGLang LMCache MP remains pending live validation, not merged upstream, not performance validated, and not production support.

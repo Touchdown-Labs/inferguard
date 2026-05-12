@@ -91,7 +91,7 @@ is present, and only artifact-backed for a specific run when SGLang metrics plus
 LMCache embedded metrics are captured. The source-backed contract is
 `--enable-lmcache` plus `LMCACHE_CONFIG_FILE` or equivalent LMCache environment
 configuration; LMCache's SGLang adapter owns the runtime lookup/retrieve/store
-path. Current GitHub recon is recorded in
+path. InferGuard now also emits `sglang_lmcache_version_provenance`, which records the specific source/version ledger for this claim: LMCache `f3bba133` (Yuwei An, 2025-06-23) for SGLang config/adapter introduction, SGLang `9a7ced4` (Yuwei An, 2025-09-06) for the `--enable-lmcache` launch surface, and LMCache PR #3002 (opened 2026-04-11, merged 2026-05-11) for env-only config validation. Current GitHub recon is recorded in
 `docs/sdlc/sglang-lmcache-support-reconciliation-report-v0.1.md`.
 
 SGLang + LMCache MP observability is tracked separately from embedded SGLang
