@@ -12,6 +12,8 @@ InferGuard v0.7.1 ships documentation and templates for the DSv4 6-SKU capabilit
 
 That is 48 cells total.
 
+AMD ROCm/CDNA planning lives in [AMD CDNA hardware coverage](amd-cdna-hardware-coverage.md). That page is planning-only until ROCm fixtures and live AMD GPU artifacts exist; do not treat it as live AMD support.
+
 ## Status counts
 
 | Status | Count | Meaning |

@@ -1,0 +1,28 @@
+{
+  "benchmark_id": null,
+  "eviction_policy": "LRU",
+  "l1_size_gb": "8",
+  "lmcache_log_level": null,
+  "metrics_sample_rate": 1.0,
+  "packet_id": "e",
+  "phases": [
+    {
+      "intent": "drive packet workload traffic",
+      "phase": "steady",
+      "prefix_pattern": "trace_replay",
+      "request_count": 20
+    }
+  ],
+  "raw_prompts_recorded": false,
+  "request_count": 20,
+  "request_log": "traffic_requests.jsonl",
+  "required_packet_b_telemetry": [],
+  "schema_version": "inferguard-lmcache-mp-workload-manifest/v1",
+  "sdlc_row_id": null,
+  "trace_source": null,
+  "trace_workload_classes": [],
+  "vllm_gpu_memory_utilization": "0.80",
+  "vllm_max_model_len": 16384,
+  "workload": "trace_replay",
+  "workload_profile": "trace_replay"
+}

@@ -2,12 +2,12 @@
 
 Thanks for contributing to InferGuard.
 
-InferGuard is an OSS diagnostics package for inference operators. The best contributions preserve the project's core contract: read-only by default, evidence before recommendation, and no private/pro-tier imports in the OSS tree.
+InferGuard is a source-available diagnostics package for inference operators. The current release line is distributed under BUSL-1.1, with the Additional Use Grant and Change License described in `LICENSE`. The best contributions preserve the project's core contract: read-only by default, evidence before recommendation, and no private/pro-tier imports in the source-available tree.
 
 ## Development setup
 
 ```bash
-git clone git@github.com:OCWC22/inferguard.git
+git clone git@github.com:Touchdown-Labs/inferguard.git
 cd inferguard
 python3 -m venv venv
 source venv/bin/activate
@@ -51,7 +51,7 @@ pre-commit run --all-files
 
 ## Architecture boundaries (layer-lint)
 
-Changes in OSS files must not import from private/pro-tier modules. In this OSS tree, do not introduce imports from outside the OSS layer-lint allowlist, including forbidden modules such as:
+Changes in source-available package files must not import from private/pro-tier modules. In this public tree, do not introduce imports from outside the layer-lint allowlist, including forbidden modules such as:
 
 - `agent`
 - `brain_client`
@@ -64,6 +64,28 @@ Changes in OSS files must not import from private/pro-tier modules. In this OSS 
 - `blaxel_agent`
 
 CI enforces this boundary via `.github/workflows/layer-lint.yml`.
+
+## SDLC and evidence-gated claims
+
+Every technical claim in code, docs, release notes, or PR text must be backed by
+one of:
+
+- a source path, commit, release, or public project URL;
+- a fixture-backed test result;
+- a live artifact path and command provenance;
+- an explicit status such as `not_proven`, `not_applicable`, or `blocked`.
+
+Use conservative language. Synthetic fixtures prove parser behavior only. A
+claim is `measured` only when live artifacts exist and the relevant InferGuard
+parser/report path accepts them. Performance, hardware telemetry, and cross-repo
+runtime behavior must never be implied from parser-only changes.
+
+For release PRs, include or update:
+
+- `CHANGELOG.md`;
+- user-facing README/docs pages affected by the behavior change;
+- any SDLC report under `docs/sdlc/` that records live evidence;
+- a `release_proofs/<version>/` bundle when release gates require it.
 
 ## Documentation expectations
 

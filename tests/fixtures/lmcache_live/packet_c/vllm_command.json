@@ -1,0 +1,14 @@
+[
+  "vllm",
+  "serve",
+  "Qwen/Qwen3-8B",
+  "--kv-transfer-config",
+  "{\"kv_connector\":\"LMCacheMPConnector\",\"kv_role\":\"kv_both\",\"kv_load_failure_policy\":\"recompute\",\"kv_connector_extra_config\":{\"lmcache.mp.host\":\"tcp://127.0.0.1\",\"lmcache.mp.port\":6555,\"lmcache.mp.mq_timeout\":10}}",
+  "--disable-hybrid-kv-cache-manager",
+  "--max-model-len",
+  "16384",
+  "--gpu-memory-utilization",
+  "0.80",
+  "--port",
+  "8000"
+]

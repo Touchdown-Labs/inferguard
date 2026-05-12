@@ -1,0 +1,14 @@
+{
+  "engine": "sglang",
+  "gpu_count": 8,
+  "hardware": "b200",
+  "kv_cache_dtype": "fp8",
+  "max_model_len": 131072,
+  "model": "deepseek-v4-pro",
+  "model_profile": "dsv4-long-context",
+  "network_fabric": "ib",
+  "node_count": 1,
+  "quantization": "fp8",
+  "sku": "B200",
+  "tensor_parallel_size": 8
+}

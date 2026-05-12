@@ -81,6 +81,26 @@ This is a useful blocked live artifact:
 
 Find or patch the LMCache/vLLM reference that emits `lmcache_mp_l0_block_*` under LMCacheMPConnector for Packet B long-context agent traffic. Then rerun exactly one Packet B H100 validation and import a compact sanitized fixture only if `l0_lifecycle` is populated.
 
+## Second blocked H100 result after vLLM post-allocation patch
+
+The later post-allocation vLLM validation also remained blocked:
+
+- Modal app/run: `https://modal.com/apps/ocwc22/main/ap-nLj0CuZK3uOoUHZzujIamH`
+- Local artifact dir: `/Users/chen/Projects/inferguard/modal-out/packet-b-lifecycle-reuse-eviction/20260508T104021Z`
+- vLLM branch: `ocwc/lmcache-mp-l0-lifecycle`
+- vLLM HEAD reported by operator: `9ee3699ca09fa85674edec20014cb3a71888b97d`
+- Result: `claim_status=not_proven`, `acceptance_status=blocked`, `blocked_reason=lmcache_mp_l0_block_metrics_absent`
+
+The artifact again proved lookup hits, L1 lifecycle, real reuse, L1 eviction/allocation pressure, and L0→L1 throughput. It did **not** prove whether `REPORT_BLOCK_ALLOCATION` was attempted by vLLM, received by LMCache, or processed by the L0 lifecycle subscriber. `vllm_overlay_plan.json` only proved the path overlay, not the connector content hash or git commit.
+
+Narrowed runtime-boundary plan now implemented for the next run:
+
+1. vLLM appends redacted boundary events when it attempts and completes `report_block_allocations`; each event records request id and block count only.
+2. LMCache appends redacted boundary events when the vLLM adapter submits the MQ request, when the MP server receives `REPORT_BLOCK_ALLOCATION`, and when the L0 lifecycle subscriber processes the event batch.
+3. InferGuard preserves a compact `l0_block_boundary_evidence.json` artifact summarizing stage counts, request/block samples, and vLLM overlay commit/hash evidence.
+4. The proof artifact is diagnostic only. C1 remains blocked until the real `lmcache_mp_l0_block_*` Prometheus family is populated in the live artifact.
+
 ## Changelog
 
+- v0.2 — 2026-05-08 — Add second blocked H100 result and boundary-proof plan after vLLM post-allocation patch still produced zero `lmcache_mp_l0_block_*` metrics.
 - v0.1 — 2026-05-08 — First Packet B LC1/C1 live Modal/H100 report after commit `d854ee1`.

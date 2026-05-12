@@ -1,0 +1,585 @@
+{
+  "claim_status": "measured",
+  "file_count": 1,
+  "files": [
+    {
+      "chunk_hash_count": {
+        "count": 24,
+        "max": 19,
+        "min": 8,
+        "total": 314
+      },
+      "chunk_sizes": [
+        256
+      ],
+      "claim_status": "measured",
+      "config_evidence": {},
+      "dtypes": [
+        [
+          "torch.bfloat16"
+        ]
+      ],
+      "file_size_bytes": 27520,
+      "malformed_rows": 0,
+      "models": [
+        "Qwen/Qwen3-8B"
+      ],
+      "parse_errors": [],
+      "present": true,
+      "row_count": 24,
+      "rows": [
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-a3802b3e6e288756-0-95ca5aef",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316579.7646742
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-957e567f57354b36-0-89f18282",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316582.1782296
+        },
+        {
+          "chunk_hashes": {
+            "count": 17,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-87ddba35e016025a-0-8fbda1a6",
+          "seq_len": 4533,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316583.8998237
+        },
+        {
+          "chunk_hashes": {
+            "count": 17,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-ac68896d01ba12e3-0-bfefc314",
+          "seq_len": 4533,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316585.696823
+        },
+        {
+          "chunk_hashes": {
+            "count": 17,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-884a71e46e662340-0-94db1a9c",
+          "seq_len": 4533,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316587.4899285
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-8e0ef9ca7ffad2cb-0-8c84f700",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316589.2183933
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-8449bc2b134b458c-0-ab38b2ac",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316590.8855364
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-b0a6fe91357c1104-0-9d5c36c2",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316592.5546246
+        },
+        {
+          "chunk_hashes": {
+            "count": 17,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-8f3a7a679913cc44-0-8ec58941",
+          "seq_len": 4533,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316594.2246163
+        },
+        {
+          "chunk_hashes": {
+            "count": 17,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-b70345039a427010-0-b2c36927",
+          "seq_len": 4533,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316595.955423
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-bb8081393c478e5f-0-8b19bc01",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316597.6881437
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-a3229b6ea0c80e39-0-ba81871f",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316599.4337873
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-90d9f48825936a72-0-b142b4ff",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316601.0987113
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-b62c4027bd2ad0be-0-8099783d",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316602.7653084
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-998039421298f7cf-0-8ce3ef7b",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316604.4359176
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-bc19cd45d3f542e7-0-8e8134d5",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316606.1801045
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-ae583a259591e05b-0-aa052898",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316607.9276793
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-9799932051f62e1c-0-902abcb3",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316609.6667087
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-976209c8116c6b43-0-8b34ae3a",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316611.3319223
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-a80a70e49b269520-0-a2547233",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316612.9994354
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-be267c15335cd696-0-ba06e7d4",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316614.6700559
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-ac932502f080d679-0-80fe83c6",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316616.41259
+        },
+        {
+          "chunk_hashes": {
+            "count": 19,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-b3af914bc1179ed9-0-be43fbba",
+          "seq_len": 4917,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316618.1564121
+        },
+        {
+          "chunk_hashes": {
+            "count": 8,
+            "redacted": true
+          },
+          "chunk_size": 256,
+          "dtypes": [
+            "torch.bfloat16"
+          ],
+          "model_name": "Qwen/Qwen3-8B",
+          "request_id": "cmpl-b6daf8b50c4dd561-0-8c1252d8",
+          "seq_len": 2213,
+          "shapes": [
+            [
+              2,
+              36,
+              256,
+              1024
+            ]
+          ],
+          "timestamp": 1778316619.8947072
+        }
+      ],
+      "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1",
+      "seq_len": {
+        "count": 24,
+        "max": 4917,
+        "min": 2213,
+        "total": 83640
+      },
+      "shapes": [
+        [
+          [
+            2,
+            36,
+            256,
+            1024
+          ]
+        ]
+      ],
+      "truncated": false
+    }
+  ],
+  "malformed_rows": 0,
+  "present": true,
+  "row_count": 24,
+  "schema_version": "inferguard-lmcache-lookup-hash-evidence/v1",
+  "source_type": "directory"
+}

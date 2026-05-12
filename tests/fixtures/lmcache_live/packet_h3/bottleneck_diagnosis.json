@@ -1,0 +1,149 @@
+{
+  "claim_status": "measured",
+  "confidence": 0.0,
+  "downgrades": [],
+  "evidence_paths": [
+    "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/local-diagnose-job/metrics/lmcache_compat_report.json"
+  ],
+  "job_id": "local-diagnose-job",
+  "metric_values": {
+    "lmcache_compat.detected_architecture": {
+      "cache_labels": [],
+      "claim_status": "measured",
+      "connector_labels": [],
+      "label": "vllm_embedded_cacheblend",
+      "offload_backend_labels": [],
+      "signals": {
+        "lmcache_cacheblend_metrics": true,
+        "lmcache_embedded_metrics": true,
+        "lmcache_mp_connector_label": false,
+        "lmcache_mp_metrics": false,
+        "sglang_enable_lmcache_label": false,
+        "sglang_hicache_metrics": false,
+        "sglang_lmcache_connector_label": false,
+        "sglang_lmcradix_cache_label": false,
+        "sglang_metrics": false,
+        "stale_lmcache_connector_label": false,
+        "vllm_embedded_connector_label": false,
+        "vllm_lmcache_offload_backend_label": false,
+        "vllm_metrics": true
+      }
+    },
+    "lmcache_compat.detected_mode": "embedded_cacheblend",
+    "lmcache_compat.diagnostic_findings": [
+      {
+        "code": "lmcache_log_p2p_transfer_failure",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+        "metrics": {
+          "category": "p2p_transfer_failure",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "warning"
+      },
+      {
+        "code": "lmcache_log_pd_stall",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain disaggregated prefill/decode stall or timeout hints.",
+        "metrics": {
+          "category": "pd_stall",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "warning"
+      },
+      {
+        "code": "lmcache_log_nixl_proxy_indicator",
+        "evidence_status": "parser_only",
+        "message": "LMCache logs contain NIXL proxy indicators.",
+        "metrics": {
+          "category": "nixl_proxy",
+          "event_count": 1,
+          "numeric_hints": []
+        },
+        "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+        "severity": "info"
+      }
+    ]
+  },
+  "primary_evidence": [
+    {
+      "claim_status": "measured",
+      "metric": "diagnose.required_evidence",
+      "source": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/local-diagnose-job/metrics/lmcache_compat_report.json",
+      "value": {
+        "lmcache_compat.detected_architecture": {
+          "cache_labels": [],
+          "claim_status": "measured",
+          "connector_labels": [],
+          "label": "vllm_embedded_cacheblend",
+          "offload_backend_labels": [],
+          "signals": {
+            "lmcache_cacheblend_metrics": true,
+            "lmcache_embedded_metrics": true,
+            "lmcache_mp_connector_label": false,
+            "lmcache_mp_metrics": false,
+            "sglang_enable_lmcache_label": false,
+            "sglang_hicache_metrics": false,
+            "sglang_lmcache_connector_label": false,
+            "sglang_lmcradix_cache_label": false,
+            "sglang_metrics": false,
+            "stale_lmcache_connector_label": false,
+            "vllm_embedded_connector_label": false,
+            "vllm_lmcache_offload_backend_label": false,
+            "vllm_metrics": true
+          }
+        },
+        "lmcache_compat.detected_mode": "embedded_cacheblend",
+        "lmcache_compat.diagnostic_findings": [
+          {
+            "code": "lmcache_log_p2p_transfer_failure",
+            "evidence_status": "parser_only",
+            "message": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+            "metrics": {
+              "category": "p2p_transfer_failure",
+              "event_count": 1,
+              "numeric_hints": []
+            },
+            "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+            "severity": "warning"
+          },
+          {
+            "code": "lmcache_log_pd_stall",
+            "evidence_status": "parser_only",
+            "message": "LMCache logs contain disaggregated prefill/decode stall or timeout hints.",
+            "metrics": {
+              "category": "pd_stall",
+              "event_count": 1,
+              "numeric_hints": []
+            },
+            "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+            "severity": "warning"
+          },
+          {
+            "code": "lmcache_log_nixl_proxy_indicator",
+            "evidence_status": "parser_only",
+            "message": "LMCache logs contain NIXL proxy indicators.",
+            "metrics": {
+              "category": "nixl_proxy",
+              "event_count": 1,
+              "numeric_hints": []
+            },
+            "recommendation": "Pair parser-only log evidence with Prometheus, HTTP, trace, and live transfer artifacts before making a runtime coverage claim.",
+            "severity": "info"
+          }
+        ]
+      }
+    }
+  ],
+  "reasoning": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+  "recommended_next_probe": "inferguard collect-metrics --engine <engine> --engine-metrics-url <url> --dcgm-metrics-url <url> --output-dir /Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z/local-diagnose-job/metrics --duration-seconds 120",
+  "rule_fired": "lmcache_log_p2p_transfer_failure",
+  "schema_version": "inferguard-bottleneck-diagnosis/v1",
+  "secondary_evidence": [],
+  "supporting_request_rows": [],
+  "verdict": "not_enough_evidence"
+}

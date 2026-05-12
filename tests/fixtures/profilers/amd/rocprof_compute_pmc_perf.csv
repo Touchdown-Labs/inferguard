@@ -1,0 +1,4 @@
+Kernel_Name,Metric,Value,Unit
+paged_attention_kernel,SQ_WAVES,2048,waves
+paged_attention_kernel,TCC_EA_RDREQ,8192,requests
+paged_attention_kernel,MFMA_UTILIZATION,58.5,%

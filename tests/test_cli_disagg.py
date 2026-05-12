@@ -92,6 +92,44 @@ def mock_pair():
         decode.stop()
 
 
+@pytest.fixture
+def mooncake_pair():
+    prefill = _ServerThread(
+        engine="sglang", scenario="healthy", connector="mooncake", port=_pick_port()
+    )
+    decode = _ServerThread(
+        engine="sglang", scenario="healthy", connector="mooncake", port=_pick_port()
+    )
+    prefill.start()
+    decode.start()
+    prefill.wait_ready()
+    decode.wait_ready()
+    try:
+        yield prefill, decode
+    finally:
+        prefill.stop()
+        decode.stop()
+
+
+@pytest.fixture
+def llmd_pair():
+    prefill = _ServerThread(
+        engine="vllm", scenario="healthy", connector="nixl", port=_pick_port()
+    )
+    decode = _ServerThread(
+        engine="vllm", scenario="healthy", connector="nixl", port=_pick_port()
+    )
+    prefill.start()
+    decode.start()
+    prefill.wait_ready()
+    decode.wait_ready()
+    try:
+        yield prefill, decode
+    finally:
+        prefill.stop()
+        decode.stop()
+
+
 def test_cli_status_returns_json(mock_pair) -> None:
     prefill, decode = mock_pair
     runner = CliRunner()
@@ -133,6 +171,57 @@ def test_cli_status_table_mode(mock_pair) -> None:
     # Table mode prints "role", "engine", etc. in the header.
     assert "role" in result.stdout
     assert "engine" in result.stdout
+
+
+def test_cli_status_reports_mooncake_connector_label(mooncake_pair) -> None:
+    prefill, decode = mooncake_pair
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "disagg",
+            "status",
+            "--prefill",
+            f"http://127.0.0.1:{prefill.port}",
+            "--decode",
+            f"http://127.0.0.1:{decode.port}",
+            "--engine",
+            "sglang",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["prefill"]["endpoint"]["engine"] == "sglang"
+    assert payload["prefill"]["endpoint"]["connector"] == "mooncake"
+    assert payload["decode"]["endpoint"]["connector"] == "mooncake"
+    assert payload["prefill"]["scrape_error"] == ""
+
+
+def test_cli_status_reports_llmd_adapter_pending(llmd_pair) -> None:
+    prefill, decode = llmd_pair
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "disagg",
+            "status",
+            "--prefill",
+            f"http://127.0.0.1:{prefill.port}",
+            "--decode",
+            f"http://127.0.0.1:{decode.port}",
+            "--engine",
+            "llm-d",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["prefill"]["endpoint"]["engine"] == "llm-d"
+    assert payload["prefill"]["scrape_error"] == "adapter_not_implemented"
+    assert payload["decode"]["scrape_error"] == "adapter_not_implemented"
 
 
 def test_cli_status_unreachable_exits_nonzero() -> None:

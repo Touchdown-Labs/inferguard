@@ -8,7 +8,8 @@ from typer.testing import CliRunner
 from inferguard.cli import app
 from inferguard.observability_coverage import build_observability_coverage_report
 
-LMCACHE_FIXTURES = Path(__file__).parent / "fixtures" / "lmcache_metrics"
+FIXTURES = Path(__file__).parent / "fixtures"
+LMCACHE_FIXTURES = FIXTURES / "lmcache_metrics"
 
 
 def _lmcache_fixture(name: str) -> str:
@@ -80,6 +81,192 @@ lmcache_mp_lookup_hit_tokens_total 50
     assert report["surfaces"]["sglang"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["lmcache_mp"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["vllm"]["status"] == "not_applicable"
+
+
+def test_observability_coverage_marks_sglang_embedded_lmcache_as_existing_source_backed() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",connector="LMCacheLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text="""
+lmcache:lookup_requests_total 2
+lmcache:retrieve_requests_total 1
+lmcache:store_requests_total 2
+lmcache:num_retrieve_tokens_total 64
+lmcache:num_store_tokens_total 128
+lmcache:local_cpu_cache_usage 0.25
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="embedded",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_embedded_support"]
+    provenance = report["sglang_lmcache_version_provenance"]
+    embedded_lineage = provenance["embedded_runtime"]["minimum_observed_code_lineage"]
+    assert provenance["schema_version"] == "inferguard-sglang-lmcache-version-provenance/v1"
+    assert provenance["embedded_runtime"]["upstream_state"] == "documented_existing_embedded_support"
+    assert embedded_lineage["lmcache_sglang_config"]["introduced_commit"] == "f3bba133"
+    assert embedded_lineage["lmcache_sglang_config"]["date"] == "2025-06-23"
+    assert embedded_lineage["sglang_enable_lmcache_flag"]["introduced_commit"] == "9a7ced4"
+    assert embedded_lineage["sglang_enable_lmcache_flag"]["date"] == "2025-09-06"
+    assert embedded_lineage["lmcache_env_validation_fix"]["pull_request"].endswith("/3002")
+    assert report["detected_engines"] == ["sglang"]
+    assert report["detected_lmcache_mode"] == "embedded"
+    assert architecture["label"] == "sglang_embedded_lmcache"
+    assert architecture["claim_status"] == "measured"
+    assert support["support_status"] == "source_backed"
+    assert support["claim_status"] == "measured"
+    assert support["upstream_state"] == "documented_existing_embedded_support"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_layerwise_runtime_calls"][
+        "introduced_commit"
+    ] == "b72bdfd"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_layerwise_runtime_calls"][
+        "date"
+    ] == "2025-08-30"
+    assert support["source_provenance"]["minimum_observed_code_lineage"]["lmcache_env_validation_fix"][
+        "merged_at"
+    ] == "2026-05-11T14:39:19Z"
+    assert support["required_launch_flags"] == ["--enable-lmcache"]
+    assert "not LMCache MP support" in support["non_claims"]
+    assert "InferGuard does not enable runtime cache behavior; it only captures and classifies evidence" in support[
+        "non_claims"
+    ]
+    assert report["sglang_lmcache_mp_observability"]["claim_status"] == "not_proven"
+
+
+def test_sglang_lmcache_embedded_launch_signal_without_lmcache_metrics_is_source_backed_only() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",connector="LMCacheLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="embedded",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_embedded_support"]
+    assert architecture["label"] == "sglang_embedded_lmcache"
+    assert architecture["claim_status"] == "inferred"
+    assert support["claim_status"] == "source_backed"
+    assert support["live_validation"] == "pending"
+
+
+def test_sglang_lmcache_mp_observability_is_fixture_tested_pending_live_validation() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text=_lmcache_fixture("sglang_lmcache_mp.prom"),
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_mp_observability"]
+    provenance = report["sglang_lmcache_version_provenance"]["multiprocess_runtime"]
+    assert architecture["label"] == "sglang_mp_lmcache_observability"
+    assert architecture["claim_status"] == "fixture_tested"
+    assert support["support_status"] == "source_backed_fixture_tested"
+    assert support["claim_status"] == "fixture_tested"
+    assert support["acceptance_state"] == "complete"
+    assert support["acceptance_blockers"] == []
+    assert support["sglang_mp_launch_evidence_present"] is True
+    assert support["sglang_mp_connector_evidence_present"] is True
+    required = support["mp_family_breakdown"]["required"]
+    assert set(required) == {"storage_manager", "lookup_tokens", "l1_counters", "l1_memory"}
+    assert all(row["status"] == "populated" for row in required.values())
+    assert "l1_failures" in support["mp_family_breakdown"]["lifecycle_error_abort_when_present"]
+    assert "l0_lifecycle" in support["mp_family_breakdown"]["lifecycle_error_abort_when_present"]
+    assert support["upstream_state"] == "open_prs_not_merged"
+    assert provenance["prs"][0]["number"] == 24089
+    assert provenance["prs"][0]["opened_at"] == "2026-04-29T21:01:46Z"
+    assert provenance["prs"][0]["author"] == "Shaoting-Feng"
+    assert provenance["prs"][1]["number"] == 3166
+    assert provenance["prs"][1]["opened_at"] == "2026-04-29T21:03:17Z"
+    assert provenance["prs"][1]["author"] == "Shaoting-Feng"
+    assert support["source_provenance"]["upstream_state"] == "open_prs_not_merged"
+    assert support["live_validation"] == "pending"
+    assert support["required_launch_flags"] == [
+        "--enable-lmcache",
+        "--lmcache-mp-host",
+        "--lmcache-mp-port",
+    ]
+    assert "not live validated" in support["non_claims"]
+    assert "not merged upstream" in support["non_claims"]
+
+
+def test_sglang_lmcache_mp_without_launch_evidence_stays_candidate() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text=_lmcache_fixture("sglang_lmcache_mp.prom"),
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_mp_observability"]
+    assert architecture["label"] == "sglang_mp_lmcache_candidate"
+    assert architecture["claim_status"] == "inferred"
+    assert support["classification"] == "sglang_mp_lmcache_candidate"
+    assert support["claim_status"] == "not_proven"
+    assert support["acceptance_state"] == "incomplete"
+    assert "missing_sglang_mp_launch_evidence" in support["acceptance_blockers"]
+    assert "missing_sglang_mp_connector_evidence" in support["acceptance_blockers"]
+    assert support["live_validation"] == "pending"
+
+
+def test_sglang_lmcache_mp_missing_required_family_is_incomplete() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+""",
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 100
+lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 50
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    support = report["sglang_lmcache_mp_observability"]
+    assert support["classification"] == "sglang_mp_lmcache_observability"
+    assert support["claim_status"] == "not_proven"
+    assert support["acceptance_state"] == "incomplete"
+    assert "missing_required_family:l1_memory" in support["acceptance_blockers"]
+    assert support["mp_family_breakdown"]["required"]["l1_memory"]["status"] == "missing"
 
 
 def test_observability_coverage_cli_writes_report(tmp_path: Path) -> None:
@@ -178,6 +365,54 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     assert payload["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
 
 
+def test_observability_coverage_cli_accepts_pr3255_l0_boundary_jsonl(tmp_path: Path) -> None:
+    boundary = tmp_path / "l0_boundary.jsonl"
+    boundary.write_text(
+        "\n".join(
+            [
+                json.dumps({
+                    "schema_version": "inferguard-l0-block-boundary-event/v1",
+                    "source_component": "vllm_adapter",
+                    "stage": "vllm_adapter_before_queue_submit",
+                    "timestamp": "2026-05-11T00:00:00Z",
+                    "request_id": "redacted-request-1",
+                    "block_count": 64,
+                    "metric_update_count": 1,
+                }),
+                json.dumps({
+                    "schema_version": "inferguard-l0-block-boundary-event/v1",
+                    "source_component": "lmcache_server",
+                    "stage": "lmcache_server_receive",
+                    "timestamp": "2026-05-11T00:00:01Z",
+                    "request_id": "redacted-request-1",
+                    "block_count": 64,
+                    "metric_update_count": 1,
+                }),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "observability-coverage",
+            "--lmcache-l0-boundary-evidence-file",
+            str(boundary),
+            "--expect-lmcache-mode",
+            "mp",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["detected_lmcache_mode"] == "mp"
+    assert payload["surfaces"]["lmcache_l0_boundary"]["status"] == "complete"
+    assert payload["lmcache_compat"]["lmcache_l0_boundary_evidence"]["accepted_count"] == 2
+
+
 def test_observability_coverage_cli_accepts_new_lmcache_evidence_files(tmp_path: Path) -> None:
     log = tmp_path / "log.json"
     trace_replay = tmp_path / "trace_replay.json"
@@ -260,14 +495,14 @@ lmcache_blend_store_final_failures_total 0
 lmcache_blend_fingerprints_registered_total 8
 lmcache_blend_chunks_evicted_total 2
 """,
-        expect_lmcache_mode="mp",
+        expect_lmcache_mode="auto",
     )
 
     compat = report["lmcache_compat"]
     families = {(row["surface"], row["family"]): row for row in compat["families"]}
     assert compat["observed"]["lmcache_cacheblend"] is True
     assert compat["observed"]["lmcache_embedded"] is False
-    assert compat["detected_architecture"]["label"] == "lmcache_mp_server"
+    assert compat["detected_architecture"]["label"] == "lmcache_cacheblend"
     assert report["surfaces"]["lmcache_cacheblend"]["status"] == "complete"
     assert families[("lmcache_cacheblend", "lookup")]["status"] == "populated"
     assert families[("lmcache_cacheblend", "failure")]["status"] == "populated"
@@ -455,6 +690,38 @@ def test_sglang_hicache_only_fixture_does_not_claim_lmcache() -> None:
     assert architecture["signals"]["sglang_lmcache_connector_label"] is False
     assert architecture["signals"]["sglang_enable_lmcache_label"] is False
     assert "sglang_hicache_not_lmcache" in codes
+
+
+def test_observability_coverage_accepts_redacted_sglang_kv_events(tmp_path: Path) -> None:
+    output = tmp_path / "coverage.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "observability-coverage",
+            "--engine-metrics-file",
+            str(LMCACHE_FIXTURES / "sglang_lmcache_embedded.prom"),
+            "--expected-engine",
+            "sglang",
+            "--expect-lmcache-mode",
+            "embedded",
+            "--sglang-kv-events-evidence-file",
+            str(FIXTURES / "sglang_kv_events.jsonl"),
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["surfaces"]["sglang_kv_events"]["status"] == "complete"
+    evidence = payload["sglang_kv_events_evidence"]
+    assert evidence["raw_token_id_values_recorded"] is False
+    assert evidence["raw_block_hash_values_recorded"] is False
+    rendered = json.dumps(payload, sort_keys=True)
+    assert "token_ids" not in rendered
+    assert "hash-a" not in rendered
+    assert "parent-hash" not in rendered
 
 
 def test_lmcache_mp_l0_lifecycle_populated_when_block_metrics_present() -> None:

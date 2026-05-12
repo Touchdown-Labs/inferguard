@@ -14,6 +14,18 @@ from inferguard.collect_metrics.normalize import LMCACHE_LOCKED_METRICS, VLLM_LO
 from inferguard.metrics_core import LabeledSample, parse_labeled_prometheus_text
 
 SCHEMA_VERSION = "inferguard-observability-compat/v1"
+L0_BOUNDARY_SCHEMA_VERSION = "inferguard-l0-block-boundary-event/v1"
+L0_BOUNDARY_FORBIDDEN_FIELDS = (
+    "token_ids",
+    "tokens",
+    "raw_tokens",
+    "raw_token_ids",
+    "block_ids",
+    "raw_block_ids",
+    "gpu_block_ids",
+)
+SGLANG_KV_EVENTS_SCHEMA_VERSION = "inferguard-sglang-kv-events-evidence/v1"
+SGLANG_KV_EVENTS_FORBIDDEN_FIELDS = ("token id lists", "block hash lists", "parent block hash")
 
 
 class ExpectMode(StrEnum):
@@ -214,7 +226,27 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec(
         "lmcache_mp",
         "l0_lifecycle",
-        ("lmcache_mp_l0_block_*_seconds*", "lmcache_mp.l0_block_*_seconds*"),
+        (
+            "lmcache_mp_l0_block_*_seconds*",
+            "lmcache_mp_l0_block_*_total",
+            "lmcache_mp.l0_block_*_seconds*",
+            "lmcache_mp.l0_block_*_total",
+        ),
+        required_when="sampled",
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l0_allocation_counters",
+        (
+            "lmcache_mp_l0_block_allocation_records",
+            "lmcache_mp_l0_block_allocation_records_total",
+            "lmcache_mp_l0_block_allocated_blocks",
+            "lmcache_mp_l0_block_allocated_blocks_total",
+            "lmcache_mp.l0_block_allocation_records",
+            "lmcache_mp.l0_block_allocation_records_total",
+            "lmcache_mp.l0_block_allocated_blocks",
+            "lmcache_mp.l0_block_allocated_blocks_total",
+        ),
         required_when="sampled",
     ),
     MetricFamilySpec(
@@ -312,25 +344,25 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lmcache_cacheblend",
         "store_pre_computed",
         ("lmcache_blend_store_pre_computed_requests*", "lmcache_blend_store_pre_computed_chunks*"),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "store_final",
         ("lmcache_blend_store_final_requests*", "lmcache_blend_store_final_chunks*"),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "fingerprint",
         ("lmcache_blend_fingerprints_registered*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "evict",
         ("lmcache_blend_chunks_evicted*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
@@ -340,19 +372,19 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_blend_store_pre_computed_failures*",
             "lmcache_blend_store_final_failures*",
         ),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "no_gpu_context",
         ("lmcache_blend_lookup_no_gpu_context_errors*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "stale",
         ("lmcache_blend_lookup_stale_chunks*",),
-        required_when="cacheblend_observed",
+        required_when="optional",
     ),
 )
 
@@ -383,6 +415,7 @@ def build_compat_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
@@ -396,15 +429,29 @@ def build_compat_report(
         and not name.startswith("lmcache_blend_")
         for name in observed_names
     )
-    detected_mode = _detected_mode(
-        observed_lmcache_mp or observed_lmcache_cacheblend,
-        observed_lmcache_embedded,
+    observed_lmcache_mp_evidence = _has_measured_mp_evidence(
+        lmcache_http_evidence=lmcache_http_evidence,
+        lmcache_log_evidence=lmcache_log_evidence,
+        lmcache_otel_evidence=lmcache_otel_evidence,
+        lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
     )
+    observed_lmcache_cacheblend_evidence = _has_measured_cacheblend_evidence(
+        lmcache_otel_evidence=lmcache_otel_evidence,
+    )
+    cacheblend_observed = observed_lmcache_cacheblend or observed_lmcache_cacheblend_evidence
+    mp_metrics_prometheus_unavailable = observed_lmcache_mp_evidence and not observed_lmcache_mp
+    detected_mode = _detected_mode(
+        observed_lmcache_mp or observed_lmcache_mp_evidence,
+        observed_lmcache_embedded,
+        cacheblend_observed,
+    )
+    mp_launch_evidence = _sglang_lmcache_mp_launch_evidence(samples, mp_observability or {})
     architecture = _architecture_detection(
         samples,
         observed_lmcache_mp=observed_lmcache_mp,
         observed_lmcache_cacheblend=observed_lmcache_cacheblend,
         observed_lmcache_embedded=observed_lmcache_embedded,
+        sglang_lmcache_mp_launch_evidence=mp_launch_evidence,
     )
     mp_observability_report = _mp_observability_report(
         samples,
@@ -417,8 +464,9 @@ def build_compat_report(
             samples,
             detected_mode=detected_mode,
             l2_configured=l2_configured,
-            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled")),
-            cacheblend_observed=observed_lmcache_cacheblend,
+            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled"))
+            or mp_metrics_prometheus_unavailable,
+            cacheblend_observed=cacheblend_observed,
         )
         for spec in COMPAT_REGISTRY
     ]
@@ -430,6 +478,7 @@ def build_compat_report(
             lmcache_otel_evidence=lmcache_otel_evidence,
             lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
             lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
         )
     )
     diagnostic_findings = _diagnostic_findings(
@@ -468,6 +517,7 @@ def build_compat_report(
             lmcache_http_evidence=lmcache_http_evidence,
             lmcache_trace_evidence=lmcache_trace_evidence,
             lmcache_otel_evidence=lmcache_otel_evidence,
+            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
             mp_observability=mp_observability_report,
         )
     )
@@ -484,7 +534,11 @@ def build_compat_report(
         "upstream_questions": upstream_questions,
         "observed": {
             "lmcache_mp": observed_lmcache_mp,
-            "lmcache_cacheblend": observed_lmcache_cacheblend,
+            "lmcache_mp_evidence": observed_lmcache_mp_evidence,
+            "lmcache_mp_metrics_prometheus_unavailable": mp_metrics_prometheus_unavailable,
+            "lmcache_cacheblend": cacheblend_observed,
+            "lmcache_cacheblend_metrics": observed_lmcache_cacheblend,
+            "lmcache_cacheblend_evidence": observed_lmcache_cacheblend_evidence,
             "lmcache_embedded": observed_lmcache_embedded,
             "vllm": any(name.startswith("vllm:") for name in observed_names),
             "total_series": len(observed_names),
@@ -501,6 +555,7 @@ def build_compat_report(
         "lmcache_otel_evidence": lmcache_otel_evidence,
         "lmcache_trace_replay_evidence": lmcache_trace_replay_evidence,
         "lmcache_lookup_hash_evidence": lmcache_lookup_hash_evidence,
+        "lmcache_l0_boundary_evidence": lmcache_l0_boundary_evidence,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -523,6 +578,7 @@ def build_compat_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -542,6 +598,7 @@ def build_compat_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
     )
 
 
@@ -559,6 +616,7 @@ def build_compat_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -574,6 +632,7 @@ def build_compat_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
     )
 
 
@@ -667,14 +726,17 @@ def _evidence_family_rows(
     lmcache_otel_evidence: dict[str, Any] | None,
     lmcache_trace_replay_evidence: dict[str, Any] | None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     return [
         _evidence_family_row("lmcache_http", "mp_http_api", lmcache_http_evidence),
         _evidence_family_row("lmcache_logs", "lifecycle_logs", lmcache_log_evidence),
         _evidence_family_row("lmcache_trace_recording", "storage_lct", lmcache_trace_evidence),
         _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
+        _evidence_family_row("lmcache_otel", "cacheblend_spans", lmcache_otel_evidence),
         _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
         _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
+        _evidence_family_row("lmcache_l0_boundary", "redacted_jsonl", lmcache_l0_boundary_evidence),
     ]
 
 
@@ -689,7 +751,8 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
             evidence.get("claim_status") == "measured"
             or evidence.get("booleans", {}).get("is_healthy")
             or evidence.get("record_count", 0)
-            or evidence.get("row_count", 0)
+            or evidence.get("accepted_count", 0)
+            or evidence.get("row_count", 0) and evidence.get("claim_status") != "blocked"
             or evidence.get("total_records", 0)
             or any(int(value or 0) > 0 for value in event_counts.values())
         ):
@@ -710,14 +773,72 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
     }
 
 
-def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -> str:
+def _has_measured_mp_evidence(
+    *,
+    lmcache_http_evidence: dict[str, Any] | None,
+    lmcache_log_evidence: dict[str, Any] | None,
+    lmcache_otel_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
+) -> bool:
+    status = (lmcache_http_evidence or {}).get("endpoints", {}).get("status", {})
+    status_fields = status.get("fields") if isinstance(status, dict) else {}
+    engine_type = status_fields.get("engine_type") if isinstance(status_fields, dict) else None
+    log_modes = (lmcache_log_evidence or {}).get("mode_candidates") or []
+    otel_mp_spans = (lmcache_otel_evidence or {}).get("mp_span_count") or 0
+    l0_boundary_measured = (lmcache_l0_boundary_evidence or {}).get("claim_status") == "measured"
+    return engine_type == "MPCacheEngine" or "mp" in log_modes or float(otel_mp_spans) > 0 or l0_boundary_measured
+
+
+def _has_measured_cacheblend_evidence(*, lmcache_otel_evidence: dict[str, Any] | None) -> bool:
+    otel_cacheblend_spans = (lmcache_otel_evidence or {}).get("cacheblend_span_count") or 0
+    return float(otel_cacheblend_spans) > 0
+
+
+def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool, observed_lmcache_cacheblend: bool) -> str:
     if observed_lmcache_mp and observed_lmcache_embedded:
         return "mixed"
     if observed_lmcache_mp:
         return "mp"
+    if observed_lmcache_cacheblend and observed_lmcache_embedded:
+        return "embedded_cacheblend"
+    if observed_lmcache_cacheblend:
+        return "cacheblend"
     if observed_lmcache_embedded:
         return "embedded"
     return "unknown"
+
+
+def _sglang_lmcache_mp_launch_evidence(
+    samples: list[LabeledSample], explicit: dict[str, Any]
+) -> dict[str, Any]:
+    host_values = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"lmcache_mp_host", "sglang_lmcache_mp_host"} and value
+        }
+    )
+    port_values = sorted(
+        {
+            str(value)
+            for sample in samples
+            for key, value in sample.labels.items()
+            if key in {"lmcache_mp_port", "sglang_lmcache_mp_port"} and value
+        }
+    )
+    source_fields = explicit.get("source_fields") if isinstance(explicit.get("source_fields"), dict) else {}
+    if source_fields:
+        if source_fields.get("lmcache_mp_host"):
+            host_values.append(str(source_fields["lmcache_mp_host"]))
+        if source_fields.get("lmcache_mp_port"):
+            port_values.append(str(source_fields["lmcache_mp_port"]))
+    present = bool(host_values and port_values)
+    return {
+        "present": present,
+        "lmcache_mp_host_values": sorted(set(host_values)),
+        "lmcache_mp_port_values": sorted(set(port_values)),
+    }
 
 
 def _architecture_detection(
@@ -726,6 +847,7 @@ def _architecture_detection(
     observed_lmcache_mp: bool,
     observed_lmcache_cacheblend: bool,
     observed_lmcache_embedded: bool,
+    sglang_lmcache_mp_launch_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     names = {sample.name for sample in samples}
     has_vllm = any(name.startswith("vllm:") for name in names)
@@ -791,20 +913,26 @@ def _architecture_detection(
         connector in {"LMCacheLayerwiseConnector", "LMCacheConnector"}
         for connector in connector_labels
     )
+    has_sglang_mp_lmcache_connector = "LMCacheMPLayerwiseConnector" in connector_labels
     has_sglang_lmcradix_cache = "LMCRadixCache" in cache_labels
     has_sglang_enable_lmcache = any(
         value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels
     ) or "sglang:lmcache_enabled" in names
     has_sglang_hicache_metrics = any(name.startswith("sglang:hicache_") for name in names)
+    has_sglang_lmcache_mp_launch = bool((sglang_lmcache_mp_launch_evidence or {}).get("present"))
     has_sglang_lmcache_signal = (
         has_sglang_lmcache_connector
+        or has_sglang_mp_lmcache_connector
         or has_sglang_lmcradix_cache
         or has_sglang_enable_lmcache
     )
     label = "unknown"
     confidence = "not_proven"
-    observed_mp_like = observed_lmcache_mp or observed_lmcache_cacheblend
-    if has_vllm and (observed_mp_like or has_mp_connector):
+    observed_mp_like = observed_lmcache_mp
+    if has_vllm and observed_lmcache_cacheblend:
+        label = "vllm_embedded_cacheblend"
+        confidence = "measured"
+    elif has_vllm and (observed_mp_like or has_mp_connector):
         label = "vllm_mp_lmcache"
         confidence = "measured" if observed_mp_like and has_mp_connector else "inferred"
     elif has_vllm and (
@@ -814,6 +942,9 @@ def _architecture_detection(
     ):
         label = "vllm_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
+    elif has_sglang and observed_mp_like and has_sglang_lmcache_mp_launch:
+        label = "sglang_mp_lmcache_observability"
+        confidence = "fixture_tested"
     elif has_sglang and observed_mp_like:
         label = "sglang_mp_lmcache_candidate"
         confidence = "inferred"
@@ -822,6 +953,9 @@ def _architecture_detection(
         confidence = "measured" if observed_lmcache_embedded else "inferred"
     elif observed_mp_like:
         label = "lmcache_mp_server"
+        confidence = "measured"
+    elif observed_lmcache_cacheblend:
+        label = "lmcache_cacheblend"
         confidence = "measured"
     elif observed_lmcache_embedded:
         label = "lmcache_embedded_unknown_engine"
@@ -836,6 +970,8 @@ def _architecture_detection(
         "vllm_embedded_connector_label": has_vllm_embedded_connector,
         "vllm_lmcache_offload_backend_label": has_vllm_lmcache_offload_backend,
         "sglang_lmcache_connector_label": has_sglang_lmcache_connector,
+        "sglang_mp_lmcache_connector_label": has_sglang_mp_lmcache_connector,
+        "sglang_lmcache_mp_launch_evidence": has_sglang_lmcache_mp_launch,
         "sglang_enable_lmcache_label": has_sglang_enable_lmcache,
         "sglang_lmcradix_cache_label": has_sglang_lmcradix_cache,
         "sglang_hicache_metrics": has_sglang_hicache_metrics,
@@ -865,7 +1001,7 @@ def _is_applicable(
         return False
     if spec.surface == "lmcache_cacheblend" and (not cacheblend_observed or mp_metrics_disabled):
         return False
-    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed"}:
+    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed", "embedded_cacheblend"}:
         return False
     if spec.required_when == "l2_configured":
         return l2_configured
@@ -908,6 +1044,14 @@ def _failures(
                     "code": "lmcache_mp_family_missing",
                     "family": family["family"],
                     "message": f"expected LMCache MP family {family['family']!r} was missing",
+                }
+            )
+        if family["surface"] == "lmcache_cacheblend" and family["status"] == "missing":
+            failures.append(
+                {
+                    "code": "lmcache_cacheblend_family_missing",
+                    "family": family["family"],
+                    "message": f"expected LMCache CacheBlend family {family['family']!r} was missing",
                 }
             )
     return failures
@@ -1541,6 +1685,107 @@ def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
     }
 
 
+def read_sglang_kv_events_evidence(path: Path | None) -> dict[str, Any] | None:
+    """Read SGLang KV events and return redacted aggregate evidence only."""
+
+    if path is None:
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {
+            "present": False,
+            "claim_status": "blocked",
+            "failure_reasons": [
+                {"code": "sglang_kv_events_file_unreadable", "message": f"Could not read {path}"}
+            ],
+        }
+    records: list[Any]
+    if path.suffix == ".jsonl":
+        records = []
+        for line in text.splitlines():
+            if line.strip():
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    records.append({"_inferguard_malformed_json": True})
+    else:
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            records = [{"_inferguard_malformed_json": True}]
+        else:
+            records = payload if isinstance(payload, list) else [payload]
+    return summarize_sglang_kv_events(records)
+
+
+def summarize_sglang_kv_events(records: list[Any]) -> dict[str, Any]:
+    """Summarize SGLang/LMCache KV-event payloads without persisting raw token or hash data."""
+
+    event_batch_count = 0
+    block_stored_count = 0
+    block_removed_count = 0
+    block_count = 0
+    has_parent_relationships = 0
+    raw_token_ids_seen = False
+    raw_block_hashes_seen = False
+    malformed_count = 0
+    publishers: set[str] = set()
+    topics: set[str] = set()
+    for record in records:
+        if not isinstance(record, dict):
+            malformed_count += 1
+            continue
+        if record.get("_inferguard_malformed_json"):
+            malformed_count += 1
+            continue
+        event_batch_count += 1
+        if record.get("publisher"):
+            publishers.add(str(record["publisher"]))
+        if record.get("topic"):
+            topics.add(str(record["topic"]))
+        events = record.get("events") if isinstance(record.get("events"), list) else [record]
+        for event in events:
+            if not isinstance(event, dict):
+                malformed_count += 1
+                continue
+            event_type = str(event.get("type") or event.get("event_type") or event.get("event") or "")
+            raw_token_ids_seen = raw_token_ids_seen or "token_ids" in event
+            raw_block_hashes_seen = raw_block_hashes_seen or "block_hashes" in event or "parent_block_hash" in event
+            event_blocks = event.get("block_hashes")
+            if isinstance(event_blocks, list):
+                block_count += len(event_blocks)
+            elif event.get("block_hash") is not None:
+                block_count += 1
+                raw_block_hashes_seen = True
+            if event.get("parent_block_hash") is not None:
+                has_parent_relationships += 1
+            if event_type.endswith("BlockStored") or event_type == "BlockStored":
+                block_stored_count += 1
+            elif event_type.endswith("BlockRemoved") or event_type == "BlockRemoved":
+                block_removed_count += 1
+    present = bool(event_batch_count or block_stored_count or block_removed_count or block_count)
+    return {
+        "schema_version": SGLANG_KV_EVENTS_SCHEMA_VERSION,
+        "source_engine": "sglang",
+        "publisher": sorted(publishers)[0] if len(publishers) == 1 else None,
+        "topic": sorted(topics)[0] if len(topics) == 1 else None,
+        "event_batch_count": event_batch_count,
+        "block_stored_count": block_stored_count,
+        "block_removed_count": block_removed_count,
+        "block_count": block_count,
+        "has_parent_relationships": has_parent_relationships,
+        "raw_token_id_values_seen": raw_token_ids_seen,
+        "raw_block_hash_values_seen": raw_block_hashes_seen,
+        "raw_token_id_values_recorded": False,
+        "raw_block_hash_values_recorded": False,
+        "redacted_fields": list(SGLANG_KV_EVENTS_FORBIDDEN_FIELDS),
+        "malformed_count": malformed_count,
+        "present": present,
+        "claim_status": "measured" if present and not malformed_count else ("blocked" if malformed_count else "not_proven"),
+    }
+
+
 def _read_url(url: str, timeout_seconds: float) -> str:
     with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310  # nosec B310 - operator-supplied metrics URL.
         return response.read().decode("utf-8", errors="replace")
@@ -1556,11 +1801,69 @@ def _read_json_object(path: Path | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _read_l0_boundary_evidence(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    if path.suffix == ".json":
+        payload = _read_json_object(path)
+        return payload if payload else None
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {"present": False, "claim_status": "blocked", "failure_reasons": [{"code": "lmcache_l0_boundary_file_unreadable", "message": f"Could not read {path}"}]}
+    stage_counts: dict[str, int] = {}
+    accepted = 0
+    rejected = 0
+    failures: list[dict[str, str]] = []
+    raw_tokens = False
+    raw_block_ids = False
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            rejected += 1
+            failures.append({"code": "lmcache_l0_boundary_malformed_json", "message": "Boundary evidence JSONL contained malformed JSON."})
+            continue
+        if not isinstance(event, dict):
+            rejected += 1
+            failures.append({"code": "lmcache_l0_boundary_malformed_event", "message": "Boundary evidence row was not a JSON object."})
+            continue
+        schema = event.get("schema_version") or event.get("schema") or event.get("event_schema")
+        forbidden = sorted(set(event) & set(L0_BOUNDARY_FORBIDDEN_FIELDS))
+        raw_tokens = raw_tokens or any(name in event for name in ("token_ids", "tokens", "raw_tokens", "raw_token_ids"))
+        raw_block_ids = raw_block_ids or any(name in event for name in ("block_ids", "raw_block_ids", "gpu_block_ids"))
+        if schema != L0_BOUNDARY_SCHEMA_VERSION or forbidden:
+            rejected += 1
+            code = "lmcache_l0_boundary_forbidden_raw_fields" if forbidden else "lmcache_l0_boundary_schema_mismatch"
+            failures.append({"code": code, "message": "Boundary evidence row failed schema or redaction validation."})
+            continue
+        stage = str(event.get("stage") or event.get("boundary_stage") or "unknown")
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        accepted += 1
+    row_count = accepted + rejected
+    blocked = bool(rejected and not accepted) or raw_tokens or raw_block_ids
+    return {
+        "present": row_count > 0,
+        "claim_status": "blocked" if blocked else ("measured" if accepted else "not_proven"),
+        "schema_version": L0_BOUNDARY_SCHEMA_VERSION,
+        "row_count": row_count,
+        "accepted_count": accepted,
+        "rejected_count": rejected,
+        "stage_counts": stage_counts,
+        "raw_tokens_recorded": raw_tokens,
+        "raw_block_ids_recorded": raw_block_ids,
+        "failure_reasons": failures,
+    }
+
+
 def _evidence_failures(
     *,
     lmcache_http_evidence: dict[str, Any] | None,
     lmcache_trace_evidence: dict[str, Any] | None,
     lmcache_otel_evidence: dict[str, Any] | None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None,
     mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     failures: list[dict[str, Any]] = []
@@ -1570,6 +1873,14 @@ def _evidence_failures(
                 {
                     "code": item.get("code") or "lmcache_http_unhealthy",
                     "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy",
+                }
+            )
+    for item in (lmcache_l0_boundary_evidence or {}).get("failure_reasons", []) or []:
+        if isinstance(item, dict):
+            failures.append(
+                {
+                    "code": item.get("code") or "lmcache_l0_boundary_invalid",
+                    "message": item.get("message") or "LMCache L0 block boundary evidence was invalid.",
                 }
             )
     if (mp_observability.get("config") or {}).get("trace_recording_enabled") and not (
@@ -1776,8 +2087,11 @@ __all__ = [
     "ExpectMode",
     "FailOn",
     "SCHEMA_VERSION",
+    "SGLANG_KV_EVENTS_SCHEMA_VERSION",
     "build_compat_report",
     "build_compat_report_from_paths",
     "build_compat_report_from_urls",
+    "read_sglang_kv_events_evidence",
+    "summarize_sglang_kv_events",
     "write_compat_report",
 ]

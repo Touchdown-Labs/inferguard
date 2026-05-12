@@ -29,8 +29,43 @@ PYTHONPATH=src python3 -m inferguard.cli --help
 ## LMCache observability workflow
 
 LMCache is mode-specific. For current standalone MP, collect the LMCache server
-endpoint, not just the engine endpoint. For embedded compatibility, collect the
-serving-engine endpoint and any `lmcache:*` metrics/logs it exposes.
+endpoint, not just the engine endpoint. For embedded compatibility and
+CacheBlend, collect the serving-engine endpoint plus any `lmcache:*`,
+`lmcache_blend_*`, `cb.*`, and log evidence it exposes.
+
+I1 release status: the active vLLM + LMCache + InferGuard CLI finish line is
+release-ready; the local docs/test gates passed. The score source is
+`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
+H2/SGLang, Mooncake, P2P/PD expansion, and DLM/llm-d adapter work are paused
+backend-expansion lanes; they are not blockers for the original vLLM + LMCache
+CLI coverage closeout.
+
+Accepted evidence packets:
+
+| Lane | Mode | Fixture | Primary CLI checks |
+| --- | --- | --- | --- |
+| A-F | vLLM + standalone LMCache MP | `tests/fixtures/lmcache_live/packet_a/` through `packet_f/` | `collect-lmcache`, `lmcache-compat --expect-mode mp --fail-on missing-required`, `observability-coverage --expect-lmcache-mode mp`, `diagnose-bottleneck` |
+| G1 | Diagnostic calibration | accepted Packet A-F diagnosis outputs | `tests/test_lmcache_live_fixtures.py::test_g1_diagnostic_calibration_is_pinned_by_accepted_live_packet_diagnoses` |
+| H1 | embedded vLLM `LMCacheConnectorV1` | `tests/fixtures/lmcache_live/packet_h1/` | strict compat detects `embedded` with no failures |
+| H3 | embedded CacheBlend / vLLM | `tests/fixtures/lmcache_live/packet_h3/` | strict compat detects `embedded_cacheblend` / `vllm_embedded_cacheblend` with no MP-family requirement |
+
+Final real-H100 smoke receipts:
+
+| Packet | Runtime family | Modal run | Local artifact | Auditable result |
+| --- | --- | --- | --- | --- |
+| B / LC1 | vLLM + standalone LMCache MP | `https://modal.com/apps/ocwc22/main/ap-i3clSmO9WG4fwZQJlF5FLx` | `/Users/chen/Projects/inferguard/modal-out/pulls/20260510T230559Z` | `detected_mode=mp`, `failure_reasons=[]`, `packet-b-lifecycle-evidence.json` has `claim_status=measured` and `missing_required_families=[]`. |
+| H3 | embedded CacheBlend / vLLM | `https://modal.com/apps/ocwc22/main/ap-3OmReCOzyoAFB4qD88me8g` | `/Users/chen/Projects/inferguard/modal-out/pulls/20260510T232009Z` | `detected_mode=embedded_cacheblend`, `detected_architecture.label=vllm_embedded_cacheblend`, `failure_reasons=[]`, non-empty `lmcache_otel.jsonl`, `24` `cb.*` spans, populated `lmcache_blend_*` metrics. |
+
+Precise coverage answer: yes, LMCache MP observability with vLLM is 100% covered for the InferGuard CLI acceptance scope. That does not mean continuous DCGM/NVML hardware telemetry is covered. The H100 receipts prove H100 identity plus LMCache/vLLM/OTel/Prometheus application telemetry; they do not prove sustained GPU utilization, HBM bandwidth, NVLink, PCIe, or power because no accepted DCGM/NVML sampler samples exist.
+
+Hardware telemetry caveat:
+
+| Surface | Current status | What would upgrade it |
+| --- | --- | --- |
+| H100 identity from `nvidia-smi` | `measured` | Already captured in Packet B and H3 receipts. |
+| LMCache MP L0/L1 lifecycle, lookup, reuse, eviction | `measured` | Already captured in Packet B H100 receipt. |
+| embedded CacheBlend lookup/retrieve metrics and `cb.*` spans | `measured` | Already captured in Packet H3 H100 receipt. |
+| GPU util, HBM, NVLink, PCIe, sustained power | `not_proven` | Add DCGM or NVML sampler to the Modal H100 runner and rerun one focused smoke. |
 
 Recommended MP evidence packet:
 
@@ -55,200 +90,30 @@ inferguard collect-lmcache \
   --json
 ```
 
-Standalone reports:
+Standalone MP reports:
 
 ```bash
+PACKET_DIR=tests/fixtures/lmcache_live/packet_a
+JOB_DIR="$PACKET_DIR"
+
 inferguard lmcache-compat \
-  --engine-metrics-file modal-out/vllm.prom \
-  --lmcache-metrics-file modal-out/lmcache.prom \
-  --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
-  --lmcache-log-evidence-file modal-out/lmcache-packet/lmcache_log_evidence.json \
-  --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
-  --lmcache-trace-replay-evidence-file modal-out/lmcache-packet/lmcache_trace_replay_evidence.json \
-  --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
-  --lmcache-lookup-hash-evidence-file modal-out/lmcache-packet/lmcache_lookup_hash_evidence.json \
+  --engine-metrics-file "$PACKET_DIR/vllm_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache_metrics_loaded.prom" \
+  --lmcache-http-evidence-file "$PACKET_DIR/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET_DIR/lmcache_log_evidence.json" \
+  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache_trace_evidence.json" \
+  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache_trace_replay_evidence.json" \
   --expect-mode mp \
   --fail-on missing-required \
   --json
 
 inferguard observability-coverage \
-  --engine-metrics-file modal-out/vllm.prom \
-  --lmcache-metrics-file modal-out/lmcache.prom \
-  --lmcache-http-evidence-file modal-out/lmcache-packet/lmcache_http_evidence.json \
-  --lmcache-log-evidence-file modal-out/lmcache-packet/lmcache_log_evidence.json \
-  --lmcache-trace-evidence-file modal-out/lmcache-packet/lmcache_trace_evidence.json \
-  --lmcache-trace-replay-evidence-file modal-out/lmcache-packet/lmcache_trace_replay_evidence.json \
-  --lmcache-otel-evidence-file modal-out/lmcache-packet/lmcache_otel_evidence.json \
-  --lmcache-lookup-hash-evidence-file modal-out/lmcache-packet/lmcache_lookup_hash_evidence.json \
-  --expected-engine vllm \
-  --expect-lmcache-mode mp \
-  --json
-```
-
-Coverage accounting is **68 / 100** after the accepted live Packet A fixture.
-The active score source is
-`/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`,
-which supersedes the earlier docs 188/189/190 trackers.
-
-Run Packet B from the full InferGuard repo checkout, not from the old
-Touchdown-Labs OSS mirror:
-
-```bash
-cd /Users/chen/Projects/inferguard
-python scripts/lmcache_mp_packet_commands.py
-INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
-```
-
-B1 status as of 2026-05-07: accepted. Live Packet A landed from Modal run
-`https://modal.com/apps/ocwc22/main/ap-cH4YAMKOZxmsVOf58YzHPo`, volume
-`lmcache-mp-lab:/packet-a/20260507T230057Z`, and is pinned by
-`tests/fixtures/lmcache_live/packet_a/`. Packet B lifecycle is the next
-score-moving gate.
-
-### Local B1 missing-family diagnostic smoke
-
-A non-scoreable Packet A failure-mode fixture lives at
-`tests/fixtures/lmcache_live/packet_a_missing_prometheus/`. It is intentionally
-marked `score_points=0` and
-`acceptance_status=rejected_missing_prometheus_families`. Use it to test the
-Diagnostic CLI output shape before a real packet lands:
-
-```bash
-PACKET=tests/fixtures/lmcache_live/packet_a_missing_prometheus
-
-inferguard lmcache-compat \
-  --engine-metrics-file "$PACKET/vllm_metrics_loaded.prom" \
-  --lmcache-metrics-file "$PACKET/lmcache_metrics_loaded.prom" \
-  --lmcache-http-evidence-file "$PACKET/lmcache_http_evidence.json" \
-  --lmcache-log-evidence-file "$PACKET/lmcache_log_evidence.json" \
-  --lmcache-lookup-hash-evidence-file "$PACKET/lmcache_lookup_hash_evidence.json" \
-  --expect-mode mp \
-  --fail-on missing-required \
-  --json
-
-inferguard observability-coverage \
-  --engine-metrics-file "$PACKET/vllm_metrics_loaded.prom" \
-  --lmcache-metrics-file "$PACKET/lmcache_metrics_loaded.prom" \
-  --lmcache-http-evidence-file "$PACKET/lmcache_http_evidence.json" \
-  --lmcache-log-evidence-file "$PACKET/lmcache_log_evidence.json" \
-  --lmcache-lookup-hash-evidence-file "$PACKET/lmcache_lookup_hash_evidence.json" \
-  --expected-engine vllm \
-  --expect-lmcache-mode mp \
-  --json
-```
-
-Expected result: `lmcache-compat` exits nonzero under
-`--fail-on missing-required`, reports `detected_mode=mp`, and lists missing
-`lmcache_mp` Prometheus families including `lookup_tokens` and `l1_memory`.
-HTTP/log/lookup-hash evidence is shown as
-`live_alternate_not_scoreable`; it explains the failure mode but does not replace
-`lmcache_mp_lookup_requested_tokens_total`,
-`lmcache_mp_lookup_hit_tokens_total`, or `lmcache_mp_l1_memory_usage_bytes`.
-Do not move the 68/100 score from this rejected fixture; it remains a diagnostic
-regression for older LMCache installs.
-
-Use these exact next commands when updating endpoint, signal, or rule status:
-
-| Lane | Status now | Missing proof | Exact next command |
-| --- | --- | --- | --- |
-| Safe MP HTTP endpoints | partial | Live captures for root, config, version, quota, threads, periodic threads, and periodic thread health. | `curl -fsS "$LMCACHE_HTTP/api/status" -o "$PACKET_DIR/lmcache-status.json"` |
-| MP Prometheus signals | partial | Live L2, nonzero lookup, sampled lifecycle, and throughput packets. | `inferguard lmcache-compat --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --output "$PACKET_DIR/lmcache_compat_report.json" --expect-mode mp` |
-| Embedded LMCache signals | partial | Live vLLM embedded and SGLang `--enable-lmcache` fixtures. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
-| Trace, OTel, replay, lookup-hash evidence | partial | Real `.lct`, collector OTel export, replay output, and live lookup-hash JSONL. | `inferguard collect-lmcache --output-dir "$PACKET_DIR" --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes"` |
-| Log, P2P, and PD evidence | partial | Live MP logs plus two-engine P2P and prefiller/decoder packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
-| Diagnostic rules | missing | Calibrated findings from live packets, not only pass-through parser codes. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
-| Packet A score gate | live_validated | Accepted live vLLM + standalone LMCache MP fixture imported and pinned. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
-| Packet B lifecycle gate | next | Live sampled lifecycle/L0-L1 proof with compact fixture. | `cd /Users/chen/Projects/inferguard && INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
-
-Current source-backed caveats:
-
-- vLLM embedded LMCache uses `LMCacheConnectorV1` or
-  `LMCacheConnectorV1Dynamic`; legacy `LMCacheConnector` should be treated as a
-  stale/pinned stack.
-- vLLM MP uses `LMCacheMPConnector`, but current vLLM connector code does not
-  export LMCache MP connector-specific Prometheus metrics. Collect
-  `lmcache_mp_*` from the standalone LMCache server.
-- SGLang current mainline LMCache evidence is embedded/layerwise via
-  `--enable-lmcache` and `LMCacheLayerwiseConnector`. SGLang MP is not a
-  supported claim until source and live fixtures prove the connector contract.
-
-Source-backed checklist links:
-
-- LMCache MP observability:
-  <https://docs.lmcache.ai/mp/observability.html>
-- LMCache MP HTTP API:
-  <https://docs.lmcache.ai/mp/http_api.html>
-- LMCache production metrics:
-  <https://docs.lmcache.ai/production/observability/metrics.html>
-- LMCache production vLLM metrics endpoint:
-  <https://docs.lmcache.ai/production/observability/vllm_endpoint.html>
-- LMCache trace recording/replay:
-  <https://docs.lmcache.ai/mp/tracing_and_debugging.html>
-- vLLM `LMCacheMPConnector`:
-  <https://docs.vllm.ai/en/v0.20.1/api/vllm/distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector/>
-
-Use this exact status language in CLI output reviews and release notes:
-
-- Current LMCache observability status is **68 / 100, partial**.
-- MP parser/report support is **fixture_backed for core families** and
-  **parser_only for live-only throughput, gauges, and replay proofs**.
-- Embedded production metrics are **fixture_backed for core aliases** and
-  **parser_only for live backend, P2P, local CPU, memory-management, and
-  profiling packets**.
-- Packet A is `live_validated`; no other lane is `live_validated` until a real
-  packet is collected and replayed through `collect-lmcache`, `lmcache-compat`,
-  `observability-coverage`, and `diagnose-bottleneck`.
-
-Full docs/CLI closeout command set:
-
-```bash
-cd /Users/chen/Projects/inferguard
-python scripts/lmcache_mp_packet_commands.py
-INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache \
-modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b
-
-inferguard collect-lmcache \
-  --output-dir "$PACKET_DIR/lmcache-packet" \
-  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
-  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
-  --lmcache-health-file "$PACKET_DIR/lmcache-health.json" \
-  --lmcache-status-file "$PACKET_DIR/lmcache-status.json" \
-  --lmcache-version-file "$PACKET_DIR/lmcache-version.txt" \
-  --lmcache-lmc-version-file "$PACKET_DIR/lmcache-lmc-version.txt" \
-  --lmcache-commit-id-file "$PACKET_DIR/lmcache-commit-id.txt" \
-  --lmcache-quota-file "$PACKET_DIR/lmcache-quota.json" \
-  --engine-log-file "$PACKET_DIR/vllm.log" \
-  --lmcache-log-file "$PACKET_DIR/lmcache.log" \
-  --lmcache-trace-file "$PACKET_DIR/lmcache-trace.lct" \
-  --lmcache-trace-replay-output "$PACKET_DIR/trace-replay" \
-  --lmcache-otel-file "$PACKET_DIR/lmcache-otel.jsonl" \
-  --lmcache-lookup-hash-path "$PACKET_DIR/lookup-hashes" \
-  --expect-mode mp \
-  --json
-
-inferguard lmcache-compat \
-  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
-  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
-  --lmcache-http-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_http_evidence.json" \
-  --lmcache-log-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_log_evidence.json" \
-  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_evidence.json" \
-  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_replay_evidence.json" \
-  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_otel_evidence.json" \
-  --lmcache-lookup-hash-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_lookup_hash_evidence.json" \
-  --expect-mode mp \
-  --fail-on missing-required \
-  --json
-
-inferguard observability-coverage \
-  --engine-metrics-file "$PACKET_DIR/vllm.prom" \
-  --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" \
-  --lmcache-http-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_http_evidence.json" \
-  --lmcache-log-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_log_evidence.json" \
-  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_evidence.json" \
-  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_trace_replay_evidence.json" \
-  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_otel_evidence.json" \
-  --lmcache-lookup-hash-evidence-file "$PACKET_DIR/lmcache-packet/lmcache_lookup_hash_evidence.json" \
+  --engine-metrics-file "$PACKET_DIR/vllm_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache_metrics_loaded.prom" \
+  --lmcache-http-evidence-file "$PACKET_DIR/lmcache_http_evidence.json" \
+  --lmcache-log-evidence-file "$PACKET_DIR/lmcache_log_evidence.json" \
+  --lmcache-trace-evidence-file "$PACKET_DIR/lmcache_trace_evidence.json" \
+  --lmcache-trace-replay-evidence-file "$PACKET_DIR/lmcache_trace_replay_evidence.json" \
   --expected-engine vllm \
   --expect-lmcache-mode mp \
   --json
@@ -258,14 +123,69 @@ inferguard diagnose-bottleneck \
   --output-dir "$PACKET_DIR/diagnose-bottleneck"
 ```
 
-Every 100% checklist update must account for these metric families:
+Embedded CacheBlend / H3 reports use the same CLIs, but the strict compat mode is
+CacheBlend-specific rather than MP-specific:
+
+```bash
+PACKET_DIR=tests/fixtures/lmcache_live/packet_h3
+
+inferguard lmcache-compat \
+  --engine-metrics-file "$PACKET_DIR/engine_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache_blend_metrics.prom" \
+  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache_otel_evidence.json" \
+  --expect-mode auto \
+  --fail-on missing-required \
+  --json
+
+inferguard observability-coverage \
+  --engine-metrics-file "$PACKET_DIR/engine_metrics_loaded.prom" \
+  --lmcache-metrics-file "$PACKET_DIR/lmcache_blend_metrics.prom" \
+  --lmcache-otel-evidence-file "$PACKET_DIR/lmcache_otel_evidence.json" \
+  --expected-engine vllm \
+  --expect-lmcache-mode auto \
+  --json
+```
+
+Expected H3 result: `detected_mode=embedded_cacheblend`,
+`detected_architecture.label=vllm_embedded_cacheblend`, `failure_reasons=[]`,
+CacheBlend lookup/retrieve metrics populated, and MP-only required families
+marked not applicable.
+
+Release closeout gates:
+
+```bash
+cd /Users/chen/Projects/inferguard
+uv run --with pytest --with pytest-asyncio --with aiohttp --with msgpack pytest -q \
+  tests/test_lmcache_metrics_adapter.py \
+  tests/test_observability_coverage.py \
+  tests/test_lmcache_mp_modal_packet_lab.py \
+  tests/test_lmcache_packet.py \
+  tests/test_collect_metrics.py \
+  tests/test_diagnose_bottleneck.py \
+  tests/test_lmcache_otel.py \
+  tests/test_lmcache_trace.py \
+  tests/test_lmcache_lookup_hash.py \
+  tests/test_lmcache_live_fixtures.py \
+  tests/test_lmcache_embedded_advanced_modal_packet_lab.py
+uv run mkdocs build
+```
+
+Every release-readiness update must account for these metric families:
 
 | Surface | Families |
 | --- | --- |
 | LMCache MP | StorageManager counters; L1 counters/memory/failures/lifecycle; StorageManager real reuse; L2 counters/failures/throughput/in-flight gauges; lookup hit rate; L0 lifecycle; L0-L1 throughput; engine counter; active prefetch jobs; EventBus; CacheBlend. |
 | KV cache offload | Native vLLM CPU offload (`vllm:kv_offload_total_bytes`, `vllm:kv_offload_total_time`, `vllm:simple_cpu_offload_*`) and LMCache MP L0-L1 KV movement (`lmcache_mp_l0_l1_store_throughput_gbs`, `lmcache_mp_l0_l1_load_throughput_gbs`). Treat native vLLM CPU offload as useful pressure evidence, not LMCache proof. |
 | Embedded production LMCache | Core request; token; hit rate; performance and latency; detailed profiling; cache usage and lifecycle; remote backend and network; local CPU backend; memory management; P2P transfer; health/internal; chunk statistics. |
-| Workload packets | accepted MP Packet A; Packet B lifecycle; MP L2; embedded vLLM; embedded SGLang; CacheBlend; P2P; PD; trace replay and lookup hash; release readiness. |
+| Workload packets | accepted MP Packets A-F; G1 diagnosis; H1 embedded vLLM; H3 embedded CacheBlend; I1 docs/build/test release readiness. |
+
+Paused expansion lanes remain explicit:
+
+- H2/SGLang is paused at `ModuleNotFoundError: No module named 'sgl_kernel'`.
+- Mooncake is paused because there is no runnable local source/runtime contract.
+- DLM / `llm-d` remains detection-only until a field map and live packet exist.
+- P2P/PD remain backend-expansion work and are not part of the original vLLM +
+  LMCache CLI release score.
 
 ## Exit-code conventions
 

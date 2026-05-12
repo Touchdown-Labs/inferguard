@@ -11,6 +11,7 @@ Outputs are written to the persistent Modal volume mounted at /out, under
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shlex
@@ -39,6 +40,7 @@ LMCACHE_HOST = "127.0.0.1"
 LMCACHE_ZMQ_PORT = 6555
 LMCACHE_HTTP_PORT = 8080
 LMCACHE_PROMETHEUS_PORT = 9090
+OTLP_GRPC_PORT = 4317
 OTLP_HTTP_PORT = 4318
 MP_EVENT_BUS_QUEUE_SIZE = 10000
 MP_METRICS_SAMPLE_RATE = 1.0
@@ -48,7 +50,7 @@ VLLM_BASE_URL = f"http://127.0.0.1:{VLLM_PORT}"
 VLLM_HEALTH_URL = f"{VLLM_BASE_URL}/health"
 VLLM_METRICS_URL = f"{VLLM_BASE_URL}/metrics"
 LMCACHE_HTTP_BASE_URL = f"http://127.0.0.1:{LMCACHE_HTTP_PORT}"
-LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/api/healthcheck"
+LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/healthcheck"
 LMCACHE_HTTP_METRICS_URL = f"{LMCACHE_HTTP_BASE_URL}/metrics"
 LMCACHE_STANDALONE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
 LMCACHE_METRICS_URLS = (LMCACHE_HTTP_METRICS_URL, LMCACHE_STANDALONE_METRICS_URL)
@@ -78,6 +80,7 @@ LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
 LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
 LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
 VLLM_LOCAL_SOURCE_ENV = "INFERGUARD_VLLM_LOCAL_SOURCE"
+DEFAULT_VLLM_LOCAL_SOURCE = REPO_ROOT.parent / "vllm"
 VLLM_CONNECTOR_RELATIVE_PATH = Path("distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py")
 LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
 LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
@@ -97,6 +100,9 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
 )
 PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
 AGENT_KV_OFFLOAD_REPORT_FILE = "agent_kv_offload_report.json"
+L0_BLOCK_BOUNDARY_EVENTS_FILE = "l0_block_boundary_events.jsonl"
+L0_BLOCK_BOUNDARY_EVIDENCE_FILE = "l0_block_boundary_evidence.json"
+L0_BLOCK_BOUNDARY_EVIDENCE_ENV = "INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"
 WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
 PACKET_B_TRACE_SOURCE = "traces/isb1-dsv4-agent"
 PACKET_B_TRACE_CLASSES = (
@@ -228,6 +234,77 @@ class VllmOverlayPlan:
         }
 
 
+def _sha256_file(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _git_head(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _installed_vllm_connector_path() -> Path | None:
+    try:
+        import vllm
+    except ImportError:
+        return None
+    return Path(vllm.__file__).parent / VLLM_CONNECTOR_RELATIVE_PATH
+
+
+def _augment_vllm_overlay_plan(plan: dict[str, object]) -> dict[str, object]:
+    local_source = plan.get("local_source")
+    local_root = Path(str(local_source)).expanduser() if local_source else None
+    source_connector = local_root / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH if local_root else None
+    installed_connector = _installed_vllm_connector_path()
+    plan.update(
+        {
+            "source_git_head": _git_head(local_root) if local_root else None,
+            "source_connector_sha256": _sha256_file(source_connector) if source_connector else None,
+            "installed_connector_path": str(installed_connector) if installed_connector else None,
+            "installed_connector_sha256": (
+                _sha256_file(installed_connector) if installed_connector else None
+            ),
+        }
+    )
+    return plan
+
+
+def _runtime_vllm_overlay_plan_dict() -> dict[str, object]:
+    """Return the vLLM overlay plan, preserving image-build runtime evidence."""
+    source_kind = os.environ.get("INFERGUARD_VLLM_SOURCE_KIND", "").strip()
+    source_ref = os.environ.get("INFERGUARD_VLLM_SOURCE_REF", "").strip()
+    if source_kind and source_kind != VLLM_OVERLAY_PLAN.source_kind:
+        return _augment_vllm_overlay_plan(
+            {
+                "source_kind": source_kind,
+                "run_commands": list(VLLM_OVERLAY_PLAN.run_commands),
+                "local_source": source_ref or None,
+                "source_ref": source_ref or None,
+                "overlaid_file": str(VLLM_CONNECTOR_RELATIVE_PATH) if source_ref else None,
+            }
+        )
+    return _augment_vllm_overlay_plan(VLLM_OVERLAY_PLAN.as_dict())
+
+
 BASE_MODAL_PIP_PACKAGES = (
     "vllm",
     "hf-transfer",
@@ -308,10 +385,13 @@ LMCACHE_INSTALL_PLAN = _select_lmcache_install_plan()
 def _select_vllm_overlay_plan(env: Mapping[str, str] | None = None) -> VllmOverlayPlan:
     env = env or os.environ
     local_source_raw = env.get(VLLM_LOCAL_SOURCE_ENV, "").strip()
-    if not local_source_raw:
+    if local_source_raw:
+        local_source = Path(local_source_raw).expanduser()
+    elif DEFAULT_VLLM_LOCAL_SOURCE.exists():
+        local_source = DEFAULT_VLLM_LOCAL_SOURCE
+        local_source_raw = str(DEFAULT_VLLM_LOCAL_SOURCE)
+    else:
         return VllmOverlayPlan(source_kind="pypi")
-
-    local_source = Path(local_source_raw).expanduser()
     connector_source = local_source / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH
     if not connector_source.exists():
         raise FileNotFoundError(
@@ -439,6 +519,8 @@ class PacketSpec:
     request_count: int | None = None
     l2_configured: bool = False
     l2_adapter: str | None = None
+    l2_store_policy: str | None = None
+    l2_prefetch_policy: str | None = None
     enable_otel: bool = False
     enable_cache_salt: bool = False
     eviction_policy: str = "LRU"
@@ -486,6 +568,7 @@ PACKETS: dict[str, PacketSpec] = {
             WORKLOAD_MANIFEST_FILE,
             PACKET_B_LIFECYCLE_EVIDENCE_FILE,
             AGENT_KV_OFFLOAD_REPORT_FILE,
+            L0_BLOCK_BOUNDARY_EVIDENCE_FILE,
             "traffic.log",
         ),
         notes=(
@@ -500,9 +583,11 @@ PACKETS: dict[str, PacketSpec] = {
         name="Packet C MP L2 fs adapter",
         workload="l2_reuse",
         l2_configured=True,
-        l2_adapter="fs",
+        l2_adapter="mock",
+        l2_store_policy="skip_l1",
+        l2_prefetch_policy="default",
         extra_required_artifacts=(L2_CONFIG_FILE,),
-        notes=("Local fs L2 config is written into the run directory and reported with --l2-configured.",),
+        notes=("Mock L2 adapter config is written into the run directory and launched with LMCache MP L2 CLI flags.",),
     ),
     "d": PacketSpec(
         packet_id="d",
@@ -694,7 +779,7 @@ def _write_env_snapshot(run_dir: Path) -> None:
         encoding="utf-8",
     )
     (run_dir / "vllm_overlay_plan.json").write_text(
-        json.dumps(VLLM_OVERLAY_PLAN.as_dict(), indent=2, sort_keys=True) + "\n",
+        json.dumps(_runtime_vllm_overlay_plan_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -740,8 +825,24 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--lookup-hash-log-max-files",
         "10",
     ]
+    if spec.l2_configured:
+        l2_adapter = {
+            "type": spec.l2_adapter or "mock",
+            "max_size_gb": 80,
+            "mock_bandwidth_gb": 4,
+        }
+        cmd.extend(
+            [
+                "--l2-store-policy",
+                spec.l2_store_policy or "skip_l1",
+                "--l2-prefetch-policy",
+                spec.l2_prefetch_policy or "default",
+                "--l2-adapter",
+                json.dumps(l2_adapter, separators=(",", ":")),
+            ]
+        )
     if spec.enable_otel:
-        cmd.extend(["--enable-tracing"])
+        cmd.extend(["--enable-tracing", "--otlp-endpoint", f"http://127.0.0.1:{OTLP_GRPC_PORT}"])
     return cmd
 
 
@@ -751,7 +852,13 @@ def _write_l2_config(run_dir: Path, spec: PacketSpec) -> Path | None:
     l2_dir = run_dir / "l2-fs"
     l2_dir.mkdir(parents=True, exist_ok=True)
     config = {
-        "adapter": spec.l2_adapter or "fs",
+        "adapter": {
+            "type": spec.l2_adapter or "mock",
+            "max_size_gb": 80,
+            "mock_bandwidth_gb": 4,
+        },
+        "l2_store_policy": spec.l2_store_policy or "skip_l1",
+        "l2_prefetch_policy": spec.l2_prefetch_policy or "default",
         "path": str(l2_dir),
         "claim_status": "runner_configured_unvalidated_until_modal_packet_runs",
         "notes": [
@@ -768,15 +875,6 @@ def _write_l2_config(run_dir: Path, spec: PacketSpec) -> Path | None:
 def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[str, str]:
     spec = spec or PACKETS["a"]
     env: dict[str, str] = {}
-    l2_config_path = run_dir / L2_CONFIG_FILE
-    if spec.l2_configured:
-        env.update(
-            {
-                "LMCACHE_CONFIG_FILE": str(l2_config_path),
-                "LMCACHE_L2_ADAPTER": spec.l2_adapter or "fs",
-                "LMCACHE_L2_PATH": str(run_dir / "l2-fs"),
-            }
-        )
     if spec.enable_otel:
         endpoint = f"http://127.0.0.1:{OTLP_HTTP_PORT}"
         env.update(
@@ -808,6 +906,8 @@ def _launch_lmcache(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subp
     )
     env = os.environ.copy()
     env.update(env_update)
+    if spec.packet_id == "b":
+        env[L0_BLOCK_BOUNDARY_EVIDENCE_ENV] = str(run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
 
@@ -845,7 +945,10 @@ def _launch_vllm(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subproc
     log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
     cmd = _build_vllm_command(spec)
     (run_dir / "vllm_command.json").write_text(json.dumps(cmd, indent=2) + "\n", encoding="utf-8")
-    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
+    env = os.environ.copy()
+    if spec.packet_id == "b":
+        env[L0_BLOCK_BOUNDARY_EVIDENCE_ENV] = str(run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
+    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
 
 
@@ -853,8 +956,8 @@ def _capture_safe_http(run_dir: Path) -> dict[str, dict[str, object]]:
     log_path = run_dir / "capture.log"
     endpoints = {
         "root.txt": "/",
-        "healthcheck.json": "/api/healthcheck",
-        "status.json": "/api/status",
+        "healthcheck.json": "/healthcheck",
+        "status.json": "/status",
         "conf.json": "/conf",
         "version.txt": "/version",
         "lmc_version.txt": "/lmc_version",
@@ -1048,32 +1151,44 @@ def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]
     script = r"""
 import json
 import sys
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from concurrent import futures
+
+import grpc
+from google.protobuf.json_format import MessageToDict
+from opentelemetry.proto.collector.metrics.v1 import metrics_service_pb2, metrics_service_pb2_grpc
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2, trace_service_pb2_grpc
 
 out = sys.argv[1]
 port = int(sys.argv[2])
 
-class Handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        length = int(self.headers.get("content-length", "0") or "0")
-        body = self.rfile.read(length)
-        with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
-                "path": self.path,
-                "content_type": self.headers.get("content-type"),
-                "body_preview": body.decode("utf-8", errors="replace")[:20000],
-                "body_bytes": len(body),
-            }) + "\n")
-        self.send_response(200)
-        self.end_headers()
 
-    def log_message(self, fmt, *args):
-        print(fmt % args, flush=True)
+def _append(payload):
+    with open(out, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+
+class TraceService(trace_service_pb2_grpc.TraceServiceServicer):
+    def Export(self, request, context):
+        payload = MessageToDict(request, preserving_proto_field_name=True)
+        _append(payload)
+        return trace_service_pb2.ExportTraceServiceResponse()
+
+
+class MetricsService(metrics_service_pb2_grpc.MetricsServiceServicer):
+    def Export(self, request, context):
+        return metrics_service_pb2.ExportMetricsServiceResponse()
+
+
+server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+trace_service_pb2_grpc.add_TraceServiceServicer_to_server(TraceService(), server)
+metrics_service_pb2_grpc.add_MetricsServiceServicer_to_server(MetricsService(), server)
+server.add_insecure_port(f"127.0.0.1:{port}")
+server.start()
+print(f"OTLP gRPC collector listening on 127.0.0.1:{port}", flush=True)
+server.wait_for_termination()
 """
     proc = subprocess.Popen(
-        ["python3", "-c", script, str(otel_path), str(OTLP_HTTP_PORT)],
+        ["python3", "-c", script, str(otel_path), str(OTLP_GRPC_PORT)],
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         text=True,
@@ -1304,6 +1419,105 @@ def _write_packet_b_lifecycle_evidence(run_dir: Path, spec: PacketSpec) -> None:
     )
 
 
+def _read_l0_block_boundary_events(run_dir: Path) -> list[dict[str, object]]:
+    path = run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE
+    events: list[dict[str, object]] = []
+    if not path.exists():
+        return events
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            events.append(payload)
+    return events
+
+
+def _summarize_l0_block_boundary_events(events: list[dict[str, object]]) -> dict[str, object]:
+    stage_counts: dict[str, int] = {}
+    source_counts: dict[str, int] = {}
+    request_samples: list[dict[str, object]] = []
+    total_blocks = 0
+    for event in events:
+        stage = str(event.get("stage", "unknown"))
+        source = str(event.get("source", "unknown"))
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        source_counts[source] = source_counts.get(source, 0) + 1
+        records = event.get("records")
+        if not isinstance(records, list):
+            continue
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            block_count = int(record.get("block_count", 0) or 0)
+            total_blocks += block_count
+            if len(request_samples) < 20:
+                request_samples.append(
+                    {
+                        "stage": stage,
+                        "source": source,
+                        "request_id": str(record.get("request_id", "")),
+                        "block_count": block_count,
+                    }
+                )
+    return {
+        "event_count": len(events),
+        "stage_counts": stage_counts,
+        "source_counts": source_counts,
+        "total_reported_blocks": total_blocks,
+        "request_samples": request_samples,
+    }
+
+
+def _write_l0_block_boundary_evidence(run_dir: Path, spec: PacketSpec) -> None:
+    if spec.packet_id != "b":
+        return
+    events = _read_l0_block_boundary_events(run_dir)
+    summary = _summarize_l0_block_boundary_events(events)
+    overlay = _read_json(run_dir / "vllm_overlay_plan.json")
+    evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
+    overlay = overlay if isinstance(overlay, dict) else {}
+    evidence = evidence if isinstance(evidence, dict) else {}
+    payload = {
+        "schema_version": "inferguard-l0-block-boundary-evidence/v1",
+        "packet_id": spec.packet_id,
+        "sdlc_row_id": spec.sdlc_row_id,
+        "benchmark_id": spec.benchmark_id,
+        "raw_prompts_recorded": False,
+        "boundary_event_file": L0_BLOCK_BOUNDARY_EVENTS_FILE,
+        "summary": summary,
+        "vllm_overlay": {
+            "source_kind": overlay.get("source_kind"),
+            "source_ref": overlay.get("source_ref"),
+            "overlaid_file": overlay.get("overlaid_file"),
+            "source_git_head": overlay.get("source_git_head"),
+            "source_connector_sha256": overlay.get("source_connector_sha256"),
+            "installed_connector_path": overlay.get("installed_connector_path"),
+            "installed_connector_sha256": overlay.get("installed_connector_sha256"),
+        },
+        "packet_b_lifecycle_status": {
+            "claim_status": evidence.get("claim_status"),
+            "acceptance_status": evidence.get("acceptance_status"),
+            "blocked_reason": evidence.get("blocked_reason"),
+            "missing_required_families": evidence.get("missing_required_families", []),
+        },
+        "diagnostic_interpretation": {
+            "vllm_attempted": summary["stage_counts"].get("report_block_allocation_attempt", 0) > 0,
+            "lmcache_received": summary["stage_counts"].get("report_block_allocation_received", 0) > 0,
+            "lmcache_subscriber_processed": (
+                summary["stage_counts"].get("l0_lifecycle_subscriber_processed", 0) > 0
+            ),
+        },
+    }
+    (run_dir / L0_BLOCK_BOUNDARY_EVIDENCE_FILE).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
     if spec.packet_id != "b":
         return
@@ -1366,6 +1580,7 @@ def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
         "artifacts": {
             "workload_manifest": WORKLOAD_MANIFEST_FILE,
             "packet_b_lifecycle_evidence": PACKET_B_LIFECYCLE_EVIDENCE_FILE,
+            "l0_block_boundary_evidence": L0_BLOCK_BOUNDARY_EVIDENCE_FILE,
             "lmcache_compat_report": "lmcache_compat_report.json",
             "observability_coverage": "observability_coverage.json",
             "bottleneck_diagnosis": "diagnose-bottleneck/bottleneck_diagnosis.json",
@@ -1507,6 +1722,8 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    if spec.packet_id == "b":
+        _maybe_add_existing(cmd, "--lmcache-l0-boundary-evidence-file", run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     return cmd
 
 
@@ -1540,6 +1757,8 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    if spec.packet_id == "b":
+        _maybe_add_existing(cmd, "--lmcache-l0-boundary-evidence-file", run_dir / L0_BLOCK_BOUNDARY_EVENTS_FILE)
     return cmd
 
 
@@ -1818,6 +2037,7 @@ def _run_packet(spec: PacketSpec) -> str:
         _run_trace_replay(run_dir, spec)
         _run_inferguard_packet(run_dir, spec)
         _write_agent_kv_offload_report(run_dir, spec)
+        _write_l0_block_boundary_evidence(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
     finally:
         _terminate(vllm_proc)

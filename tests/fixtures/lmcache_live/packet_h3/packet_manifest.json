@@ -1,0 +1,113 @@
+{
+  "artifact_path": "/Users/chen/Projects/inferguard/modal-out/pulls/h3-cacheblend-20260510T221217Z/20260510T221217Z",
+  "claim_status": "measured",
+  "compat_summary": {
+    "failure_reasons": [],
+    "surfaces": {
+      "lmcache_cacheblend": {
+        "family_count": 9,
+        "missing": 7,
+        "not_applicable": 0,
+        "populated": 2,
+        "status": "partial",
+        "zero": 0
+      },
+      "lmcache_embedded": {
+        "family_count": 20,
+        "missing": 6,
+        "not_applicable": 0,
+        "populated": 7,
+        "status": "partial",
+        "zero": 7
+      },
+      "lmcache_http": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_logs": {
+        "family_count": 1,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_lookup_hash": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_mp": {
+        "family_count": 16,
+        "missing": 0,
+        "not_applicable": 16,
+        "populated": 0,
+        "status": "not_applicable",
+        "zero": 0
+      },
+      "lmcache_otel": {
+        "family_count": 2,
+        "missing": 0,
+        "not_applicable": 0,
+        "populated": 2,
+        "status": "complete",
+        "zero": 0
+      },
+      "lmcache_trace_recording": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "lmcache_trace_replay": {
+        "family_count": 1,
+        "missing": 1,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      },
+      "vllm_prefix_cache": {
+        "family_count": 4,
+        "missing": 3,
+        "not_applicable": 0,
+        "populated": 1,
+        "status": "partial",
+        "zero": 0
+      },
+      "vllm_simple_cpu_offload": {
+        "family_count": 2,
+        "missing": 2,
+        "not_applicable": 0,
+        "populated": 0,
+        "status": "missing",
+        "zero": 0
+      }
+    },
+    "upstream_questions": []
+  },
+  "detected_mode": "embedded_cacheblend",
+  "expect_mode": "auto",
+  "l2_configured": false,
+  "local_reclassification": "accepted: CacheBlend metrics/spans classify as embedded_cacheblend, not MP",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-wlmFK2sEYs6VH11zdeFuHf",
+  "packet_id": "h3-cacheblend",
+  "required_live_proof": [
+    "lmcache_blend_* metrics",
+    "cb.* OTel spans",
+    "CacheBlend logs/config"
+  ],
+  "row_id": "H3",
+  "schema_version": "inferguard-lmcache-live-packet-manifest/v1",
+  "source": "live_modal_h100",
+  "workload": "cacheblend_reuse"
+}

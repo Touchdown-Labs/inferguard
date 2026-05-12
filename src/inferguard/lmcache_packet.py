@@ -13,12 +13,21 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from inferguard.compat import build_compat_report, write_compat_report
+from inferguard.compat import (
+    _read_l0_boundary_evidence,
+    build_compat_report,
+    read_sglang_kv_events_evidence,
+    write_compat_report,
+)
 from inferguard.io import atomic_write_json, atomic_write_text
 from inferguard.lmcache_http import parse_lmcache_http_payloads
 from inferguard.lmcache_logs import parse_lmcache_logs
 from inferguard.lmcache_otel import parse_lmcache_otel_jsonl
 from inferguard.lmcache_trace import parse_lmcache_trace_file
+from inferguard.observability_coverage import (
+    build_observability_coverage_report,
+    write_observability_coverage_report,
+)
 
 PACKET_SCHEMA_VERSION = "inferguard-lmcache-packet/v1"
 
@@ -62,8 +71,14 @@ class LmcachePacketOptions:
     lmcache_otel_file: Path | None = None
     lmcache_trace_replay_output: Path | None = None
     lmcache_lookup_hash_path: Path | None = None
+    lmcache_l0_boundary_evidence_file: Path | None = None
+    sglang_kv_events_evidence_file: Path | None = None
+    expected_engine: str = "auto"
     expect_mode: str = "auto"
     l2_configured: bool = False
+    external_cache_configured: bool = False
+    cpu_offload_configured: bool = False
+    disaggregated_or_external_cache: bool = False
     timeout_seconds: float = 10.0
     mp_observability: dict[str, Any] = field(default_factory=dict)
 
@@ -375,7 +390,20 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         sources=sources,
         errors=errors,
     )
-
+    l0_boundary_evidence = _copy_and_parse_l0_boundary_evidence(
+        output_dir=output_dir,
+        source_file=options.lmcache_l0_boundary_evidence_file,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    sglang_kv_events_evidence = _copy_and_parse_sglang_kv_events_evidence(
+        output_dir=output_dir,
+        source_file=options.sglang_kv_events_evidence_file,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
     report = build_compat_report(
         engine_text=engine_text,
         lmcache_text=lmcache_text,
@@ -390,18 +418,51 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         lmcache_otel_evidence=otel_evidence,
         lmcache_trace_replay_evidence=trace_replay_evidence,
         lmcache_lookup_hash_evidence=lookup_hash_evidence,
+        lmcache_l0_boundary_evidence=l0_boundary_evidence,
     )
     compat_path = output_dir / "lmcache_compat_report.json"
     write_compat_report(report, compat_path)
     artifacts["lmcache_compat_report"] = str(compat_path)
+
+    coverage_report = build_observability_coverage_report(
+        engine_text=engine_text,
+        lmcache_text=lmcache_text,
+        engine_source=sources.get("engine_metrics", ""),
+        lmcache_source=sources.get("lmcache_metrics", ""),
+        expected_engine=options.expected_engine,
+        expect_lmcache_mode=options.expect_mode,
+        external_cache_configured=options.external_cache_configured,
+        cpu_offload_configured=options.cpu_offload_configured,
+        l2_configured=options.l2_configured,
+        disaggregated_or_external_cache=options.disaggregated_or_external_cache,
+        mp_observability=options.mp_observability,
+        lmcache_http_evidence=http_evidence,
+        lmcache_log_evidence=log_evidence,
+        lmcache_trace_evidence=trace_evidence,
+        lmcache_otel_evidence=otel_evidence,
+        lmcache_trace_replay_evidence=trace_replay_evidence,
+        lmcache_lookup_hash_evidence=lookup_hash_evidence,
+        lmcache_l0_boundary_evidence=l0_boundary_evidence,
+        sglang_kv_events_evidence=sglang_kv_events_evidence,
+    )
+    coverage_path = output_dir / "observability_coverage_report.json"
+    write_observability_coverage_report(coverage_report, coverage_path)
+    artifacts["observability_coverage_report"] = str(coverage_path)
 
     manifest = {
         "schema_version": PACKET_SCHEMA_VERSION,
         "generated_at": _utc_now_iso(),
         "claim_status": "measured" if engine_text or lmcache_text else "not_proven",
         "expect_mode": options.expect_mode,
+        "expected_engine": options.expected_engine,
+        "detected_engines": coverage_report.get("detected_engines", []),
         "detected_mode": report.get("detected_mode"),
         "l2_configured": options.l2_configured,
+        "coverage_summary": {
+            "coverage_gaps": coverage_report.get("coverage_gaps", []),
+            "surfaces": coverage_report.get("surfaces", {}),
+            "sglang_lmcache_mp_observability": coverage_report.get("sglang_lmcache_mp_observability"),
+        },
         "sources": sources,
         "artifacts": artifacts,
         "scrape_errors": errors,
@@ -417,6 +478,8 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         "otel_evidence": otel_evidence,
         "trace_replay_evidence": trace_replay_evidence,
         "lookup_hash_evidence": lookup_hash_evidence,
+        "lmcache_l0_boundary_evidence": l0_boundary_evidence,
+        "sglang_kv_events_evidence": sglang_kv_events_evidence,
     }
     manifest_path = output_dir / "packet_manifest.json"
     atomic_write_json(manifest_path, manifest)
@@ -588,6 +651,62 @@ def _copy_path(
     artifacts[source_name] = str(destination)
     sources[source_name] = str(source_path)
     return destination
+
+
+def _copy_and_parse_l0_boundary_evidence(
+    *,
+    output_dir: Path,
+    source_file: Path | None,
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    if source_file is None:
+        return None
+    destination = output_dir / "lmcache_l0_boundary_evidence.raw"
+    copied = _copy_path(
+        destination=destination,
+        source_name="lmcache_l0_boundary_evidence",
+        source_path=source_file,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    if copied is None:
+        return None
+    evidence = _read_l0_boundary_evidence(copied)
+    evidence_path = output_dir / "lmcache_l0_boundary_evidence.json"
+    atomic_write_json(evidence_path, evidence)
+    artifacts["lmcache_l0_boundary_evidence_report"] = str(evidence_path)
+    return evidence
+
+
+def _copy_and_parse_sglang_kv_events_evidence(
+    *,
+    output_dir: Path,
+    source_file: Path | None,
+    artifacts: dict[str, str],
+    sources: dict[str, str],
+    errors: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    if source_file is None:
+        return None
+    destination = output_dir / "sglang_kv_events_evidence.raw"
+    copied = _copy_path(
+        destination=destination,
+        source_name="sglang_kv_events_evidence",
+        source_path=source_file,
+        artifacts=artifacts,
+        sources=sources,
+        errors=errors,
+    )
+    if copied is None:
+        return None
+    evidence = read_sglang_kv_events_evidence(copied)
+    evidence_path = output_dir / "sglang_kv_events_evidence.json"
+    atomic_write_json(evidence_path, evidence)
+    artifacts["sglang_kv_events_evidence_report"] = str(evidence_path)
+    return evidence
 
 
 def _copy_and_parse_optional_evidence(

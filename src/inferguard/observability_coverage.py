@@ -9,7 +9,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from inferguard.compat import build_compat_report
+from inferguard.compat import (
+    _read_l0_boundary_evidence,
+    build_compat_report,
+    read_sglang_kv_events_evidence,
+)
 from inferguard.io import atomic_write_json
 from inferguard.metrics_core import parse_labeled_prometheus_text
 
@@ -128,7 +132,7 @@ ENGINE_REGISTRY: tuple[ObservabilityFamily, ...] = (
     ObservabilityFamily(
         "sglang",
         "queue",
-        ("sglang:num_running_reqs", "sglang:num_queue_reqs"),
+        ("sglang:num_running_reqs", "sglang:num_queue_reqs", "sglang:num_preemptions_total"),
     ),
     ObservabilityFamily(
         "sglang",
@@ -138,7 +142,16 @@ ENGINE_REGISTRY: tuple[ObservabilityFamily, ...] = (
     ObservabilityFamily(
         "sglang",
         "kv_cache",
-        ("sglang:token_usage", "sglang:num_used_tokens"),
+        (
+            "sglang:token_usage",
+            "sglang:num_used_tokens",
+            "sglang:hicache_l1_hit_count_total",
+            "sglang:hicache_l2_hit_count_total",
+            "sglang:hicache_l3_hit_count_total",
+            "sglang:hicache_lookup_count_total",
+            "sglang:hicache_l2_bytes",
+            "sglang:hicache_l3_bytes",
+        ),
     ),
     ObservabilityFamily(
         "sglang",
@@ -178,6 +191,8 @@ def build_observability_coverage_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
+    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
+    sglang_kv_events_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a single coverage report for engine and LMCache telemetry."""
 
@@ -210,12 +225,25 @@ def build_observability_coverage_report(
         lmcache_otel_evidence=lmcache_otel_evidence,
         lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
         lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+        lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
     )
     surfaces = _surface_rows(engine_families)
     for surface, row in lmcache_report.get("surfaces", {}).items():
         surfaces[str(surface)] = row
+    sglang_kv_row = _sglang_kv_events_surface_row(sglang_kv_events_evidence)
+    surfaces["sglang_kv_events"] = sglang_kv_row
     gaps = _coverage_gaps(engine_families, lmcache_report)
     kv_cache_offload = _kv_cache_offload_report(samples)
+    sglang_lmcache_version_provenance = _sglang_lmcache_version_provenance()
+    sglang_lmcache_embedded = _sglang_lmcache_embedded_support_report(
+        lmcache_report,
+        version_provenance=sglang_lmcache_version_provenance,
+    )
+    sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(
+        lmcache_report,
+        expect_lmcache_mode=expect_lmcache_mode,
+        version_provenance=sglang_lmcache_version_provenance,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "engine_source": engine_source,
@@ -238,6 +266,10 @@ def build_observability_coverage_report(
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
+        "sglang_lmcache_version_provenance": sglang_lmcache_version_provenance,
+        "sglang_lmcache_embedded_support": sglang_lmcache_embedded,
+        "sglang_lmcache_mp_observability": sglang_lmcache_mp,
+        "sglang_kv_events_evidence": sglang_kv_events_evidence,
         "coverage_gaps": gaps,
     }
 
@@ -252,6 +284,8 @@ def build_observability_coverage_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
+    sglang_kv_events_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -269,6 +303,8 @@ def build_observability_coverage_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        sglang_kv_events_evidence=read_sglang_kv_events_evidence(sglang_kv_events_evidence_file),
         **kwargs,
     )
 
@@ -284,6 +320,8 @@ def build_observability_coverage_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_l0_boundary_evidence_file: Path | None = None,
+    sglang_kv_events_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -297,6 +335,8 @@ def build_observability_coverage_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        sglang_kv_events_evidence=read_sglang_kv_events_evidence(sglang_kv_events_evidence_file),
         **kwargs,
     )
 
@@ -304,6 +344,275 @@ def build_observability_coverage_report_from_urls(
 def write_observability_coverage_report(report: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(output, report)
+
+
+def _sglang_lmcache_version_provenance() -> dict[str, Any]:
+    """Source-backed provenance for SGLang + LMCache support claims.
+
+    This is intentionally static source ledger metadata, not a live GitHub poll.
+    Update it only after re-checking upstream PR/issue/source state.
+    """
+
+    return {
+        "schema_version": "inferguard-sglang-lmcache-version-provenance/v1",
+        "checked_at": "2026-05-12",
+        "embedded_runtime": {
+            "claim_status": "source_backed",
+            "upstream_state": "documented_existing_embedded_support",
+            "minimum_observed_code_lineage": {
+                "lmcache_sglang_config": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/utils.py",
+                    "introduced_commit": "f3bba133",
+                    "author": "Yuwei An",
+                    "date": "2025-06-23",
+                    "evidence": "lmcache_get_config reads LMCACHE_CONFIG_FILE or environment variables for SGLang.",
+                },
+                "lmcache_sglang_adapter": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/sglang_adapter.py",
+                    "introduced_commit": "f3bba133",
+                    "author": "Yuwei An",
+                    "date": "2025-06-23",
+                    "evidence": "init_lmcache_engine and LMCacheConnector initialize LMCacheEngine for SGLang.",
+                },
+                "lmcache_layerwise_runtime_calls": {
+                    "repo": "LMCache/LMCache",
+                    "path": "lmcache/integration/sglang/sglang_adapter.py",
+                    "introduced_commit": "b72bdfd",
+                    "author": "Yuwei An",
+                    "date": "2025-08-30",
+                    "evidence": "start_load_kv/store_kv call LMCache lookup, retrieve_layer, store_layer, and lookup_unpin.",
+                },
+                "sglang_enable_lmcache_flag": {
+                    "repo": "sgl-project/sglang",
+                    "path": "python/sglang/srt/server_args.py",
+                    "introduced_commit": "9a7ced4",
+                    "author": "Yuwei An",
+                    "date": "2025-09-06",
+                    "evidence": "ServerArgs exposes enable_lmcache and scheduler selects LMCRadixCache when enabled.",
+                },
+                "lmcache_env_validation_fix": {
+                    "repo": "LMCache/LMCache",
+                    "pull_request": "https://github.com/LMCache/LMCache/pull/3002",
+                    "state": "merged",
+                    "opened_at": "2026-04-11T11:08:04Z",
+                    "merged_at": "2026-05-11T14:39:19Z",
+                    "author": "rebel-jinhwan",
+                    "commit": "9985125f",
+                    "evidence": "Env-only config path now validates config used by vLLM/SGLang integrations.",
+                },
+            },
+            "required_launch_flags": ["--enable-lmcache"],
+            "required_environment": ["LMCACHE_CONFIG_FILE or LMCache environment configuration"],
+        },
+        "multiprocess_runtime": {
+            "claim_status": "not_proven",
+            "upstream_state": "open_prs_not_merged",
+            "prs": [
+                {
+                    "repo": "sgl-project/sglang",
+                    "number": 24089,
+                    "url": "https://github.com/sgl-project/sglang/pull/24089",
+                    "title": "[Feat][LMCache] Support LMCache mp mode",
+                    "state": "open",
+                    "merged": False,
+                    "opened_at": "2026-04-29T21:01:46Z",
+                    "updated_at": "2026-05-07T22:40:59Z",
+                    "author": "Shaoting-Feng",
+                    "head_sha": "bcaa2854288b1332a5645450af61f73cbf805472",
+                    "evidence": "Adds SGLang-side --lmcache-mp-host/--lmcache-mp-port wiring for LMCache MP mode.",
+                },
+                {
+                    "repo": "LMCache/LMCache",
+                    "number": 3166,
+                    "url": "https://github.com/LMCache/LMCache/pull/3166",
+                    "title": "[Feat] Add mp support for sglang",
+                    "state": "open",
+                    "merged": False,
+                    "opened_at": "2026-04-29T21:03:17Z",
+                    "updated_at": "2026-05-07T22:40:55Z",
+                    "author": "Shaoting-Feng",
+                    "head_sha": "d298d5807fc16aaf896347c1d927383e24c0195f",
+                    "evidence": "Adds LMCache-side SGLang MP support and documents abort/liveness follow-up work.",
+                },
+            ],
+            "required_launch_flags": ["--enable-lmcache", "--lmcache-mp-host", "--lmcache-mp-port"],
+            "known_open_gaps": [
+                {
+                    "repo": "LMCache/LMCache",
+                    "number": 3192,
+                    "url": "https://github.com/LMCache/LMCache/issues/3192",
+                    "title": "SGLang integration: LMCache doesn't support MLA models (DeepSeek V3/R1)",
+                    "state": "open",
+                    "opened_at": "2026-05-04T20:33:28Z",
+                    "author": "andyluo7",
+                },
+                {
+                    "repo": "sgl-project/sglang",
+                    "number": 24549,
+                    "url": "https://github.com/sgl-project/sglang/pull/24549",
+                    "title": "[Bugfix] support MLA models for LMCache Radix Cache.",
+                    "state": "open",
+                    "opened_at": "2026-05-06T20:10:33Z",
+                    "author": "Shaoting-Feng",
+                },
+            ],
+        },
+        "non_claims": [
+            "Embedded SGLang + LMCache provenance does not prove SGLang + LMCache MP support.",
+            "Open PR metadata does not prove merged upstream support.",
+            "InferGuard reports classify observed evidence; InferGuard does not enable LMCache runtime behavior.",
+            "Synthetic fixtures do not prove live performance or production readiness.",
+        ],
+    }
+
+
+
+def _sglang_lmcache_embedded_support_report(
+    lmcache_report: dict[str, Any],
+    *,
+    version_provenance: dict[str, Any],
+) -> dict[str, Any]:
+    architecture = lmcache_report.get("detected_architecture") or {}
+    classification = str(architecture.get("label") or "unknown")
+    observed = lmcache_report.get("observed") if isinstance(lmcache_report.get("observed"), dict) else {}
+    has_embedded_metrics = bool(observed.get("lmcache_embedded"))
+    is_sglang_embedded = classification == "sglang_embedded_lmcache"
+    claim_status = "measured" if is_sglang_embedded and has_embedded_metrics else "source_backed"
+    live_validation = "artifact_present" if claim_status == "measured" else "pending"
+    return {
+        "support_status": "source_backed",
+        "classification": classification,
+        "claim_status": claim_status,
+        "upstream_state": "documented_existing_embedded_support",
+        "sglang_docs": "https://docs.lmcache.ai/getting_started/quickstart.html#sglang",
+        "lmcache_adapter_source": "lmcache/integration/sglang/sglang_adapter.py",
+        "configuration_source": "lmcache/integration/sglang/utils.py",
+        "live_validation": live_validation,
+        "required_launch_flags": ["--enable-lmcache"],
+        "required_environment": ["LMCACHE_CONFIG_FILE or LMCache environment configuration"],
+        "runtime_contract": [
+            "SGLang enables the LMCache integration with --enable-lmcache.",
+            "LMCache reads configuration from LMCACHE_CONFIG_FILE or environment variables.",
+            "The SGLang LMCache adapter initializes an LMCacheEngine for EngineType.SGLANG.",
+            "The adapter calls LMCache lookup/retrieve and store paths during prefill/store lifecycle.",
+        ],
+        "source_provenance": version_provenance["embedded_runtime"],
+        "non_claims": [
+            "not LMCache MP support",
+            "not performance validated",
+            "not production support without live artifacts",
+            "InferGuard does not enable runtime cache behavior; it only captures and classifies evidence",
+        ],
+    }
+
+
+
+def _sglang_lmcache_mp_observability_report(
+    lmcache_report: dict[str, Any],
+    *,
+    expect_lmcache_mode: str,
+    version_provenance: dict[str, Any],
+) -> dict[str, Any]:
+    architecture = lmcache_report.get("detected_architecture") or {}
+    classification = str(architecture.get("label") or "unknown")
+    signals = architecture.get("signals") if isinstance(architecture.get("signals"), dict) else {}
+    families = lmcache_report.get("families") if isinstance(lmcache_report.get("families"), list) else []
+    family_breakdown = _sglang_lmcache_mp_family_breakdown(families)
+    required_families_present = all(
+        row["status"] == "populated" for row in family_breakdown["required"].values()
+    )
+    expected_mode_is_mp = expect_lmcache_mode == "mp"
+    detected_mode_is_mp = lmcache_report.get("detected_mode") == "mp"
+    launch_evidence_present = bool(signals.get("sglang_lmcache_mp_launch_evidence"))
+    connector_evidence_present = bool(signals.get("sglang_mp_lmcache_connector_label"))
+    complete = all(
+        [
+            expected_mode_is_mp,
+            detected_mode_is_mp,
+            classification == "sglang_mp_lmcache_observability",
+            launch_evidence_present,
+            connector_evidence_present,
+            required_families_present,
+        ]
+    )
+    blockers = []
+    if not expected_mode_is_mp:
+        blockers.append("expected_mode_not_mp")
+    if not detected_mode_is_mp:
+        blockers.append("detected_mode_not_mp")
+    if not launch_evidence_present:
+        blockers.append("missing_sglang_mp_launch_evidence")
+    if not connector_evidence_present:
+        blockers.append("missing_sglang_mp_connector_evidence")
+    for family, row in family_breakdown["required"].items():
+        if row["status"] != "populated":
+            blockers.append(f"missing_required_family:{family}")
+    claim_status = "fixture_tested" if complete else "not_proven"
+    acceptance_state = "complete" if complete else ("incomplete" if detected_mode_is_mp else "mixed_or_not_proven")
+    return {
+        "support_status": "source_backed_fixture_tested",
+        "classification": classification,
+        "claim_status": claim_status,
+        "acceptance_state": acceptance_state,
+        "acceptance_blockers": blockers,
+        "expected_mode_is_mp": expected_mode_is_mp,
+        "detected_mode_is_mp": detected_mode_is_mp,
+        "sglang_mp_launch_evidence_present": launch_evidence_present,
+        "sglang_mp_connector_evidence_present": connector_evidence_present,
+        "mp_family_breakdown": family_breakdown,
+        "upstream_state": "open_prs_not_merged",
+        "sglang_pr": "https://github.com/sgl-project/sglang/pull/24089",
+        "lmcache_pr": "https://github.com/LMCache/LMCache/pull/3166",
+        "live_validation": "pending",
+        "required_launch_flags": [
+            "--enable-lmcache",
+            "--lmcache-mp-host",
+            "--lmcache-mp-port",
+        ],
+        "source_provenance": version_provenance["multiprocess_runtime"],
+        "non_claims": [
+            "not live validated",
+            "not merged upstream",
+            "not performance validated",
+            "not production support",
+        ],
+    }
+
+
+def _sglang_lmcache_mp_family_breakdown(families: list[Any]) -> dict[str, Any]:
+    required_names = ("storage_manager", "lookup_tokens", "l1_counters", "l1_memory")
+    optional_names = (
+        "l1_failures",
+        "l1_lifecycle",
+        "l0_lifecycle",
+        "l0_allocation_counters",
+        "real_reuse",
+        "event_bus",
+    )
+    by_name = {
+        str(row.get("family")): row
+        for row in families
+        if isinstance(row, dict) and row.get("surface") == "lmcache_mp"
+    }
+
+    def summarize(name: str) -> dict[str, Any]:
+        row = by_name.get(name) or {}
+        return {
+            "status": str(row.get("status") or "missing"),
+            "required_when": str(row.get("required_when") or "always"),
+            "matched_metrics": list(row.get("matched_metrics") or []),
+        }
+
+    return {
+        "required": {name: summarize(name) for name in required_names},
+        "lifecycle_error_abort_when_present": {
+            name: summarize(name)
+            for name in optional_names
+            if summarize(name)["status"] in {"populated", "zero"}
+        },
+    }
 
 
 def _family_row(
@@ -467,6 +776,21 @@ def _hist_avg(samples: list[Any], prefix: str) -> float | None:
     if count <= 0:
         return None
     return total / count
+
+
+def _sglang_kv_events_surface_row(evidence: dict[str, Any] | None) -> dict[str, Any]:
+    populated = 1 if evidence and evidence.get("claim_status") == "measured" else 0
+    zero = 1 if evidence and evidence.get("present") and not populated else 0
+    missing = 0 if evidence else 1
+    status = "complete" if populated else ("zero" if zero else "missing")
+    return {
+        "family_count": 1,
+        "populated": populated,
+        "zero": zero,
+        "missing": missing,
+        "not_applicable": 0,
+        "status": status,
+    }
 
 
 def _coverage_gaps(

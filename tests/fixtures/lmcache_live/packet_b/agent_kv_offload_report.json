@@ -1,0 +1,209 @@
+{
+  "artifacts": {
+    "bottleneck_diagnosis": "diagnose-bottleneck/bottleneck_diagnosis.json",
+    "l0_block_boundary_evidence": "l0_block_boundary_evidence.json",
+    "lmcache_compat_report": "lmcache_compat_report.json",
+    "observability_coverage": "observability_coverage.json",
+    "packet_b_lifecycle_evidence": "packet-b-lifecycle-evidence.json",
+    "workload_manifest": "workload_manifest.json"
+  },
+  "benchmark_id": "LC1",
+  "diagnosis": {
+    "acceptance_status": "candidate_measured",
+    "blocked_reason": null,
+    "claim_status": "measured",
+    "compat_diagnostic_findings": [
+      {
+        "code": "lmcache_mp_empty_cache_salt",
+        "message": "LMCache MP lookup metrics contain a populated empty cache_salt label.",
+        "metrics": {
+          "cache_salt": ""
+        },
+        "recommendation": "Confirm whether this is intentional single-tenant behavior or a connector propagation gap.",
+        "severity": "info"
+      },
+      {
+        "code": "lmcache_mp_l1_failures",
+        "message": "LMCache MP reports L1 allocation or read failures.",
+        "metrics": {
+          "lmcache_mp_l1_allocation_failure_total": 279.0,
+          "lmcache_mp_l1_read_failure_total": 0
+        },
+        "recommendation": "Inspect L1 memory capacity, object locks, and read/write conflict logs before interpreting hit-rate economics.",
+        "severity": "critical"
+      }
+    ],
+    "compat_failure_reasons": [],
+    "concrete_remediation": null,
+    "diagnose_bottleneck_rule": "lmcache_mp_l1_failures",
+    "missing_telemetry": [],
+    "operator_facing_code": null
+  },
+  "lmcache_mp": {
+    "l0_l1_store_load_throughput": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_bucket",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_count",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_sum"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_bucket",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_count",
+        "lmcache_mp_l0_l1_store_throughput_gbs_GB_per_second_sum"
+      ],
+      "status": "populated"
+    },
+    "l0_lifecycle": {
+      "matched_metrics": [
+        "lmcache_mp_l0_block_allocated_blocks_total",
+        "lmcache_mp_l0_block_allocation_records_total"
+      ],
+      "required_for_c1_acceptance": true,
+      "status": "populated"
+    },
+    "l1_lifecycle_and_real_reuse": {
+      "l1_lifecycle": {
+        "claim_status": "measured",
+        "matched_metrics": [
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_bucket",
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_count",
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_sum",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_bucket",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_count",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_sum",
+          "lmcache_mp_l1_chunk_lifetime_seconds_bucket",
+          "lmcache_mp_l1_chunk_lifetime_seconds_count",
+          "lmcache_mp_l1_chunk_lifetime_seconds_sum",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_bucket",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_count",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_sum"
+        ],
+        "populated_metrics": [
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_bucket",
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_count",
+          "lmcache_mp_l1_chunk_evict_reuse_gap_seconds_sum",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_bucket",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_count",
+          "lmcache_mp_l1_chunk_idle_before_evict_seconds_sum",
+          "lmcache_mp_l1_chunk_lifetime_seconds_bucket",
+          "lmcache_mp_l1_chunk_lifetime_seconds_count",
+          "lmcache_mp_l1_chunk_lifetime_seconds_sum",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_bucket",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_count",
+          "lmcache_mp_l1_chunk_reuse_gap_seconds_sum"
+        ],
+        "status": "populated"
+      },
+      "real_reuse": {
+        "claim_status": "measured",
+        "matched_metrics": [
+          "lmcache_mp_real_reuse_gap_chunks_bucket",
+          "lmcache_mp_real_reuse_gap_chunks_count",
+          "lmcache_mp_real_reuse_gap_chunks_sum",
+          "lmcache_mp_real_reuse_gap_seconds_bucket",
+          "lmcache_mp_real_reuse_gap_seconds_count",
+          "lmcache_mp_real_reuse_gap_seconds_sum"
+        ],
+        "populated_metrics": [
+          "lmcache_mp_real_reuse_gap_chunks_bucket",
+          "lmcache_mp_real_reuse_gap_chunks_count",
+          "lmcache_mp_real_reuse_gap_chunks_sum",
+          "lmcache_mp_real_reuse_gap_seconds_bucket",
+          "lmcache_mp_real_reuse_gap_seconds_count",
+          "lmcache_mp_real_reuse_gap_seconds_sum"
+        ],
+        "status": "populated"
+      }
+    },
+    "lookup_hit_tokens": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_lookup_hit_tokens_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_lookup_hit_tokens_total"
+      ],
+      "status": "populated"
+    },
+    "lookup_requested_tokens": {
+      "claim_status": "measured",
+      "matched_metrics": [
+        "lmcache_mp_lookup_requested_tokens_total"
+      ],
+      "populated_metrics": [
+        "lmcache_mp_lookup_requested_tokens_total"
+      ],
+      "status": "populated"
+    }
+  },
+  "packet_id": "b",
+  "schema_version": "inferguard-agent-kv-offload-report/v1",
+  "sdlc_row_id": "C1",
+  "vllm": {
+    "external_prefix_cache": null,
+    "native_cpu_offload": {
+      "cpu_to_gpu_bytes": 0,
+      "cpu_to_gpu_seconds": 0,
+      "gpu_to_cpu_bytes": 0,
+      "gpu_to_cpu_seconds": 0,
+      "interpretation": "Native vLLM CPU offload metrics; useful for offload pressure, but not proof that LMCache is serving KV.",
+      "metric_source": "vllm /metrics",
+      "simple_cpu_offload_pending_loads": null,
+      "simple_cpu_offload_pending_stores": null,
+      "simple_cpu_offload_usage_perc": null,
+      "simple_cpu_offload_used_blocks": null,
+      "status": "missing"
+    }
+  },
+  "workload": {
+    "legacy_workload": "reuse_eviction",
+    "phases": [
+      {
+        "intent": "populate reusable long-context agent KV state",
+        "phase": "warm",
+        "prefix_pattern": "shared-agent-session-prefix",
+        "request_count": 12,
+        "trace_classes": [
+          "coding-long",
+          "prefix-reuse",
+          "session-resume"
+        ]
+      },
+      {
+        "intent": "force unique-prefix KV writes and L1 eviction pressure",
+        "phase": "pressure",
+        "prefix_pattern": "unique-agent-pressure-window",
+        "request_count": 28,
+        "trace_classes": [
+          "kv-pressure",
+          "tool-heavy",
+          "multi-agent-coding"
+        ]
+      },
+      {
+        "intent": "revisit warm agent context to expose reuse and L0/L1 lifecycle",
+        "phase": "retest",
+        "prefix_pattern": "shared-agent-session-prefix",
+        "request_count": 8,
+        "trace_classes": [
+          "coding-long",
+          "prefix-reuse",
+          "session-resume"
+        ]
+      }
+    ],
+    "profile": "long_context_agent_kv_offload",
+    "raw_prompts_recorded": false,
+    "request_count": 48,
+    "trace_source": "traces/isb1-dsv4-agent",
+    "trace_workload_classes": [
+      "coding-long",
+      "kv-pressure",
+      "multi-agent-coding",
+      "prefix-reuse",
+      "session-resume",
+      "tool-heavy"
+    ]
+  }
+}

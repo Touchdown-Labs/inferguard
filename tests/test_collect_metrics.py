@@ -18,7 +18,11 @@ from inferguard.collect_metrics import (
 )
 from inferguard.collect_metrics.normalize import VLLM_LOCKED_METRICS, build_metrics_summary
 from inferguard.collect_metrics.types import ENGINE_GROUPS, GpuMetricsSample
-from inferguard.compat import build_compat_report, build_compat_report_from_paths
+from inferguard.compat import (
+    build_compat_report,
+    build_compat_report_from_paths,
+    read_sglang_kv_events_evidence,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -110,6 +114,40 @@ def test_sglang_engine_groups() -> None:
 
     for group in {"prefill", "decode", "queue", "prefix_cache"}:
         assert summary[group]["claim_status"] == "measured"
+    assert summary["queue"]["num_preemptions_total"] == 0
+
+
+def test_parse_sglang_hicache_fixture() -> None:
+    summary = _summary_from_engine("sglang", _fixture("sglang_hicache.txt"))
+
+    kv_cache = summary["kv_cache"]
+    assert kv_cache["hicache_l1_hit_count_total"] == 900
+    assert kv_cache["hicache_l2_hit_count_total"] == 120
+    assert kv_cache["hicache_l3_hit_count_total"] == 30
+    assert kv_cache["hicache_lookup_count_total"] == 1100
+    assert kv_cache["hicache_l2_bytes"] == 4294967296
+    assert kv_cache["hicache_l3_bytes"] == 8589934592
+
+
+def test_sglang_kv_events_evidence_redacts_raw_tokens_and_hashes() -> None:
+    evidence = read_sglang_kv_events_evidence(FIXTURES / "sglang_kv_events.jsonl")
+
+    assert evidence is not None
+    assert evidence["schema_version"] == "inferguard-sglang-kv-events-evidence/v1"
+    assert evidence["publisher"] == "zmq"
+    assert evidence["topic"] == "kv-events"
+    assert evidence["event_batch_count"] == 1
+    assert evidence["block_stored_count"] == 1
+    assert evidence["block_removed_count"] == 1
+    assert evidence["block_count"] == 3
+    assert evidence["raw_token_id_values_seen"] is True
+    assert evidence["raw_block_hash_values_seen"] is True
+    assert evidence["raw_token_id_values_recorded"] is False
+    assert evidence["raw_block_hash_values_recorded"] is False
+    rendered = json.dumps(evidence, sort_keys=True)
+    assert "token_ids" not in rendered
+    assert "hash-a" not in rendered
+    assert "parent-hash" not in rendered
 
 
 def test_parse_lmcache_fixture() -> None:

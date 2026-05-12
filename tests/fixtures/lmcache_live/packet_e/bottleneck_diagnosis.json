@@ -1,0 +1,106 @@
+{
+  "claim_status": "inferred",
+  "confidence": 0.0,
+  "downgrades": [
+    {
+      "claim_id": "lmcache_mp_diagnostics",
+      "from": "measured",
+      "reason": "lmcache_mp_empty_cache_salt",
+      "to": "inferred"
+    }
+  ],
+  "evidence_paths": [
+    "/out/packet-e/20260509T083910Z/inferguard-job/metrics/lmcache_compat_report.json"
+  ],
+  "job_id": "inferguard-job",
+  "metric_values": {
+    "lmcache_compat.detected_architecture": {
+      "cache_labels": [],
+      "claim_status": "inferred",
+      "connector_labels": [],
+      "label": "vllm_mp_lmcache",
+      "offload_backend_labels": [
+        "native"
+      ],
+      "signals": {
+        "lmcache_cacheblend_metrics": false,
+        "lmcache_embedded_metrics": false,
+        "lmcache_mp_connector_label": false,
+        "lmcache_mp_metrics": true,
+        "sglang_enable_lmcache_label": false,
+        "sglang_hicache_metrics": false,
+        "sglang_lmcache_connector_label": false,
+        "sglang_lmcradix_cache_label": false,
+        "sglang_metrics": false,
+        "stale_lmcache_connector_label": false,
+        "vllm_embedded_connector_label": false,
+        "vllm_lmcache_offload_backend_label": false,
+        "vllm_metrics": true
+      }
+    },
+    "lmcache_compat.detected_mode": "mp",
+    "lmcache_compat.diagnostic_findings": [
+      {
+        "code": "lmcache_mp_empty_cache_salt",
+        "message": "LMCache MP lookup metrics contain a populated empty cache_salt label.",
+        "metrics": {
+          "cache_salt": ""
+        },
+        "recommendation": "Confirm whether this is intentional single-tenant behavior or a connector propagation gap.",
+        "severity": "info"
+      }
+    ]
+  },
+  "primary_evidence": [
+    {
+      "claim_status": "inferred",
+      "metric": "diagnose.required_evidence",
+      "source": "/out/packet-e/20260509T083910Z/inferguard-job/metrics/lmcache_compat_report.json",
+      "value": {
+        "lmcache_compat.detected_architecture": {
+          "cache_labels": [],
+          "claim_status": "inferred",
+          "connector_labels": [],
+          "label": "vllm_mp_lmcache",
+          "offload_backend_labels": [
+            "native"
+          ],
+          "signals": {
+            "lmcache_cacheblend_metrics": false,
+            "lmcache_embedded_metrics": false,
+            "lmcache_mp_connector_label": false,
+            "lmcache_mp_metrics": true,
+            "sglang_enable_lmcache_label": false,
+            "sglang_hicache_metrics": false,
+            "sglang_lmcache_connector_label": false,
+            "sglang_lmcradix_cache_label": false,
+            "sglang_metrics": false,
+            "stale_lmcache_connector_label": false,
+            "vllm_embedded_connector_label": false,
+            "vllm_lmcache_offload_backend_label": false,
+            "vllm_metrics": true
+          }
+        },
+        "lmcache_compat.detected_mode": "mp",
+        "lmcache_compat.diagnostic_findings": [
+          {
+            "code": "lmcache_mp_empty_cache_salt",
+            "message": "LMCache MP lookup metrics contain a populated empty cache_salt label.",
+            "metrics": {
+              "cache_salt": ""
+            },
+            "recommendation": "Confirm whether this is intentional single-tenant behavior or a connector propagation gap.",
+            "severity": "info"
+          }
+        ]
+      }
+    }
+  ],
+  "reasoning": "LMCache MP lookup metrics contain a populated empty cache_salt label.",
+  "recommended_next_probe": "inferguard collect-metrics --engine <engine> --engine-metrics-url <url> --dcgm-metrics-url <url> --output-dir /out/packet-e/20260509T083910Z/inferguard-job/metrics --duration-seconds 120",
+  "rule_fired": "lmcache_mp_empty_cache_salt",
+  "schema_version": "inferguard-bottleneck-diagnosis/v1",
+  "secondary_evidence": [],
+  "supporting_request_rows": [],
+  "verdict": "not_enough_evidence"
+}

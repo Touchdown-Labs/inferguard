@@ -1,0 +1,220 @@
+{
+  "booleans": {
+    "has_commit_id": true,
+    "has_conf": true,
+    "has_health": true,
+    "has_lmc_version": true,
+    "has_metrics": false,
+    "has_periodic_thread": false,
+    "has_periodic_threads": true,
+    "has_periodic_threads_health": true,
+    "has_quota": true,
+    "has_root": true,
+    "has_status": true,
+    "has_threads": true,
+    "has_version": true,
+    "is_healthy": true
+  },
+  "endpoints": {
+    "commit_id": {
+      "content_type": "json",
+      "fields": {},
+      "json_type": "str",
+      "present": true,
+      "raw_length": 11,
+      "status": "unknown"
+    },
+    "conf": {
+      "content_type": "json",
+      "fields": {
+        "storage_manager": {
+          "eviction_config": {
+            "eviction_policy": "IsolatedLRU",
+            "eviction_ratio": 0.2,
+            "trigger_watermark": 0.8
+          },
+          "l1_manager_config": {
+            "memory_config": {
+              "align_bytes": 4096,
+              "init_size_in_bytes": 8589934592,
+              "size_in_bytes": 8589934592,
+              "use_lazy": true
+            },
+            "read_ttl_seconds": 300,
+            "write_ttl_seconds": 600
+          },
+          "l2_adapter_config": {
+            "adapters": []
+          },
+          "prefetch_max_in_flight": 8,
+          "prefetch_policy": "default",
+          "store_policy": "default"
+        }
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 1530,
+      "status": "unknown"
+    },
+    "health": {
+      "content_type": "json",
+      "fields": {
+        "status": "healthy"
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 20,
+      "status": "healthy"
+    },
+    "lmc_version": {
+      "content_type": "json",
+      "fields": {},
+      "json_type": "str",
+      "present": true,
+      "raw_length": 13,
+      "status": "unknown"
+    },
+    "periodic_threads": {
+      "content_type": "json",
+      "fields": {
+        "threads": []
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 263,
+      "status": "unknown"
+    },
+    "periodic_threads_health": {
+      "content_type": "json",
+      "fields": {
+        "healthy": true
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 59,
+      "status": "healthy"
+    },
+    "quota": {
+      "content_type": "json",
+      "fields": {},
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 12,
+      "status": "unknown"
+    },
+    "root": {
+      "content_type": "json",
+      "fields": {
+        "status": "ok"
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 44,
+      "status": "healthy"
+    },
+    "status": {
+      "content_type": "json",
+      "fields": {
+        "active_prefetch_jobs": 0,
+        "active_sessions": 0,
+        "chunk_size": 256,
+        "engine_type": "MPCacheEngine",
+        "is_healthy": true,
+        "registered_gpu_ids": [
+          84
+        ],
+        "storage_manager": {
+          "is_healthy": true,
+          "l1_eviction_controller": {
+            "eviction_policy": "IsolatedLRU",
+            "eviction_ratio": 0.2,
+            "is_healthy": true,
+            "thread_alive": true,
+            "trigger_watermark": 0.8
+          },
+          "l1_manager": {
+            "is_healthy": true,
+            "memory_total_bytes": 8589934592,
+            "memory_usage_ratio": 0.63720703125,
+            "memory_used_bytes": 5473566720,
+            "read_locked_count": 36,
+            "read_ttl_seconds": 300,
+            "temporary_count": 0,
+            "total_object_count": 145,
+            "write_locked_count": 0,
+            "write_ttl_seconds": 600
+          },
+          "l2_adapters": [],
+          "l2_eviction_controller": {
+            "adapters": [],
+            "is_healthy": true,
+            "thread_alive": true
+          },
+          "num_l2_adapters": 0,
+          "prefetch_controller": {
+            "completed_results_count": 0,
+            "in_flight_request_count": 0,
+            "is_healthy": true,
+            "load_phase_count": 0,
+            "lookup_phase_count": 0,
+            "max_in_flight": 8,
+            "num_l2_adapters": 0,
+            "pending_queue_size": 0,
+            "submission_queue_size": 0,
+            "thread_alive": true
+          },
+          "store_controller": {
+            "in_flight_task_count": 0,
+            "is_healthy": true,
+            "num_l2_adapters": 0,
+            "pending_keys_count": 0,
+            "thread_alive": true
+          }
+        }
+      },
+      "json_type": "dict",
+      "present": true,
+      "raw_length": 1531,
+      "status": "healthy"
+    },
+    "threads": {
+      "content_type": "text",
+      "present": true,
+      "raw_length": 8231,
+      "status": "unknown",
+      "summary": "Thread: <_MainThread(MainThread, started 46944390187904)>\nStack trace:\n  File \"/usr/local/bin/lmcache\", line 6, in <module>\n    sys.exit(main())\n  File \"/opt/lmcache/lmcache/cli/main.py\", line 37, in main\n    args.func(args)\n  File \"/opt..."
+    },
+    "version": {
+      "content_type": "json",
+      "fields": {},
+      "json_type": "str",
+      "present": true,
+      "raw_length": 23,
+      "status": "unknown"
+    }
+  },
+  "failure_reasons": [],
+  "schema_version": "inferguard-lmcache-http-evidence/v1",
+  "skipped_endpoints": [
+    {
+      "endpoint": "GET /env",
+      "reason": "sensitive environment disclosure; collect-lmcache does not fetch it by default",
+      "status": "sensitive_skipped"
+    },
+    {
+      "endpoint": "POST /api/clear-cache",
+      "reason": "destructive; collect-lmcache records evidence only and does not clear customer caches",
+      "status": "destructive_skipped"
+    },
+    {
+      "endpoint": "POST /metrics/reset",
+      "reason": "destructive; collect-lmcache records evidence only and does not reset counters",
+      "status": "destructive_skipped"
+    },
+    {
+      "endpoint": "quota mutation endpoints",
+      "reason": "mutating quota routes are excluded; collect-lmcache only fetches safe GET /api/quota",
+      "status": "destructive_skipped"
+    }
+  ]
+}

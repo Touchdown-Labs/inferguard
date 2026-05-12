@@ -97,6 +97,7 @@ nav:
       - Supported Engines: reference/supported-engines.md
       - Supported Inputs: reference/supported-inputs.md
       - Hardware Coverage: reference/hardware-coverage.md
+      - AMD CDNA Hardware Coverage: reference/amd-cdna-hardware-coverage.md
   - System Design:
       - Architecture: system-design/architecture.md
       - Specification: system-design/spec.md

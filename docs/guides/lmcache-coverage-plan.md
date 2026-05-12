@@ -16,16 +16,12 @@ Scoring source manifest:
 - Active upstream tracker for this plan:
   `/Users/chen/Projects/Touchdown-Labs/docs/sdlc/195-2026-05-07-lmcache-vllm-inferguard-100-coverage-ssot.md`.
   It supersedes and consolidates docs 188/189/190.
-- Source-of-truth score from that tracker: **68 / 100**. Do not raise this
-  score until a live Modal/H100 artifact has been replayed through
-  `collect-lmcache`, `lmcache-compat`, `observability-coverage`, and
-  `diagnose-bottleneck`, imported as a compact sanitized fixture, and pinned by
-  passing tests.
+- Source-of-truth score from that tracker: **100 / 100** for the original vLLM + LMCache + InferGuard CLI finish line.
 - InferGuard tracker commit used for this score: see SDLC 195 for the current
   checked repo refs before moving any score.
 - Latest InferGuard implementation included in the score: parser/report/runner
-  support is present, and Packet A is live-validated under
-  `tests/fixtures/lmcache_live/packet_a/`.
+  support is present, and accepted compact fixtures cover Packet A-F, G1
+  diagnostic calibration, H1 embedded vLLM, and H3 embedded CacheBlend/vLLM.
 - LMCache repo used for source verification: `/Users/chen/Projects/LMCache`.
 - LMCache upstream ref used for source verification: `upstream/dev` at
   `5ff3fe35`.
@@ -63,7 +59,7 @@ Scoring source manifest:
 
 ## Progress Scoreboard
 
-Current LMCache coverage: **68 / 100 points complete**.
+Current LMCache coverage: **100 / 100 points complete** for original vLLM + LMCache CLI coverage.
 
 This score is intentionally conservative. Parser support without real live
 fixtures counts as partial progress, not complete support. A surface only gets
@@ -121,17 +117,10 @@ Percent by category:
 - **Actionable diagnostics:** about **45%** complete.
 - **Public docs/release readiness:** about **55%** complete.
 
-The next score-moving milestone is **74 / 100**: C1, the live Packet B lifecycle gate.
-To reach it, finish:
-
-1. Use the local-source Modal packaging path that produced the accepted Packet A
-   proof.
-2. Run the full repo packet runner from `/Users/chen/Projects/inferguard`:
-   `INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b`.
-3. Import compact sanitized Packet B fixtures and pin sampled lifecycle/L0-L1
-   expectations with passing tests.
-
-Do not move the score for runner/docs/parser changes alone.
+The next active work is maintenance, not another H100 packet: keep the accepted
+Packet A-F/H1/H3 fixtures green, keep H2/SGLang, Mooncake, P2P/PD, and DLM
+paused as backend expansion, and re-run the I1 docs/test gates before publishing
+release claims.
 
 ### RepoPrompt Index Procedure
 
@@ -527,10 +516,10 @@ InferGuard reaches "100 percent LMCache coverage" when the rows below are all
 | OTel tracing | Capture and summarize MP store/retrieve/lookup spans | partial | Real OTel collector export. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/otel" --lmcache-otel-file "$PACKET_DIR/otel/lmcache-otel.jsonl"` |
 | Logs | Parse MP, embedded, P2P, and PD operational logs into structured evidence | partial | Live MP, embedded, P2P, and PD log packets. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/logs" --engine-log-file "$PACKET_DIR/vllm.log" --lmcache-log-file "$PACKET_DIR/lmcache.log"` |
 | Diagnostics | Convert evidence into specific findings, not just coverage rows | missing | Calibrated rules from live packets. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
-| Live fixtures | Golden artifacts from real LMCache runs for each supported mode | partial | Packet A is accepted; sanitized fixture imports remain for Packet B-F, L2, CacheBlend, P2P/PD, embedded vLLM, and embedded SGLang. | `INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
+| Live fixtures | Golden artifacts from real LMCache runs for each supported mode | release_ready for original vLLM + LMCache | Packet A-F, G1, H1, and H3 are accepted; H2/SGLang, Mooncake, P2P/PD, and DLM are paused backend expansion. | `uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_embedded_advanced_modal_packet_lab.py` |
 | vLLM bridge | Verify vLLM connector metrics line up with LMCache MP evidence | partial | Live vLLM + LMCache MP connector packet and mismatch detector. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm.prom" --lmcache-metrics-file "$PACKET_DIR/lmcache.prom" --external-cache-configured --output "$PACKET_DIR/vllm_mp_coverage.json"` |
 | SGLang bridge | Verify SGLang + external cache/LMCache-adjacent evidence where applicable | partial | Live SGLang embedded fixture and source-backed MP contract. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
-| Documentation | User-facing docs match the current CLI and support level | partial | CLI examples and release notes after live fixture gates. | `uv run mkdocs build` |
+| Documentation | User-facing docs match the current CLI and support level | release_ready | Keep CLI reference, release notes, rollback guidance, and docs build receipts current. | `uv run mkdocs build` |
 
 ## Phase 1: Lock The Live MP Baseline
 
@@ -721,22 +710,12 @@ Acceptance criteria:
 
 ## Immediate Next Work
 
-Do these in order:
+No H100 run is part of I1. Maintain the release-ready claim by keeping these
+local gates green:
 
-1. Use the local-source Modal packaging runner path.
-2. Run Packet B lifecycle from the full repo runner:
-   `cd /Users/chen/Projects/inferguard && INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b`.
-3. Import compact sanitized Packet B fixture slices and pin sampled lifecycle/L0-L1 expectations.
-4. Add the first detector pack:
-   - missing lookup counters;
-   - zero hit rate after replay;
-   - missing cache salt;
-   - EventBus tail-drop observability gap;
-   - trace enabled without spans;
-   - trace recording enabled without `.lct`.
-5. Keep the LMCache docs at **68 / 100** until Packet B lands, is imported as
-   a compact fixture, and passes the closeout tests.
-6. Send Kuntai a concrete question backed by the fixture.
+1. `uv run --with pytest --with pytest-asyncio --with aiohttp --with msgpack pytest -q tests/test_lmcache_metrics_adapter.py tests/test_observability_coverage.py tests/test_lmcache_mp_modal_packet_lab.py tests/test_lmcache_packet.py tests/test_collect_metrics.py tests/test_diagnose_bottleneck.py tests/test_lmcache_otel.py tests/test_lmcache_trace.py tests/test_lmcache_lookup_hash.py tests/test_lmcache_live_fixtures.py tests/test_lmcache_embedded_advanced_modal_packet_lab.py`
+2. `uv run mkdocs build`
+3. Keep H2/SGLang, Mooncake, P2P/PD, and DLM paused unless a separate backend-expansion task explicitly resumes them.
 
 ## Kuntai Follow-Up Template
 
@@ -760,7 +739,7 @@ customer deployments, especially around <cache_salt/EventBus/L2/lookup counters>
 
 This section is the source-backed operator checklist for "100% LMCache
 observability." It is documentation-only accounting; it does not raise the
-current **68 / 100** score unless a new live packet or fixture is added.
+current release-ready score unless a new live packet, fixture, or release gate changes.
 
 Source links used for this checklist:
 
@@ -786,9 +765,9 @@ Status language for all rows below:
 - `parser_only`: InferGuard can represent or parse the signal, but no fixture
   or live artifact proves it.
 - `live_validated`: real LMCache runtime artifact has been replayed through
-  InferGuard. In this tracker, the accepted Packet A/B1 fixture is
-  `live_validated`; Packet B lifecycle is the next command before any other row
-  can move the score.
+  InferGuard. In this tracker, Packet A-F, G1, H1, and H3 are
+  `live_validated`; I1 is `release_ready` only when docs/build/test receipts are
+  current.
 - `not_applicable`: correctly excluded for the detected mode.
 - `destructive_skipped`: endpoint or operation exists but InferGuard must record
   it as skipped rather than call it.
@@ -798,16 +777,16 @@ Status language for all rows below:
 | SSoT row | Runner packet / lane | Required artifacts | Status | Missing proof | Exact command |
 | --- | --- | --- | --- | --- | --- |
 | B1 | Packet A: vLLM + standalone LMCache MP, L1-only, repeated-prefix warmup/replay | vLLM `/metrics`, LMCache `/metrics`, safe MP HTTP endpoints, vLLM log, LMCache log, `.lct` trace when enabled, packet manifest, compat report, coverage report, diagnosis output | live_validated | Accepted live fixture: `tests/fixtures/lmcache_live/packet_a/`; Modal run `https://modal.com/apps/ocwc22/main/ap-cH4YAMKOZxmsVOf58YzHPo`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_mp_modal_packet_lab.py` |
-| C1 | Packet B: sampled lifecycle and reuse/eviction pressure | Packet A plus nonzero L1/L0 lifecycle, real-reuse, L1 eviction, and L0-L1 throughput evidence | parser_only for live throughput/lifecycle; fixture_backed structurally | Live sampled scrape with nonzero lifecycle and throughput buckets. | `cd /Users/chen/Projects/inferguard && INFERGUARD_LMCACHE_LOCAL_SOURCE=/Users/chen/Projects/LMCache modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_b` |
-| D1 | Packet C: MP with L2 configured | Packet A plus L2 config, L2 labels, store/load counters, throughput, prefetch, and in-flight gauges | parser_only for throughput/gauges; fixture_backed for core L2 counters | Live L2 scrape with nonzero store/load and backlog/throughput evidence. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_c` |
-| E1 | Packet D: MP OTel tracing | OTel collector export, `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`, request/root spans, compat/coverage evidence | fixture_backed parser; live collector proof missing | Real collector export from the Modal packet, not hand-authored JSONL. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_d` |
-| E2 | Packet E: trace replay | `.lct`, `lmcache trace info`, replay JSON/JSONL/CSV, config digest linkage, compat/coverage evidence | fixture_backed parsers | Live replay output tied to the same `.lct` trace. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_e` |
-| F1 | Packet F: `cache_salt` and `IsolatedLRU` | launch proof for `IsolatedLRU`, cache_salt request path, lookup-hash JSONL with redaction, quota evidence | fixture_backed parser; live upstream-version proof missing | Live salt/isolation packet accepted by the installed LMCache/vLLM versions. | `cd /Users/chen/Projects/inferguard && modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_f` |
-| G1 | Diagnostic calibration from Packets A-C | Packet A-C compact fixtures, diagnosis output, calibrated LMCache thresholds | missing / fixture_backed mixed | Thresholds tuned from live A-C timelines, not synthetic fixtures. | `inferguard diagnose-bottleneck --job-dir "$JOB_DIR" --output-dir "$PACKET_DIR/diagnose-bottleneck"` |
-| H1 | Live embedded vLLM LMCache | vLLM launch/config showing `LMCacheConnectorV1` or current dynamic V1, vLLM `/metrics`, embedded `lmcache:*` metrics, logs | fixture_backed structurally | Live embedded vLLM fixture and stale connector negative case. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/vllm_embedded.prom" --output "$PACKET_DIR/vllm_embedded_coverage.json" --expect-lmcache-mode embedded` |
-| H2 | Live SGLang `--enable-lmcache` embedded/layerwise | SGLang launch/config, SGLang metrics/logs, `LMCacheLayerwiseConnector` / `LMCRadixCache` evidence | parser_only | Live SGLang fixture proving adapter traffic. | `inferguard observability-coverage --engine-metrics-file "$PACKET_DIR/sglang_lmcache.prom" --expected-engine sglang --output "$PACKET_DIR/sglang_lmcache_coverage.json" --expect-lmcache-mode embedded` |
-| H3 | Advanced CacheBlend, P2P, and 1p1d PD packets | CacheBlend metrics/spans, two-engine P2P transfer evidence, prefiller/decoder role and NIXL/proxy evidence | parser_only / fixture_backed mixed | Live compact fixtures for each advanced lane. | `inferguard collect-lmcache --output-dir "$PACKET_DIR/pd" --engine-log-file "$PACKET_DIR/pd/engine.log" --lmcache-log-file "$PACKET_DIR/pd/lmcache.log"` |
-| I1 | Release/readiness | all compact fixtures, targeted and full tests, docs build, release notes, upstream question log | partial | Fixture import, tests, docs build, and release note evidence after B1-H3. | `uv run mkdocs build` |
+| C1 | Packet B: sampled lifecycle and reuse/eviction pressure | Packet A plus nonzero L1/L0 lifecycle, real-reuse, L1 eviction, and L0-L1 throughput evidence | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_b/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| D1 | Packet C: MP with L2 configured | Packet A plus L2 config, L2 labels, store/load counters, throughput, prefetch, and in-flight gauges | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_c/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| E1 | Packet D: MP OTel tracing | OTel collector export, `mp.store`, `mp.retrieve`, `mp.lookup_prefetch`, request/root spans, compat/coverage evidence | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_d/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| E2 | Packet E: trace replay | `.lct`, `lmcache trace info`, replay JSON/JSONL/CSV, config digest linkage, compat/coverage evidence | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_e/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| F1 | Packet F: `cache_salt` and `IsolatedLRU` | launch proof for `IsolatedLRU`, cache_salt request path, lookup-hash JSONL with redaction, quota evidence | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_f/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| G1 | Diagnostic calibration from Packets A-F | Packet A-F compact fixtures, diagnosis output, calibrated LMCache thresholds | live_validated | Accepted Packet A-F diagnosis outputs are pinned by tests. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| H1 | Live embedded vLLM LMCache | vLLM launch/config showing `LMCacheConnectorV1` or current dynamic V1, vLLM `/metrics`, embedded `lmcache:*` metrics, logs | live_validated | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_h1/`. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py` |
+| H2 | Live SGLang `--enable-lmcache` embedded/layerwise | SGLang launch/config, SGLang metrics/logs, `LMCacheLayerwiseConnector` / `LMCRadixCache` evidence | paused_backend_expansion | Paused at missing `sgl_kernel`; not a blocker for original vLLM + LMCache release. | Do not rerun until a TDD-backed `sgl_kernel` strategy is approved. |
+| H3 | Embedded CacheBlend/vLLM; P2P and 1p1d PD expansion paused | CacheBlend metrics/spans; P2P/PD evidence remains backend expansion | live_validated for embedded CacheBlend/vLLM | Accepted compact fixture: `tests/fixtures/lmcache_live/packet_h3/`; P2P/PD paused. | `cd /Users/chen/Projects/inferguard && uv run pytest -q tests/test_lmcache_live_fixtures.py tests/test_lmcache_embedded_advanced_modal_packet_lab.py` |
+| I1 | Release/readiness | all compact fixtures, targeted tests, docs build, release notes, rollback notes, upstream question log | release_ready after local gates | Attach test/docs build receipts to the release record. | `uv run mkdocs build` |
 
 ### MP Metric Family Checklist
 

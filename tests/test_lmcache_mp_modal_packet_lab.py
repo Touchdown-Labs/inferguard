@@ -4,8 +4,24 @@ import importlib.util
 import json
 import os
 import sys
+import tempfile
 import types
 from pathlib import Path
+
+_LOCAL_SOURCE_TMP = tempfile.TemporaryDirectory()
+_LOCAL_SOURCE_ROOT = Path(_LOCAL_SOURCE_TMP.name)
+_FAKE_VLLM_SOURCE = _LOCAL_SOURCE_ROOT / "vllm"
+_FAKE_VLLM_CONNECTOR = (
+    _FAKE_VLLM_SOURCE
+    / "vllm"
+    / "distributed"
+    / "kv_transfer"
+    / "kv_connector"
+    / "v1"
+    / "lmcache_mp_connector.py"
+)
+_FAKE_VLLM_CONNECTOR.parent.mkdir(parents=True, exist_ok=True)
+_FAKE_VLLM_CONNECTOR.write_text("# fake local connector\n", encoding="utf-8")
 
 _LMCACHE_SOURCE_ENV_KEYS = (
     "INFERGUARD_LMCACHE_LOCAL_SOURCE",
@@ -20,6 +36,8 @@ _LMCACHE_SOURCE_ENV_KEYS = (
     "INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN",
     "INFERGUARD_PACKET_B_LMCACHE_LOG_LEVEL",
     "INFERGUARD_VLLM_LOCAL_SOURCE",
+    "INFERGUARD_VLLM_SOURCE_KIND",
+    "INFERGUARD_VLLM_SOURCE_REF",
 )
 
 
@@ -93,6 +111,8 @@ def _load_lab_module(env: dict[str, str] | None = None):
         os.environ.pop(key, None)
     if env:
         os.environ.update(env)
+    if not env or "INFERGUARD_VLLM_LOCAL_SOURCE" not in env:
+        os.environ["INFERGUARD_VLLM_LOCAL_SOURCE"] = str(_FAKE_VLLM_SOURCE)
 
     path = Path(__file__).resolve().parents[1] / "scripts" / "lmcache_mp_modal_packet_lab.py"
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -128,6 +148,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
         "lmcache_mp_lookup_hit_tokens_total",
         "lmcache_mp_l1_memory_usage_bytes",
     )
+    assert lab.LMCACHE_HEALTH_URL == "http://127.0.0.1:8080/healthcheck"
     assert lab.LMCACHE_METRICS_URL == "http://127.0.0.1:8080/metrics"
     assert lab.LMCACHE_METRICS_URLS == (
         "http://127.0.0.1:8080/metrics",
@@ -161,14 +182,20 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     add_local_dirs = [kwargs for name, _args, kwargs in calls if name == "add_local_dir"]
     assert add_local_dirs == [
         {
+            "local_path": str(_FAKE_VLLM_SOURCE / "vllm"),
+            "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
+            "copy": True,
+        },
+        {
             "local_path": str(lab.REPO_ROOT / lab.MODAL_INFERGUARD_PACKAGE_DIR),
             "remote_path": f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}",
             "copy": True,
-        }
+        },
     ]
-    assert add_local_dirs[0]["local_path"] != str(lab.REPO_ROOT)
+    assert add_local_dirs[1]["local_path"] != str(lab.REPO_ROOT)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (lab.INFERGUARD_LOCAL_INSTALL_COMMAND,)
+    assert run_commands_args[-1] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
+    assert "lmcache_mp_connector.py" in run_commands_args[-2]
     runtime_env = calls[-1][1][0]
     assert runtime_env["INFERGUARD_PACKET_B_VLLM_GPU_MEMORY_UTILIZATION"] == "0.65"
     assert runtime_env["INFERGUARD_PACKET_B_VLLM_MAX_MODEL_LEN"] == "8192"
@@ -176,7 +203,7 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
 
     call_names = [name for name, _args, _kwargs in calls]
     assert call_names.index("add_local_file") > call_names.index("pip_install")
-    assert call_names.index("add_local_dir") > call_names.index("add_local_file")
+    assert call_names.index("add_local_dir") > call_names.index("pip_install")
     assert call_names.index("run_commands") > call_names.index("add_local_dir")
 
 
@@ -210,7 +237,12 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
         "remote_path": lab.MODAL_LMCACHE_SOURCE,
         "copy": True,
     }
-    assert add_local_dirs[1]["remote_path"] == (
+    assert add_local_dirs[1] == {
+        "local_path": str(_FAKE_VLLM_SOURCE / "vllm"),
+        "remote_path": f"{lab.MODAL_VLLM_SOURCE}/vllm",
+        "copy": True,
+    }
+    assert add_local_dirs[2]["remote_path"] == (
         f"{lab.MODAL_INFERGUARD_SOURCE}/{lab.MODAL_INFERGUARD_PACKAGE_DIR}"
     )
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
@@ -221,10 +253,9 @@ def test_modal_image_can_install_lmcache_from_local_checkout(tmp_path: Path) -> 
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_KIND"] == "local"
     assert runtime_env["INFERGUARD_PACKET_A_LMCACHE_SOURCE_REF"] == str(tmp_path)
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (
-        "python -m pip install -e /opt/lmcache --no-build-isolation",
-        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
-    )
+    assert run_commands_args[0] == "python -m pip install -e /opt/lmcache --no-build-isolation"
+    assert "lmcache_mp_connector.py" in run_commands_args[1]
+    assert run_commands_args[2] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
 
 
 def test_modal_image_can_install_lmcache_from_git_ref() -> None:
@@ -249,10 +280,11 @@ def test_modal_image_can_install_lmcache_from_git_ref() -> None:
     for dep in lab.LMCACHE_SOURCE_BUILD_DEPS:
         assert dep in pip_install_args
     run_commands_args = next(args for name, args, _kwargs in calls if name == "run_commands")
-    assert run_commands_args == (
-        "python -m pip install git+https://github.com/LMCache/LMCache.git@b1-metrics-ref --no-build-isolation",
-        lab.INFERGUARD_LOCAL_INSTALL_COMMAND,
+    assert run_commands_args[0] == (
+        "python -m pip install git+https://github.com/LMCache/LMCache.git@b1-metrics-ref --no-build-isolation"
     )
+    assert "lmcache_mp_connector.py" in run_commands_args[1]
+    assert run_commands_args[2] == lab.INFERGUARD_LOCAL_INSTALL_COMMAND
 
 
 def test_packet_a_lmcache_command_enables_trace_and_lookup_hash(tmp_path: Path) -> None:
@@ -436,14 +468,37 @@ def test_packet_b_workload_manifest_describes_lifecycle_pressure(tmp_path: Path)
     assert set(manifest["required_packet_b_telemetry"]) == set(lab.PACKET_B_REQUIRED_TELEMETRY)
 
 
-def test_vllm_overlay_plan_defaults_to_pypi() -> None:
+def test_vllm_overlay_plan_defaults_to_sibling_private_fork() -> None:
     lab = _load_lab_module()
 
     plan = lab._select_vllm_overlay_plan({})
 
-    assert plan.source_kind == "pypi"
-    assert plan.run_commands == ()
-    assert plan.local_source is None
+    if lab.DEFAULT_VLLM_LOCAL_SOURCE.exists():
+        assert plan.source_kind == "local_connector_overlay"
+        assert plan.local_source == lab.DEFAULT_VLLM_LOCAL_SOURCE
+        assert plan.source_ref == str(lab.DEFAULT_VLLM_LOCAL_SOURCE)
+        assert len(plan.run_commands) == 1
+        assert "/opt/vllm/vllm" in plan.run_commands[0]
+        assert "lmcache_mp_connector.py" in plan.run_commands[0]
+    else:
+        assert plan.source_kind == "pypi"
+        assert plan.local_source is None
+        assert plan.run_commands == ()
+
+
+def test_runtime_vllm_overlay_plan_preserves_image_build_env(monkeypatch) -> None:
+    lab = _load_lab_module()
+    monkeypatch.setenv("INFERGUARD_VLLM_SOURCE_KIND", "local_connector_overlay")
+    monkeypatch.setenv("INFERGUARD_VLLM_SOURCE_REF", "/Users/chen/Projects/vllm")
+    lab.VLLM_OVERLAY_PLAN = lab.VllmOverlayPlan(source_kind="pypi")
+
+    plan = lab._runtime_vllm_overlay_plan_dict()
+
+    assert plan["source_kind"] == "local_connector_overlay"
+    assert plan["source_ref"] == "/Users/chen/Projects/vllm"
+    assert plan["local_source"] == "/Users/chen/Projects/vllm"
+    assert plan["overlaid_file"] == str(lab.VLLM_CONNECTOR_RELATIVE_PATH)
+
 
 
 def test_vllm_overlay_plan_copies_local_connector(tmp_path: Path) -> None:
@@ -567,6 +622,86 @@ def test_packet_b_agent_kv_offload_report_records_blocked_l0_gap(tmp_path: Path)
     assert report["diagnosis"]["operator_facing_code"] == "lmcache_mp_l0_lifecycle_missing"
 
 
+def test_packet_b_l0_boundary_evidence_summarizes_redacted_events(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+    (tmp_path / "vllm_overlay_plan.json").write_text(
+        json.dumps(
+            {
+                "source_kind": "local_connector_overlay",
+                "source_ref": "/Users/chen/Projects/vllm",
+                "overlaid_file": "distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py",
+                "source_git_head": "abc123",
+                "source_connector_sha256": "source-sha",
+                "installed_connector_path": "/site-packages/vllm/lmcache_mp_connector.py",
+                "installed_connector_sha256": "installed-sha",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "packet-b-lifecycle-evidence.json").write_text(
+        json.dumps(
+            {
+                "claim_status": "not_proven",
+                "acceptance_status": "blocked",
+                "blocked_reason": "lmcache_mp_l0_block_metrics_absent",
+                "missing_required_families": ["l0_lifecycle"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "l0_block_boundary_events.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "source": "vllm_lmcache_mp_connector",
+                        "stage": "report_block_allocation_attempt",
+                        "records": [{"request_id": "req-1", "block_count": 2}],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "source": "lmcache_mp_server",
+                        "stage": "report_block_allocation_received",
+                        "records": [{"request_id": "req-1", "block_count": 2}],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    lab._write_l0_block_boundary_evidence(tmp_path, spec)
+
+    proof = json.loads((tmp_path / "l0_block_boundary_evidence.json").read_text(encoding="utf-8"))
+    assert proof["schema_version"] == "inferguard-l0-block-boundary-evidence/v1"
+    assert proof["raw_prompts_recorded"] is False
+    assert proof["summary"]["stage_counts"]["report_block_allocation_attempt"] == 1
+    assert proof["summary"]["stage_counts"]["report_block_allocation_received"] == 1
+    assert proof["summary"]["request_samples"] == [
+        {
+            "stage": "report_block_allocation_attempt",
+            "source": "vllm_lmcache_mp_connector",
+            "request_id": "req-1",
+            "block_count": 2,
+        },
+        {
+            "stage": "report_block_allocation_received",
+            "source": "lmcache_mp_server",
+            "request_id": "req-1",
+            "block_count": 2,
+        },
+    ]
+    assert proof["diagnostic_interpretation"]["vllm_attempted"] is True
+    assert proof["diagnostic_interpretation"]["lmcache_received"] is True
+    assert proof["diagnostic_interpretation"]["lmcache_subscriber_processed"] is False
+    assert proof["vllm_overlay"]["source_git_head"] == "abc123"
+    assert proof["raw_prompts_recorded"] is False
+    assert "new_token_ids" not in json.dumps(proof)
+
+
 def test_packet_b_lifecycle_evidence_records_debug_log_markers(tmp_path: Path) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]
@@ -642,23 +777,32 @@ def test_packet_b_inferguard_gate_keeps_blocked_reports(tmp_path: Path) -> None:
     assert "diagnose-bottleneck" in calls[4][1]
 
 
-def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> None:
+def test_packet_c_wires_current_lmcache_mp_l2_cli_contract_and_strict_report_flags(
+    tmp_path: Path,
+) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["c"]
     (tmp_path / "lmcache-packet").mkdir()
     (tmp_path / "lmcache-packet" / "lmcache_trace_replay_evidence.json").write_text("{}", encoding="utf-8")
 
+    cmd = lab._build_lmcache_command(tmp_path, spec)
     config_path = lab._write_l2_config(tmp_path, spec)
     env = lab._build_lmcache_env(tmp_path, spec)
     collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
     compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
+    assert spec.l2_adapter == "mock"
+    assert cmd[cmd.index("--l2-store-policy") + 1] == "skip_l1"
+    assert cmd[cmd.index("--l2-prefetch-policy") + 1] == "default"
+    adapter = json.loads(cmd[cmd.index("--l2-adapter") + 1])
+    assert adapter["type"] == "mock"
+    assert adapter["max_size_gb"] == 80
+    assert adapter["mock_bandwidth_gb"] == 4
     assert config_path == tmp_path / "lmcache_l2_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    assert config["adapter"] == "fs"
-    assert env["LMCACHE_CONFIG_FILE"] == str(config_path)
-    assert env["LMCACHE_L2_ADAPTER"] == "fs"
+    assert config["adapter"] == adapter
+    assert env == {}
     assert "--l2-configured" in collect
     assert "--l2-configured" in compat
     assert "--l2-configured" in coverage
@@ -680,6 +824,7 @@ def test_packet_d_wires_otel_collector_evidence_into_reports(tmp_path: Path) -> 
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
     assert "--enable-tracing" in cmd
+    assert cmd[cmd.index("--otlp-endpoint") + 1] == "http://127.0.0.1:4317"
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(tmp_path / "lmcache_otel.jsonl")
     assert "--mp-tracing-enabled" in collect
@@ -711,8 +856,24 @@ def test_packet_a_collect_command_uses_saved_safe_http_and_optional_outputs(tmp_
     (tmp_path / "trace-replay").mkdir()
     (tmp_path / "lookup_hashes").mkdir()
 
+    captured: list[tuple[str, Path]] = []
+
+    def fake_curl_to_file(url, path, log_path, *, timeout=30):
+        captured.append((url, path))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+        return True
+
+    lab._curl_to_file = fake_curl_to_file
+
+    capture = lab._capture_safe_http(tmp_path)
     cmd = lab._build_collect_lmcache_cmd(tmp_path)
 
+    assert capture["healthcheck.json"]["path"] == "/healthcheck"
+    assert capture["status.json"]["path"] == "/status"
+    assert capture["quota.json"]["path"] == "/api/quota"
+    assert (lab.LMCACHE_HTTP_BASE_URL + "/healthcheck", tmp_path / "http" / "healthcheck.json") in captured
+    assert (lab.LMCACHE_HTTP_BASE_URL + "/status", tmp_path / "http" / "status.json") in captured
     assert "--lmcache-http-base-url" in cmd
     assert cmd[cmd.index("--lmcache-health-file") + 1] == str(tmp_path / "http" / "healthcheck.json")
     assert cmd[cmd.index("--lmcache-status-file") + 1] == str(tmp_path / "http" / "status.json")

@@ -1,0 +1,135 @@
+{
+  "booleans": {
+    "has_config_hints": true,
+    "has_health_startup": true,
+    "has_nixl_proxy": true,
+    "has_nixl_request": false,
+    "has_p2p_peer": false,
+    "has_p2p_transfer": true,
+    "has_p2p_transfer_failure": true,
+    "has_p2p_transfer_speed": false,
+    "has_pd_receiver": false,
+    "has_pd_role_mismatch": false,
+    "has_pd_sender": false,
+    "has_pd_stall": true,
+    "has_prefetch_complete": false,
+    "has_retrieve": true,
+    "has_stale_lmcache_connector": true,
+    "has_store": true
+  },
+  "config": {
+    "connectors": [
+      "LMCacheConnector",
+      "LMCacheConnectorV1"
+    ],
+    "enable_async_loading": null,
+    "enable_p2p": null,
+    "enable_pd": null,
+    "pythonhashseed_seen": false,
+    "pythonhashseed_values": [],
+    "stale_lmcache_connector_seen": true
+  },
+  "event_counts": {
+    "health_startup": 7,
+    "nixl_proxy": 1,
+    "nixl_request": 0,
+    "p2p_peer": 0,
+    "p2p_transfer": 1,
+    "p2p_transfer_failure": 1,
+    "p2p_transfer_speed": 0,
+    "pd_receiver": 0,
+    "pd_role_mismatch": 0,
+    "pd_sender": 0,
+    "pd_stall": 1,
+    "prefetch_complete": 0,
+    "retrieve": 17,
+    "store": 3
+  },
+  "findings": [
+    {
+      "category": "p2p_transfer_failure",
+      "code": "lmcache_log_p2p_transfer_failure",
+      "event_count": 1,
+      "evidence_status": "parser_only",
+      "message": "LMCache logs contain P2P transfer failure, timeout, retry, or disconnect hints.",
+      "severity": "warning",
+      "snippets": [
+        "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+      ]
+    },
+    {
+      "category": "pd_stall",
+      "code": "lmcache_log_pd_stall",
+      "event_count": 1,
+      "evidence_status": "parser_only",
+      "message": "LMCache logs contain disaggregated prefill/decode stall or timeout hints.",
+      "severity": "warning",
+      "snippets": [
+        "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+      ]
+    },
+    {
+      "category": "nixl_proxy",
+      "code": "lmcache_log_nixl_proxy_indicator",
+      "event_count": 1,
+      "evidence_status": "parser_only",
+      "message": "LMCache logs contain NIXL proxy indicators.",
+      "severity": "info",
+      "snippets": [
+        "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+      ]
+    }
+  ],
+  "line_count": 272,
+  "mode_candidates": [
+    "disaggregated_prefill",
+    "embedded",
+    "p2p"
+  ],
+  "numeric_hints": {
+    "p2p_transfer_speed": []
+  },
+  "schema_version": "inferguard-lmcache-logs/v1",
+  "snippets": {
+    "health_startup": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,692] LMCache INFO:\u001b[0m Started PeriodicThread: PinMonitor-thread (level=critical, interval=30.0s, init_wait=0.0s) \u001b[3m(periodic_thread.py:239:lmcache.v...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,693] LMCache INFO:\u001b[0m PinMonitor started \u001b[3m(pin_monitor.py:212:lmcache.v1.pin_monitor)\u001b[0m",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:45,034] LMCache INFO:\u001b[0m lmcache lookup server started \u001b[3m(lmcache_lookup_client.py:259:lmcache.v1.lookup_client.lmcache_lookup_client)\u001b[0m",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:46,930] LMCache INFO:\u001b[0m No active health checks to monitor, skipping monitor thread \u001b[3m(base.py:520:lmcache.v1.health_monitor.base)\u001b[0m",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:46,930] LMCache INFO:\u001b[0m Health monitor initialized and started \u001b[3m(base_service_factory.py:126:lmcache.integration.base_service_factory)\u001b[0m",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[31;20m[2026-05-09 21:07:43,187] LMCache ERROR:\u001b[0m PrometheusLogger instance already created with different metadata. This should not happen except in test \u001b[3m(observability.py:..."
+    ],
+    "nixl_proxy": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+    ],
+    "nixl_request": [],
+    "p2p_peer": [],
+    "p2p_transfer": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+    ],
+    "p2p_transfer_failure": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+    ],
+    "p2p_transfer_speed": [],
+    "pd_receiver": [],
+    "pd_role_mismatch": [],
+    "pd_sender": [],
+    "pd_stall": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ..."
+    ],
+    "prefetch_complete": [],
+    "retrieve": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:54,454] LMCache INFO:\u001b[0m Reqid: cmpl-aad61286c6bf474d803e2f11fb2fac82-0, Total tokens 1992, Inference Engine computed tokens: 0, LMCache hit tokens: 0, n...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:55,859] LMCache INFO:\u001b[0m Reqid: cmpl-8a98db42929d47ba843e26d64b59e86b-0, Total tokens 1992, Inference Engine computed tokens: 1984, LMCache hit tokens: 1...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:57,218] LMCache INFO:\u001b[0m Reqid: cmpl-f1d93c994ec349728f3f877d566e9e5b-0, Total tokens 1992, Inference Engine computed tokens: 1984, LMCache hit tokens: 1...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:58,570] LMCache INFO:\u001b[0m Reqid: cmpl-9b0a339353b843749a325236b7975f52-0, Total tokens 1992, Inference Engine computed tokens: 1984, LMCache hit tokens: 1...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:59,921] LMCache INFO:\u001b[0m Reqid: cmpl-c68b0ac5fdb04335bc3c47f02a83c2ec-0, Total tokens 1992, Inference Engine computed tokens: 1984, LMCache hit tokens: 1..."
+    ],
+    "store": [
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:44,294] LMCache INFO:\u001b[0m Creating LMCacheEngine with config: {'chunk_size': 256, 'local_cpu': True, 'max_local_cpu_size': 8.0, 'reserve_local_cpu_size': ...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:06:45,038] LMCache INFO:\u001b[0m Initialize storage manager on rank 0, use layerwise: False,save only first rank: False \u001b[3m(cache_engine.py:295:lmcache.v1.cache...",
+      "\u001b[1;36m(EngineCore_DP0 pid=49)\u001b[0;0m \u001b[32;20m[2026-05-09 21:07:54,496] LMCache INFO:\u001b[0m [req_id=cmpl-aad61286c6bf474d803e2f11fb2fac82-0] Stored 1792 out of total 1792 tokens. size: 0.1914 GB, cost 12.8034 ms, through..."
+    ]
+  }
+}

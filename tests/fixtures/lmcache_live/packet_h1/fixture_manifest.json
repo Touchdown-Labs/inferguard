@@ -1,0 +1,21 @@
+{
+  "acceptance_status": "accepted",
+  "artifact_path": "/out/packet-h1-embedded-vllm/20260509T210602Z",
+  "local_artifact_path": "/Users/chen/Projects/inferguard/modal-out/pulls/20260509T210602Z",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-SfIwqyS0PgfNcMtHf1jvM6",
+  "notes": [
+    "Live Modal H100 H1 embedded vLLM run using LMCacheConnectorV1 via --kv-transfer-config.",
+    "PROMETHEUS_MULTIPROC_DIR was shared across vLLM API and engine processes so embedded lmcache:* metrics appeared in vLLM /metrics.",
+    "Fixture includes metrics, command/env proof, compat/coverage reports, diagnosis, and parsed log evidence only; raw engine logs and traffic prompts are excluded.",
+    "H1 fixture is accepted, but score points remain gated on H2/H3 per SDLC 195 advanced-lane rung."
+  ],
+  "packet_id": "h1",
+  "raw_hashes_removed": true,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "row_id": "H1",
+  "schema_version": "inferguard-lmcache-live-fixture/v1",
+  "score_points": 0,
+  "source": "live_modal_h100",
+  "timestamp_utc": "2026-05-09T21:06:02Z"
+}

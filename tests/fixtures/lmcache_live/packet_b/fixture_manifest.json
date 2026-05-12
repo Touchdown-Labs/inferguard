@@ -1,0 +1,21 @@
+{
+  "acceptance_status": "accepted",
+  "artifact_path": "/packet-b-lifecycle-reuse-eviction/20260508T173047Z",
+  "benchmark_id": "LC1",
+  "modal_run_url": "https://modal.com/apps/ocwc22/main/ap-fnSk3mvREgoyqPpx3QuogL",
+  "notes": [
+    "Live Modal H100 Packet B run using standalone lmcache server plus vLLM LMCacheMPConnector.",
+    "Required Packet B lifecycle families populated, including lmcache_mp_l0_block_* metrics.",
+    "Traffic rows are metadata-only; raw prompts and raw hashes are not included."
+  ],
+  "packet_id": "b",
+  "raw_hashes_removed": true,
+  "raw_prompts_recorded": false,
+  "raw_prompts_removed": true,
+  "redacted": true,
+  "row_id": "C1",
+  "score_points": 6,
+  "source": "live_modal_h100",
+  "timestamp_utc": "2026-05-08T17:30:47Z",
+  "workload_profile": "long_context_agent_kv_offload"
+}

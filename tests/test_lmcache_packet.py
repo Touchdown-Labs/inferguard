@@ -9,6 +9,9 @@ from typer.testing import CliRunner
 from inferguard.cli import app
 from inferguard.lmcache_packet import LmcachePacketOptions, collect_lmcache_packet
 
+FIXTURES = Path(__file__).parent / "fixtures"
+LMCACHE_FIXTURES = FIXTURES / "lmcache_metrics"
+
 
 def test_collect_lmcache_packet_writes_partial_first_artifacts(tmp_path: Path) -> None:
     lmcache_metrics = tmp_path / "lmcache.prom"
@@ -151,6 +154,58 @@ lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen3-8B",cache_salt="tenant
     assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
     assert report["surfaces"]["lmcache_trace_replay"]["status"] == "complete"
     assert report["surfaces"]["lmcache_lookup_hash"]["status"] == "complete"
+
+
+def test_collect_lmcache_packet_writes_sglang_lmcache_mp_coverage(tmp_path: Path) -> None:
+    output_dir = tmp_path / "packet"
+    engine_metrics = tmp_path / "sglang_engine.prom"
+    engine_metrics.write_text(
+        '\n'.join(
+            [
+                'sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1',
+                'sglang:prompt_tokens_total 8',
+                'sglang:generation_tokens_total 4',
+                'sglang:num_requests_total{state="running"} 1',
+                'sglang:cached_tokens_total{cache_source="device"} 2',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "collect-lmcache",
+            "--output-dir",
+            str(output_dir),
+            "--engine-metrics-file",
+            str(engine_metrics),
+            "--lmcache-metrics-file",
+            str(LMCACHE_FIXTURES / "sglang_lmcache_mp.prom"),
+            "--expected-engine",
+            "sglang",
+            "--expect-mode",
+            "mp",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["expected_engine"] == "sglang"
+    assert payload["detected_engines"] == ["sglang"]
+    assert payload["detected_mode"] == "mp"
+    assert "observability_coverage_report" in payload["artifacts"]
+    coverage = json.loads((output_dir / "observability_coverage_report.json").read_text(encoding="utf-8"))
+    assert coverage["expected_engine"] == "sglang"
+    assert coverage["expect_lmcache_mode"] == "mp"
+    sglang_mp = coverage["sglang_lmcache_mp_observability"]
+    assert sglang_mp["classification"] == "sglang_mp_lmcache_observability"
+    assert sglang_mp["claim_status"] == "fixture_tested"
+    assert sglang_mp["acceptance_state"] == "complete"
+    assert sglang_mp["acceptance_blockers"] == []
+    assert all(row["status"] == "populated" for row in sglang_mp["mp_family_breakdown"]["required"].values())
+    assert coverage["surfaces"]["lmcache_mp"]["status"] == "complete"
 
 
 def test_collect_lmcache_packet_records_failed_inputs(tmp_path: Path) -> None:

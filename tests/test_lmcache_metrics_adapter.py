@@ -421,6 +421,99 @@ lmcache_mp_event_bus_dropped_events_total 1
         assert any(item["code"] == "lmcache_mp_l2_failures" for item in report["diagnostic_findings"])
 
 
+def test_lmcache_pr3255_l0_allocation_counters_are_first_class() -> None:
+    report = build_compat_report(
+        lmcache_text="""
+# HELP lmcache_mp_l0_block_allocation_records Total vLLM block allocation records processed by the L0 lifecycle subscriber.
+# TYPE lmcache_mp_l0_block_allocation_records counter
+lmcache_mp_l0_block_allocation_records{model_name="Qwen/Qwen3-8B"} 3
+# HELP lmcache_mp_l0_block_allocated_blocks Total vLLM GPU KV cache blocks processed by the L0 lifecycle subscriber.
+# TYPE lmcache_mp_l0_block_allocated_blocks counter
+lmcache_mp_l0_block_allocated_blocks{model_name="Qwen/Qwen3-8B"} 128
+""",
+        expect_mode="mp",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    allocation = families[("lmcache_mp", "l0_allocation_counters")]
+    assert allocation["status"] == "populated"
+    assert allocation["matched_metrics"] == [
+        "lmcache_mp_l0_block_allocated_blocks",
+        "lmcache_mp_l0_block_allocation_records",
+    ]
+    assert report["detected_mode"] == "mp"
+
+
+def test_lmcache_pr3255_boundary_evidence_accepts_redacted_jsonl_schema() -> None:
+    evidence = {
+        "present": True,
+        "claim_status": "measured",
+        "schema_version": "inferguard-l0-block-boundary-event/v1",
+        "row_count": 3,
+        "accepted_count": 3,
+        "rejected_count": 0,
+        "stage_counts": {
+            "vllm_adapter_before_queue_submit": 1,
+            "lmcache_server_receive": 1,
+            "l0_lifecycle_subscriber_process": 1,
+        },
+        "raw_tokens_recorded": False,
+        "raw_block_ids_recorded": False,
+    }
+    report = build_compat_report(lmcache_l0_boundary_evidence=evidence, expect_mode="mp")
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_l0_boundary", "redacted_jsonl")]["status"] == "populated"
+    assert report["lmcache_l0_boundary_evidence"]["claim_status"] == "measured"
+    assert report["detected_mode"] == "mp"
+    assert report["failure_reasons"] == []
+
+
+def test_lmcache_pr3255_boundary_evidence_flags_forbidden_raw_fields() -> None:
+    evidence = {
+        "present": True,
+        "claim_status": "blocked",
+        "schema_version": "inferguard-l0-block-boundary-event/v1",
+        "row_count": 1,
+        "accepted_count": 0,
+        "rejected_count": 1,
+        "raw_tokens_recorded": True,
+        "raw_block_ids_recorded": True,
+        "failure_reasons": [
+            {"code": "lmcache_l0_boundary_forbidden_raw_fields", "message": "raw token or block identifiers were present"}
+        ],
+    }
+    report = build_compat_report(lmcache_l0_boundary_evidence=evidence, expect_mode="mp")
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_l0_boundary", "redacted_jsonl")]["status"] == "zero"
+    assert any(item["code"] == "lmcache_l0_boundary_forbidden_raw_fields" for item in report["failure_reasons"])
+
+
+def test_lmcache_otel_push_mode_uses_live_evidence_when_prometheus_mp_metrics_are_unavailable() -> None:
+    report = build_compat_report(
+        engine_text="vllm:request_success_total{finished_reason=\"stop\"} 1\n",
+        lmcache_text="",
+        expect_mode="mp",
+        mp_observability={"tracing_enabled": True},
+        lmcache_http_evidence={
+            "booleans": {"is_healthy": True},
+            "endpoints": {"status": {"fields": {"engine_type": "MPCacheEngine"}}},
+        },
+        lmcache_log_evidence={"mode_candidates": ["mp"]},
+        lmcache_otel_evidence={"claim_status": "measured", "mp_span_count": 3},
+    )
+
+    assert report["detected_mode"] == "mp"
+    assert report["observed"]["lmcache_mp"] is False
+    assert report["observed"]["lmcache_mp_evidence"] is True
+    assert report["observed"]["lmcache_mp_metrics_prometheus_unavailable"] is True
+    assert report["failure_reasons"] == []
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("lmcache_mp", "storage_manager")]["status"] == "not_applicable"
+    assert report["surfaces"]["lmcache_otel"]["status"] == "complete"
+
+
 def test_lmcache_unknown_metrics_are_preserved() -> None:
     snap = _parse_lmcache((FIXTURES / "variant_unknown.prom").read_text(encoding="utf-8"), url="http://lmcache", role="prefill")
 
@@ -631,7 +724,7 @@ lmcache_blend_fingerprints_registered_total{model_name="a"} 4
 lmcache_blend_fingerprints_registered_total{model_name="b"} 6
 lmcache_blend_chunks_evicted_total{model_name="a"} 2
 """,
-        expect_mode="mp",
+        expect_mode="auto",
     )
 
     summary = report["lmcache_cacheblend_summary"]
@@ -642,6 +735,52 @@ lmcache_blend_chunks_evicted_total{model_name="a"} 2
     assert summary["failures"] == 6
     assert summary["fingerprints_registered"] == 10
     assert any(item["code"] == "lmcache_cacheblend_failures" for item in report["diagnostic_findings"])
+
+
+def test_lmcache_cacheblend_vllm_artifact_shape_is_not_mp_mode() -> None:
+    report = build_compat_report(
+        engine_text='vllm:request_success_total{finished_reason="stop"} 8\n',
+        lmcache_text="""
+lmcache:num_lookup_requests_total 8
+lmcache:num_retrieve_requests_total 8
+lmcache:num_requested_tokens_total 14112
+lmcache:num_hit_tokens_total 14112
+lmcache_blend_lookup_requests_total 8
+lmcache_blend_lookup_requested_tokens_total 14112
+lmcache_blend_lookup_hit_tokens_total 14112
+lmcache_blend_retrieve_requests_total 8
+lmcache_blend_retrieve_chunks_total 48
+""",
+        expect_mode="auto",
+        lmcache_otel_evidence={"claim_status": "measured", "cacheblend_span_count": 24, "span_counts": {"cb.lookup": 8, "cb.retrieve": 8}},
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert report["detected_mode"] == "embedded_cacheblend"
+    assert report["detected_architecture"]["label"] == "vllm_embedded_cacheblend"
+    assert report["failure_reasons"] == []
+    assert report["observed"]["lmcache_cacheblend"] is True
+    assert families[("lmcache_cacheblend", "lookup")]["status"] == "populated"
+    assert families[("lmcache_cacheblend", "retrieve")]["status"] == "populated"
+    assert families[("lmcache_mp", "storage_manager")]["status"] == "not_applicable"
+    assert families[("lmcache_mp", "lookup_tokens")]["status"] == "not_applicable"
+    assert families[("lmcache_mp", "l1_counters")]["status"] == "not_applicable"
+    assert families[("lmcache_mp", "l1_memory")]["status"] == "not_applicable"
+
+
+def test_lmcache_cacheblend_requires_metrics_when_cb_spans_are_present() -> None:
+    report = build_compat_report(
+        engine_text='vllm:request_success_total{finished_reason="stop"} 8\n',
+        lmcache_text="lmcache:num_lookup_requests_total 8\n",
+        expect_mode="auto",
+        lmcache_otel_evidence={"claim_status": "measured", "cacheblend_span_count": 24, "span_counts": {"cb.lookup": 8, "cb.retrieve": 8}},
+    )
+
+    assert report["detected_mode"] == "embedded_cacheblend"
+    assert any(
+        item.get("code") == "lmcache_cacheblend_family_missing" and item.get("family") == "lookup"
+        for item in report["failure_reasons"]
+    )
 
 
 def test_operator_brief_renders_lmcache_sections(tmp_path: Path) -> None:

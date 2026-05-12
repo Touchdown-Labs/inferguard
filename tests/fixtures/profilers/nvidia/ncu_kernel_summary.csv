@@ -1,0 +1,4 @@
+Kernel Name,Metric Name,Metric Value,Unit
+void paged_attention_kernel,sm__warps_active.avg.pct_of_peak_sustained_active,62.5,%
+void paged_attention_kernel,dram__throughput.avg.pct_of_peak_sustained_elapsed,71.0,%
+void paged_attention_kernel,smsp__inst_executed_pipe_tensor.sum,123456,inst

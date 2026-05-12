@@ -1,0 +1,52 @@
+{
+  "claim_status": "measured",
+  "duration_s": 172.47317814826965,
+  "failed_rows": 0,
+  "file_size_bytes": 24227,
+  "latency_ms": {
+    "lmcache.v1.distributed.storage_manager.StorageManager.finish_read_prefetched": {
+      "avg": 0.1362893442598701,
+      "count": 57.0,
+      "max": 0.20260700000562792,
+      "min": 0.095517
+    },
+    "lmcache.v1.distributed.storage_manager.StorageManager.finish_write": {
+      "avg": 0.1343035272631999,
+      "count": 22.0,
+      "max": 0.180938,
+      "min": 0.09678999998641302
+    },
+    "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write": {
+      "avg": 0.29535033054232107,
+      "count": 61.0,
+      "max": 0.565884,
+      "min": 0.08155099999385129
+    },
+    "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task": {
+      "avg": 0.14877385728984904,
+      "count": 60.0,
+      "max": 0.171403,
+      "min": 0.10614299998223942
+    }
+  },
+  "op_counts": {
+    "lmcache.v1.distributed.storage_manager.StorageManager.finish_read_prefetched": 180,
+    "lmcache.v1.distributed.storage_manager.StorageManager.finish_write": 40,
+    "lmcache.v1.distributed.storage_manager.StorageManager.reserve_write": 196,
+    "lmcache.v1.distributed.storage_manager.StorageManager.submit_prefetch_task": 192
+  },
+  "op_errors": {},
+  "parse_errors": [],
+  "present": true,
+  "replay_info": {
+    "duration_s": "172.472s",
+    "format_version": 1,
+    "level": "storage",
+    "sm_config_digest": "ad94701427c47af933c4dea664419984752b96438d013bb4fd4939abbf67d5b0",
+    "total_records": 152,
+    "trace_schema_version": 1
+  },
+  "rows_seen": 156,
+  "schema_version": "inferguard-lmcache-trace-replay-evidence/v1",
+  "source_kind": "directory"
+}

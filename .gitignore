@@ -27,6 +27,12 @@ env/
 htmlcov/
 .tox/
 
+# Local benchmark/runtime artifacts
+modal-out/
+
+# Local agent memory/context, not public OSS documentation
+AGENTS.md
+
 # IDE
 .idea/
 .vscode/

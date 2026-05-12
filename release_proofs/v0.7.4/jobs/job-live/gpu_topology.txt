@@ -1,0 +1,1 @@
+GPU0 GPU1 NV18

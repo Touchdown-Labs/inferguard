@@ -1,0 +1,1 @@
+{"publisher":"zmq","topic":"kv-events","events":[{"event_type":"BlockStored","block_hashes":["hash-a","hash-b"],"parent_block_hash":"parent-hash","token_ids":[101,102,103],"block_size":16,"lora_id":0},{"event_type":"BlockRemoved","block_hashes":["hash-c"],"token_ids":[201,202],"block_size":16,"lora_id":0}]}

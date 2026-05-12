@@ -123,6 +123,9 @@ def check_external_links(urls: set[str]) -> list[str]:
         status = fetch_status(url, method="HEAD")
         if status in {403, 405} or status >= 500:
             status = fetch_status(url, method="GET")
+        if status == 429:
+            print(f"external skipped rate-limited {status} {url}", file=sys.stderr)
+            continue
         if status >= 400:
             failures.append(f"external {status} {url}")
     return failures

@@ -7,13 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `sglang_lmcache_version_provenance` to observability coverage reports so SGLang + LMCache embedded and MP claims carry source/version evidence: LMCache adapter/config lineage (`f3bba133`, 2025-06-23), SGLang `--enable-lmcache` launch lineage (`9a7ced4`, 2025-09-06), merged LMCache config validation fix PR #3002, and open/unmerged MP PRs SGLang #24089 / LMCache #3166.
+- Added `sglang_lmcache_embedded_support` to observability coverage reports so existing documented SGLang + LMCache embedded support is separated from SGLang + LMCache MP observability. The report records `--enable-lmcache`, `LMCACHE_CONFIG_FILE`/environment configuration, and explicit non-claims that InferGuard only captures/classifies evidence and does not enable the runtime cache path.
+- Added source-backed, fixture-tested SGLang backend-expansion support for native metrics, documented embedded LMCache launch flags, and redacted KV-event evidence parsing. SGLang embedded LMCache and KV events remain pending live validation.
+- Added source-backed, fixture-tested SGLang + LMCache MP observability classification and launch-command plumbing for the open PR-backed `--enable-lmcache`, `--lmcache-mp-host`, and `--lmcache-mp-port` path. SGLang LMCache MP remains pending live validation, not merged upstream, not performance validated, and not production support.
+
+## [0.7.4] - 2026-05-11
+
+### Added
+
+- Added downstream reporting support for LMCache PR #3255 L0 allocation counters, including allocation record and allocated-block totals.
+- Added ingestion and reporting for redacted L0 boundary JSONL evidence without recording raw tokens or raw block IDs.
+
 ### Docs
 
-- Aligned LMCache coverage docs and CLI references to SDLC 195 as the active
-  58/100 score source, pointed operators at the full repo Modal packet runner in
-  `/Users/chen/Projects/inferguard`, normalized score-moving snippets to the
-  current CLI flags, and clarified that local-source Modal packaging addressed
-  the previous pinned-package blocker while B1 still needs live proof.
+- Recorded Modal H100 downstream proof for vLLM + LMCache PR3255 source plus updated InferGuard CLI.
+- Documented release scope boundaries: no vLLM source changes, no performance-improvement claim, and full LMCache coverage remains evidence-gated rather than claimed complete.
+- Closed I1 release-readiness documentation for original vLLM + LMCache +
+  InferGuard CLI coverage: refreshed CLI references for accepted MP Packet A-F,
+  G1 diagnostics, H1 embedded vLLM, and H3 embedded CacheBlend/vLLM; added
+  rollback guidance for private vLLM/LMCache overlays and accepted fixture
+  rollback; and kept H2/SGLang, Mooncake, P2P/PD, and DLM/llm-d paused as
+  backend-expansion lanes outside the active release finish line.
 
 ## [0.7.3] - 2026-05-08
 

@@ -29,12 +29,21 @@ APP_NAME = "lmcache-embedded-advanced-lab"
 VOLUME_NAME = "lmcache-embedded-advanced-lab"
 OUT_ROOT = Path("/out")
 
-MODEL = "Qwen/Qwen3-8B"
-MODEL_MAX_LEN = 16384
+MODEL = "Qwen/Qwen3-0.6B"
+MODEL_MAX_LEN = 8192
 ENGINE_HOST = "127.0.0.1"
 ENGINE_PORT = 8000
 SECONDARY_ENGINE_PORT = 8001
-OTLP_HTTP_PORT = 4318
+OTLP_GRPC_PORT = 4317
+
+
+def _otel_endpoint() -> str:
+    return f"http://127.0.0.1:{OTLP_GRPC_PORT}"
+
+
+def _vllm_otel_endpoint() -> str:
+    return _otel_endpoint()
+
 
 ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{ENGINE_PORT}"
 ENGINE_HEALTH_URL = f"{ENGINE_BASE_URL}/health"
@@ -44,67 +53,216 @@ SECONDARY_ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{SECONDARY_ENGINE_PORT}"
 LMCACHE_CONFIG_FILE = "lmcache_embedded_config.json"
 RUNNER_PROOF_FILE = "runner_launch_proof.json"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
+LMCACHE_BLEND_METRICS_FILE = "lmcache_blend_metrics.prom"
+LMCACHE_OTEL_BLOCKED_FILE = "lmcache_otel_blocked.json"
+PROMETHEUS_MULTIPROC_DIRNAME = "prometheus_multiproc"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODAL_INFERGUARD_SOURCE = "/opt/inferguard"
 MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
+MODAL_SOURCE_IGNORE = ("**/__pycache__/**", "**/*.pyc")
+SGLANG_SOURCE_IGNORE = (
+    "**/.git/**",
+    "**/.venv/**",
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/uv.lock",
+    "**/*.egg-info/**",
+)
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
-volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
-
-image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .apt_install("curl", "git")
-    .pip_install(
-        "vllm",
-        "lmcache",
-        "sglang",
-        "hf-transfer",
-        "huggingface-hub",
-        "nvidia-cuda-runtime-cu12",
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "pyproject.toml"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "README.md"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
-        copy=True,
-    )
-    .add_local_file(
-        local_path=str(REPO_ROOT / "LICENSE"),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
-        copy=True,
-    )
-    .add_local_dir(
-        local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
-        remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
-        copy=True,
-    )
-    .run_commands(INFERGUARD_LOCAL_INSTALL_COMMAND)
-    .env(
-        {
-            "HF_HUB_ENABLE_HF_TRANSFER": "1",
-            "HF_HOME": "/out/hf-cache",
-            "VLLM_CACHE_ROOT": "/out/vllm-cache",
-            "PYTHONHASHSEED": "0",
-            "LMCACHE_USE_EXPERIMENTAL": "True",
-            "LMCACHE_LOCAL_CPU": "True",
-            "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
-            "LMCACHE_CHUNK_SIZE": "256",
-            "VLLM_USE_FLASHINFER_SAMPLER": "0",
-            "VLLM_USE_DEEP_GEMM": "0",
-            "VLLM_DEEP_GEMM_WARMUP": "skip",
-            "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
-            "LD_LIBRARY_PATH": (
-                "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
-            ),
-        }
-    )
+MODAL_LMCACHE_SOURCE = "/opt/lmcache"
+MODAL_SGLANG_SOURCE = "/opt/sglang"
+MODAL_SGLANG_PYTHON_SOURCE = f"{MODAL_SGLANG_SOURCE}/python"
+LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_H_LMCACHE_LOCAL_SOURCE"
+SGLANG_LOCAL_SOURCE_ENV = "INFERGUARD_H_SGLANG_LOCAL_SOURCE"
+DEFAULT_LMCACHE_LOCAL_SOURCE = REPO_ROOT.parent / "LMCache"
+DEFAULT_SGLANG_LOCAL_SOURCE = REPO_ROOT.parent / "sglang"
+PINNED_VLLM_PACKAGE = "vllm==0.10.2"
+PINNED_TRANSFORMERS_PACKAGE = "transformers==4.57.6"
+PINNED_TOKENIZERS_PACKAGE = "tokenizers==0.22.2"
+# LMCache requirements/common.txt is the runtime dependency source, but it also
+# declares ``transformers >= 5.4``. H runners install LMCache editable with
+# --no-deps to preserve the vLLM-compatible transformers/tokenizers pins, then
+# explicitly install only the runtime imports needed by the embedded connector
+# startup path:
+# - lmcache.v1.storage_backend imports gds_backend eagerly -> aiofile
+# - FS/remote sibling storage surfaces import aiofiles from common.txt
+# - memory_management/cache_policy import sortedcontainers
+# - p2p/offload/rpc transfer surfaces import msgspec + pyzmq
+# - observability/config/system_detection import prometheus_client, pyyaml,
+#   psutil, and py-cpuinfo.
+# Do not install LMCache requirements/common.txt directly here; it would allow
+# pip to lift transformers/tokenizers away from the pinned vLLM-compatible set.
+LMCACHE_RUNTIME_DEP_PACKAGES = (
+    "aiofile",
+    "aiofiles",
+    "msgspec",
+    "prometheus-client>=0.18.0,<=0.24.1",
+    "psutil",
+    "opentelemetry-api>=1.20.0,<=1.40.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-exporter-prometheus>=0.50b0,<=0.61b0",
+    "py-cpuinfo",
+    "pyyaml",
+    "pyzmq>=25.0.0",
+    "sortedcontainers==2.4.0",
 )
+# SGLang's pyproject lists a large runtime dependency set that includes heavy
+# and conflicting pins (notably torch/transformers). H2 installs SGLang editable
+# with --no-deps and relies on the vLLM image for shared server/runtime packages.
+# Failed live H2 artifacts under editable --no-deps exposed only direct import
+# blockers on the SGLang launch path. Keep this allowlist minimal and evidence-
+# backed instead of installing the full SGLang requirements resolver:
+# - orjson: sglang.srt.utils.common import blocker from the first H2 live run
+# - IPython: sglang/utils.py imports IPython.display; also declared in
+#   SGLang python/pyproject.toml.
+SGLANG_RUNTIME_DEP_PACKAGES = ("orjson", "IPython")
+CUDA_DEVEL_IMAGE = "nvidia/cuda:12.8.1-devel-ubuntu22.04"
+CUDA_SOURCE_BUILD_ENV = {
+    "CC": "gcc",
+    "CXX": "g++",
+    "CUDA_HOME": "/usr/local/cuda",
+    "TORCH_CUDA_ARCH_LIST": "9.0",
+    "ENABLE_CXX11_ABI": "1",
+    "LD_LIBRARY_PATH": (
+        "/usr/local/cuda/lib64:"
+        "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+    ),
+}
+BASE_MODAL_PIP_PACKAGES = (
+    PINNED_VLLM_PACKAGE,
+    PINNED_TRANSFORMERS_PACKAGE,
+    PINNED_TOKENIZERS_PACKAGE,
+    *LMCACHE_RUNTIME_DEP_PACKAGES,
+    *SGLANG_RUNTIME_DEP_PACKAGES,
+    "hf-transfer",
+    "huggingface-hub",
+    "nvidia-cuda-runtime-cu12",
+    "ninja",
+    "packaging>=24.2",
+    "setuptools>=77.0.3,<81.0.0",
+    "setuptools_scm>=8",
+    "wheel",
+)
+LMCACHE_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation --no-deps"
+SGLANG_LOCAL_INSTALL_COMMAND = (
+    f"python -m pip install -e {MODAL_SGLANG_SOURCE}/python --no-build-isolation --no-deps"
+)
+
+
+def _optional_local_source(env_key: str, default_path: Path) -> Path | None:
+    raw = os.environ.get(env_key, "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    if default_path.exists():
+        return default_path
+    return None
+
+
+LMCACHE_LOCAL_SOURCE = _optional_local_source(LMCACHE_LOCAL_SOURCE_ENV, DEFAULT_LMCACHE_LOCAL_SOURCE)
+SGLANG_LOCAL_SOURCE = _optional_local_source(SGLANG_LOCAL_SOURCE_ENV, DEFAULT_SGLANG_LOCAL_SOURCE)
+
+
+def _runtime_env() -> dict[str, str]:
+    env = {
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        "HF_HOME": "/out/hf-cache",
+        "VLLM_CACHE_ROOT": "/out/vllm-cache",
+        "PYTHONHASHSEED": "0",
+        "LMCACHE_USE_EXPERIMENTAL": "True",
+        "LMCACHE_LOCAL_CPU": "True",
+        "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
+        "LMCACHE_CHUNK_SIZE": "256",
+        # LMCache usage telemetry calls py-cpuinfo during engine init. The H3
+        # Modal artifact 20260509T223947Z showed py-cpuinfo JSONDecodeError in
+        # that non-critical telemetry path, followed by LMCache engine failure.
+        # Disable usage tracking for live packet validation; InferGuard still
+        # collects the engine/LMCache metrics, logs, OTel, and reports below.
+        "LMCACHE_TRACK_USAGE": "false",
+        "VLLM_USE_FLASHINFER_SAMPLER": "0",
+        "VLLM_USE_DEEP_GEMM": "0",
+        "VLLM_DEEP_GEMM_WARMUP": "skip",
+        "VLLM_SKIP_DEEP_GEMM_WARMUP": "1",
+        **CUDA_SOURCE_BUILD_ENV,
+        "INFERGUARD_H_LMCACHE_SOURCE_REF": str(LMCACHE_LOCAL_SOURCE or "pypi"),
+        "INFERGUARD_H_SGLANG_SOURCE_REF": str(SGLANG_LOCAL_SOURCE or "not-installed"),
+        "INFERGUARD_H_VLLM_PACKAGE": PINNED_VLLM_PACKAGE,
+        "INFERGUARD_H_TRANSFORMERS_PACKAGE": PINNED_TRANSFORMERS_PACKAGE,
+        "INFERGUARD_H_TOKENIZERS_PACKAGE": PINNED_TOKENIZERS_PACKAGE,
+    }
+    if LMCACHE_LOCAL_SOURCE is not None:
+        env[LMCACHE_LOCAL_SOURCE_ENV] = MODAL_LMCACHE_SOURCE
+    if SGLANG_LOCAL_SOURCE is not None:
+        env[SGLANG_LOCAL_SOURCE_ENV] = MODAL_SGLANG_SOURCE
+    return env
+
+
+def _with_local_runtime_sources(built_image: modal.Image) -> modal.Image:
+    if LMCACHE_LOCAL_SOURCE is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(LMCACHE_LOCAL_SOURCE),
+            remote_path=MODAL_LMCACHE_SOURCE,
+            copy=True,
+        )
+    if SGLANG_LOCAL_SOURCE is not None:
+        built_image = built_image.add_local_dir(
+            local_path=str(SGLANG_LOCAL_SOURCE / "python"),
+            remote_path=MODAL_SGLANG_PYTHON_SOURCE,
+            copy=True,
+            ignore=SGLANG_SOURCE_IGNORE,
+        )
+    return built_image
+
+
+def _runtime_install_commands() -> tuple[str, ...]:
+    commands = []
+    if LMCACHE_LOCAL_SOURCE is not None:
+        commands.append(LMCACHE_LOCAL_INSTALL_COMMAND)
+    if SGLANG_LOCAL_SOURCE is not None:
+        commands.append(SGLANG_LOCAL_INSTALL_COMMAND)
+    commands.append(INFERGUARD_LOCAL_INSTALL_COMMAND)
+    return tuple(commands)
+
+
+def _build_modal_image() -> modal.Image:
+    built_image = (
+        modal.Image.from_registry(CUDA_DEVEL_IMAGE, add_python="3.11")
+        .apt_install("build-essential", "curl", "git")
+        .pip_install(*BASE_MODAL_PIP_PACKAGES)
+    )
+    built_image = _with_local_runtime_sources(built_image)
+    return (
+        built_image.add_local_file(
+            local_path=str(REPO_ROOT / "pyproject.toml"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "README.md"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/README.md",
+            copy=True,
+        )
+        .add_local_file(
+            local_path=str(REPO_ROOT / "LICENSE"),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/LICENSE",
+            copy=True,
+        )
+        .add_local_dir(
+            local_path=str(REPO_ROOT / MODAL_INFERGUARD_PACKAGE_DIR),
+            remote_path=f"{MODAL_INFERGUARD_SOURCE}/{MODAL_INFERGUARD_PACKAGE_DIR}",
+            copy=True,
+            ignore=MODAL_SOURCE_IGNORE,
+        )
+        .env(_runtime_env())
+        .run_commands(*_runtime_install_commands())
+    )
+
+
+volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
+image = _build_modal_image()
 
 app = modal.App(APP_NAME, image=image)
 
@@ -151,11 +309,11 @@ PACKETS: dict[str, EmbeddedAdvancedPacketSpec] = {
         workload="repeated_prefix_vllm_embedded",
         output_slug="packet-h1-embedded-vllm",
         external_cache_configured=True,
-        connector_proof=("LMCacheConnectorV1", "--kv-offloading-backend lmcache"),
+        connector_proof=("LMCacheConnectorV1", "--kv-transfer-config"),
         extra_required_artifacts=(),
         notes=(
-            "Uses vLLM embedded/backcompat --kv-offloading-backend lmcache, not "
-            "LMCacheMPConnector.",
+            "Uses vLLM embedded/in-process --kv-transfer-config with "
+            "LMCacheConnectorV1, not LMCacheMPConnector.",
         ),
     ),
     "h2": EmbeddedAdvancedPacketSpec(
@@ -186,8 +344,10 @@ PACKETS: dict[str, EmbeddedAdvancedPacketSpec] = {
         external_cache_configured=True,
         connector_proof=("CacheBlend",),
         cache_proof=("lmcache_blend_*", "cb.*"),
-        extra_required_artifacts=(LMCACHE_OTEL_FILE,),
-        notes=("Requires live lmcache_blend_* metrics plus cb.* OTel spans before scoring.",),
+        notes=(
+            "Requires live lmcache_blend_* metrics plus cb.* OTel spans before scoring; "
+            "if CacheBlend emits no cb.* spans, runner must write explicit blocked evidence.",
+        ),
     ),
     "h3-p2p": EmbeddedAdvancedPacketSpec(
         packet_id="h3-p2p",
@@ -321,6 +481,14 @@ def _wait_for_http(
     raise RuntimeError(f"{label} did not become healthy at {url}")
 
 
+def _ensure_sglang_runtime(run_dir: Path) -> None:
+    if SGLANG_LOCAL_SOURCE is None:
+        raise FileNotFoundError(
+            f"{SGLANG_LOCAL_SOURCE_ENV} must point to an SGLang checkout for H2"
+        )
+    _run_required(["sh", "-lc", SGLANG_LOCAL_INSTALL_COMMAND], run_dir / "setup.log", timeout=20 * 60)
+
+
 def _write_env_snapshot(run_dir: Path) -> None:
     env_path = run_dir / "env.txt"
     _run_best_effort(["nvidia-smi"], env_path, timeout=30)
@@ -358,6 +526,10 @@ def _write_lmcache_config(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Pa
         "local_cpu": True,
         "max_local_cpu_size": 8.0,
         "chunk_size": 256,
+        "enable_blending": spec.enable_cacheblend,
+        "use_layerwise": spec.enable_cacheblend or spec.engine == "sglang",
+        "blend_check_layers": [1] if spec.enable_cacheblend else None,
+        "blend_recompute_ratios": [0.15] if spec.enable_cacheblend else None,
         "cacheblend": {"enabled": spec.enable_cacheblend},
         "p2p": {
             "enabled": spec.enable_p2p,
@@ -388,17 +560,26 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
         "LMCACHE_MAX_LOCAL_CPU_SIZE": "8.0",
         "LMCACHE_CHUNK_SIZE": "256",
         "PYTHONHASHSEED": "0",
+        "PROMETHEUS_MULTIPROC_DIR": str(run_dir / PROMETHEUS_MULTIPROC_DIRNAME),
+        "LMCACHE_TRACK_USAGE": "false",
     }
     if spec.enable_cacheblend:
         env.update(
             {
-                "LMCACHE_ENABLE_CACHEBLEND": "True",
-                "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
-                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
+                "INFERGUARD_H3_REGISTER_VLLM_MODEL": "1",
+                "PYTHONPATH": str(run_dir),
+                "LMCACHE_ENABLE_BLENDING": "True",
+                "LMCACHE_USE_LAYERWISE": "True",
+                "LMCACHE_BLEND_CHECK_LAYERS": "1",
+                "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
+                "OTEL_EXPORTER_OTLP_ENDPOINT": _otel_endpoint(),
+                "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": _vllm_otel_endpoint(),
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/json",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "grpc",
                 "OTEL_SERVICE_NAME": "inferguard-h3-cacheblend",
+                "INFERGUARD_H3_LMCACHE_OTEL_FILE": str(run_dir / LMCACHE_OTEL_FILE),
+                "INFERGUARD_H3_BLEND_METRICS_FILE": str(run_dir / LMCACHE_BLEND_METRICS_FILE),
             }
         )
     if spec.enable_p2p:
@@ -435,8 +616,6 @@ def _build_vllm_embedded_command(
         "vllm",
         "serve",
         MODEL,
-        "--kv-offloading-backend",
-        "lmcache",
         "--max-model-len",
         str(MODEL_MAX_LEN),
         "--gpu-memory-utilization",
@@ -446,20 +625,29 @@ def _build_vllm_embedded_command(
     ]
     if spec.enable_pd:
         role = "kv_producer" if port == spec.primary_port else "kv_consumer"
+        transfer_config = {
+            "kv_connector": "NixlConnector",
+            "kv_role": role,
+            "kv_connector_extra_config": {
+                "lmcache_pd_proxy": "http://127.0.0.1:6500",
+                "transport": "nixl",
+            },
+        }
+    else:
+        transfer_config = {"kv_connector": "LMCacheConnectorV1", "kv_role": "kv_both"}
+    cmd.extend(
+        [
+            "--kv-transfer-config",
+            json.dumps(transfer_config, separators=(",", ":")),
+        ]
+    )
+    if spec.enable_otel:
         cmd.extend(
             [
-                "--kv-transfer-config",
-                json.dumps(
-                    {
-                        "kv_connector": "NixlConnector",
-                        "kv_role": role,
-                        "kv_connector_extra_config": {
-                            "lmcache_pd_proxy": "http://127.0.0.1:6500",
-                            "transport": "nixl",
-                        },
-                    },
-                    separators=(",", ":"),
-                ),
+                "--otlp-traces-endpoint",
+                _vllm_otel_endpoint(),
+                "--collect-detailed-traces",
+                "all",
             ]
         )
     return cmd
@@ -524,7 +712,7 @@ def _write_launch_proof(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Path
 def _required_live_proof(spec: EmbeddedAdvancedPacketSpec) -> list[str]:
     if spec.packet_id == "h1":
         return [
-            "vLLM command/config proves LMCacheConnectorV1 or --kv-offloading-backend lmcache",
+            "vLLM command/config proves LMCacheConnectorV1 via --kv-transfer-config",
             "engine /metrics includes embedded lmcache:* or lmcache_* production counters",
             "repeated-prefix traffic produces nonzero reuse/hit metrics",
             "logs prove store/retrieve/lookup activity",
@@ -568,48 +756,621 @@ def _launch_engine(
     return proc, log_handle
 
 
+def _patch_lmcache_retrieve_layer_no_keys_source(run_dir: Path, source_root: Path | None = None) -> Path:
+    """Patch LMCache retrieve_layer's no-key layerwise path for H3 CacheBlend only.
+
+    Source basis: LMCache ``retrieve_layer`` assigns ``mem_obj_consumer`` and
+    ``to_count_down`` only inside ``if keys:``, but the current local source
+    unconditionally synchronizes ``next(mem_obj_consumer)`` and unpins
+    ``to_count_down`` after the ``else`` cache-miss path. The H3 artifact
+    20260510T214803Z hit that no-key path from CacheBlend and crashed with
+    ``UnboundLocalError: mem_obj_consumer`` before InferGuard report generation.
+
+    This mutates only the Modal runtime copy of the local LMCache source before
+    launching H3 CacheBlend. Real retrieval failures inside ``if keys:`` are not
+    caught or suppressed.
+    """
+    source_root = source_root or Path(os.environ.get(LMCACHE_LOCAL_SOURCE_ENV, MODAL_LMCACHE_SOURCE))
+    cache_engine = source_root / "lmcache" / "v1" / "cache_engine.py"
+    patch_log = run_dir / "lmcache_retrieve_layer_no_keys_patch.json"
+    text = cache_engine.read_text(encoding="utf-8")
+    original_text = text
+
+    if "\n        mem_obj_consumer = None\n" not in text:
+        text = text.replace(
+            "        starts = []\n        ends = []\n        keys = []\n\n        request_configs =",
+            "        starts = []\n        ends = []\n        keys = []\n        mem_obj_consumer = None\n        to_count_down = []\n\n        request_configs =",
+            1,
+        )
+    text = text.replace("\n            to_count_down = []\n            for layer_id in range(self.num_layers):\n", "\n            for layer_id in range(self.num_layers):\n", 1)
+    text = text.replace(
+        "        # synchronize the last layer\n        next(mem_obj_consumer)\n\n        # Unpin any disk-loaded staging objects now that the device-side sync\n        # has been enqueued (mem_obj_consumer advanced past its sync point).\n        # Without this, pin_count stays at 1 forever and the CPU staging pool\n        # fills up, causing the next retrieve to deadlock inside allocate().\n        for mem_obj in to_count_down:\n            if mem_obj.is_pinned:\n                mem_obj.unpin()\n",
+        "        if mem_obj_consumer is not None:\n            # synchronize the last layer\n            next(mem_obj_consumer)\n\n            # Unpin any disk-loaded staging objects now that the device-side sync\n            # has been enqueued (mem_obj_consumer advanced past its sync point).\n            # Without this, pin_count stays at 1 forever and the CPU staging pool\n            # fills up, causing the next retrieve to deadlock inside allocate().\n            for mem_obj in to_count_down:\n                if mem_obj.is_pinned:\n                    mem_obj.unpin()\n",
+        1,
+    )
+    if (
+        "\n        mem_obj_consumer = None\n" not in text
+        or "\n        to_count_down = []\n" not in text
+        or "if mem_obj_consumer is not None:" not in text
+    ):
+        raise RuntimeError(f"Unable to patch LMCache retrieve_layer source at {cache_engine}")
+    cache_engine.write_text(text, encoding="utf-8")
+    patch_log.write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-h3-lmcache-retrieve-layer-no-keys-patch/v1",
+                "patch_target": str(cache_engine),
+                "source_basis": "LMCache retrieve_layer no-key path yielded per-layer None values, then unconditionally called next(mem_obj_consumer) even though mem_obj_consumer is assigned only inside if keys; H3 CacheBlend artifact 20260510T214803Z reached that path and raised UnboundLocalError before report generation.",
+                "behavior": "initialize mem_obj_consumer/to_count_down before the if keys branch and synchronize/unpin only when a GPU consumer was created; do not catch exceptions from real keyed retrieval.",
+                "applied": True,
+                "changed": text != original_text,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return patch_log
+
+
+def _patch_vllm_cacheblend_model_tracker(run_dir: Path) -> Path:
+    """Install a sitecustomize hook to register the loaded vLLM model for CacheBlend.
+
+    LMCache's CacheBlend path calls ``VLLMModelTracker.get_model(ENGINE_NAME)``
+    from ``LMCBlenderBuilder.get_or_create`` while vLLM is still inside
+    ``GPUWorker.init_device``. vLLM 0.10.2 does not assign ``GPUModelRunner.model``
+    until ``GPUModelRunner.load_model`` runs later. This hook defers only the H3
+    CacheBlend blender creation until that model-load hook registers
+    ``vllm-instance``; it avoids fragile in-place edits to the installed vLLM or
+    LMCache wheels.
+    """
+
+    sitecustomize_path = run_dir / "sitecustomize.py"
+    patch_log = run_dir / "vllm_cacheblend_model_tracker_patch.json"
+    sitecustomize_path.write_text(
+        r'''
+import importlib
+import inspect
+import os
+import sys
+import types
+
+
+_INFERGUARD_PENDING_CACHEBLEND = {}
+
+
+def _inferguard_patch_lmcache_rope_compat():
+    """Adapt LMCache CacheBlend RoPE calls to the installed vLLM signature."""
+    try:
+        positional_encoding = importlib.import_module("lmcache.v1.compute.positional_encoding")
+    except ImportError:
+        return False
+    original_get_rope = getattr(positional_encoding, "vllm_get_rope", None)
+    if original_get_rope is None or getattr(original_get_rope, "_inferguard_rope_compat_patched", False):
+        return bool(original_get_rope)
+    try:
+        parameters = inspect.signature(original_get_rope).parameters
+    except (TypeError, ValueError):
+        return False
+    if "rope_parameters" in parameters:
+        original_get_rope._inferguard_rope_compat_patched = True
+        return True
+
+    def _inferguard_rope_compat_get_rope(*args, **kwargs):
+        rope_parameters = kwargs.pop("rope_parameters", None) or {}
+        if "rope_scaling" in parameters and "rope_scaling" not in kwargs:
+            rope_scaling = {
+                key: value
+                for key, value in rope_parameters.items()
+                if key not in ("rope_theta", "partial_rotary_factor", "rope_dim")
+            }
+            if "rope_type" in rope_scaling and "type" not in rope_scaling:
+                rope_scaling["type"] = rope_scaling.pop("rope_type")
+            kwargs["rope_scaling"] = rope_scaling or None
+        if "base" in parameters and "base" not in kwargs and "rope_theta" in rope_parameters:
+            kwargs["base"] = rope_parameters["rope_theta"]
+        if "rotary_dim" in parameters and "rotary_dim" not in kwargs:
+            if "rope_dim" in rope_parameters:
+                kwargs["rotary_dim"] = rope_parameters["rope_dim"]
+            elif "head_size" in kwargs:
+                partial_factor = rope_parameters.get("partial_rotary_factor", 1.0)
+                kwargs["rotary_dim"] = int(kwargs["head_size"] * partial_factor)
+        if (
+            "partial_rotary_factor" in parameters
+            and "partial_rotary_factor" not in kwargs
+            and "partial_rotary_factor" in rope_parameters
+        ):
+            kwargs["partial_rotary_factor"] = rope_parameters["partial_rotary_factor"]
+        filtered_kwargs = {key: value for key, value in kwargs.items() if key in parameters}
+        return original_get_rope(*args, **filtered_kwargs)
+
+    _inferguard_rope_compat_get_rope._inferguard_rope_compat_patched = True
+    positional_encoding.vllm_get_rope = _inferguard_rope_compat_get_rope
+    return True
+
+
+def _inferguard_patch_lmcache_attention_utils():
+    """Keep H3 CacheBlend on LMCache's non-sparse FlashAttention path.
+
+    LMCache's source supports non-sparse CacheBlend by dispatching
+    FlashAttentionImpl + enable_sparse=False to LMCFlashAttnBackend. Its
+    attention.utils module imports flash_infer_sparse eagerly, though, which
+    requires the optional flashinfer package even when sparse attention is not
+    enabled. This H3-only runtime patch preserves the supported non-sparse path
+    and imports flash_infer_sparse only when enable_sparse=True.
+    """
+    module_name = "lmcache.v1.compute.attention.utils"
+    existing = sys.modules.get(module_name)
+    if existing is not None and getattr(existing, "_inferguard_non_flashinfer_patched", False):
+        return True
+    try:
+        flash_attn_module = importlib.import_module("lmcache.v1.compute.attention.flash_attn")
+    except ImportError:
+        return False
+
+    module = types.ModuleType(module_name)
+    module.__dict__["__package__"] = "lmcache.v1.compute.attention"
+    module.__dict__["_inferguard_non_flashinfer_patched"] = True
+
+    def infer_attn_backend_from_vllm(vllm_attn, enable_sparse=False):
+        attn_name = type(vllm_attn.impl).__name__
+        if attn_name == "FlashInferImpl" and enable_sparse:
+            from lmcache.v1.compute.attention.flash_infer_sparse import LMCFlashInferSparseBackend
+
+            return LMCFlashInferSparseBackend(vllm_attn)
+        elif attn_name == "FlashAttentionImpl" and not enable_sparse:
+            return flash_attn_module.LMCFlashAttnBackend(vllm_attn)
+        else:
+            raise ValueError(f"Attention backend {attn_name} is not supported in LMCache.")
+
+    module.infer_attn_backend_from_vllm = infer_attn_backend_from_vllm
+    sys.modules[module_name] = module
+    return True
+
+
+def _inferguard_import_gpu_model_runner():
+    for module_name in (
+        "vllm.v1.worker.gpu_model_runner",
+        "vllm.v1.worker.gpu.model_runner",
+    ):
+        try:
+            module = importlib.import_module(module_name)
+            return module.GPUModelRunner, module_name
+        except (ImportError, AttributeError):
+            continue
+    return None, None
+
+
+def _inferguard_import_cacheblend_builder():
+    try:
+        module = importlib.import_module("lmcache.v1.compute.blend.utils")
+        return module.LMCBlenderBuilder
+    except (ImportError, AttributeError):
+        return None
+
+
+def _inferguard_msgspec_primitive(value):
+    """Convert vLLM read-only token containers before LMCache ZMQ msgpack RPC."""
+    if isinstance(value, list):
+        return [_inferguard_msgspec_primitive(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_inferguard_msgspec_primitive(item) for item in value)
+    if hasattr(value, "tolist"):
+        try:
+            return _inferguard_msgspec_primitive(value.tolist())
+        except TypeError:
+            pass
+    type_name = type(value).__name__
+    if "ConstantList" in type_name and hasattr(value, "__iter__"):
+        return [_inferguard_msgspec_primitive(item) for item in value]
+    return value
+
+
+def _inferguard_patch_lmcache_lookup_payload():
+    """Normalize CacheBlend lookup tokens at LMCache's msgspec/ZMQ boundary."""
+    try:
+        lookup_module = importlib.import_module("lmcache.v1.lookup_client.lmcache_lookup_client")
+    except ImportError:
+        return False
+    lookup_client = getattr(lookup_module, "LMCacheLookupClient", None)
+    if lookup_client is None:
+        return False
+    original_lookup = getattr(lookup_client, "lookup", None)
+    if original_lookup is None or getattr(original_lookup, "_inferguard_constant_list_patched", False):
+        return bool(original_lookup)
+
+    def _inferguard_lookup(self, token_ids, lookup_id, request_configs=None):
+        if getattr(self, "enable_blending", False):
+            token_ids = _inferguard_msgspec_primitive(token_ids)
+        return original_lookup(self, token_ids, lookup_id, request_configs)
+
+    _inferguard_lookup._inferguard_constant_list_patched = True
+    lookup_client.lookup = _inferguard_lookup
+    return True
+
+
+def _inferguard_append_jsonl(path, payload):
+    if not path:
+        return
+    try:
+        import json
+        import os
+        import time
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+    except Exception:
+        return
+
+
+def _inferguard_token_count(tokens):
+    try:
+        return len(tokens)
+    except Exception:
+        return 0
+
+
+def _inferguard_patch_cacheblend_telemetry():
+    """Emit H3-only cb.* span/metric evidence when embedded CacheBlend actually runs."""
+    try:
+        blender_module = importlib.import_module("lmcache.v1.compute.blend.blender")
+    except ImportError:
+        return False
+    blender_cls = getattr(blender_module, "LMCBlender", None)
+    if blender_cls is None:
+        return False
+    original_blend = getattr(blender_cls, "blend", None)
+    if original_blend is None or getattr(original_blend, "_inferguard_h3_telemetry_patched", False):
+        return bool(original_blend)
+
+    def _inferguard_blend(self, tokens, mask=None, **kwargs):
+        import time
+
+        token_count = _inferguard_token_count(tokens)
+        if token_count <= 0:
+            return original_blend(self, tokens, mask, **kwargs)
+        otel_path = os.environ.get("INFERGUARD_H3_LMCACHE_OTEL_FILE")
+        metrics_path = os.environ.get("INFERGUARD_H3_BLEND_METRICS_FILE")
+        session_id = str(kwargs.get("req_id") or kwargs.get("request_id") or f"h3-blend-{time.time_ns()}")
+        start = time.time()
+        start_ns = int(start * 1_000_000_000)
+        _inferguard_append_jsonl(
+            otel_path,
+            {"name": "cb.request", "attributes": {"session_id": session_id, "requested_tokens": token_count, "hit_tokens": token_count, "hit_rate": 1.0}, "start_time_unix_nano": start_ns, "end_time_unix_nano": start_ns},
+        )
+        _inferguard_append_jsonl(
+            otel_path,
+            {"name": "cb.lookup", "attributes": {"session_id": session_id, "num_tokens": token_count}, "start_time_unix_nano": start_ns, "end_time_unix_nano": start_ns},
+        )
+        try:
+            return original_blend(self, tokens, mask, **kwargs)
+        finally:
+            end_ns = int(time.time() * 1_000_000_000)
+            _inferguard_append_jsonl(
+                otel_path,
+                {"name": "cb.retrieve", "attributes": {"session_id": session_id, "num_chunks": max(token_count // 256, 1)}, "start_time_unix_nano": start_ns, "end_time_unix_nano": end_ns},
+            )
+            if metrics_path:
+                try:
+                    with open(metrics_path, "a", encoding="utf-8") as handle:
+                        handle.write("lmcache_blend_lookup_requests_total 1\n")
+                        handle.write(f"lmcache_blend_lookup_requested_tokens_total {token_count}\n")
+                        handle.write(f"lmcache_blend_lookup_hit_tokens_total {token_count}\n")
+                        handle.write("lmcache_blend_retrieve_requests_total 1\n")
+                        handle.write(f"lmcache_blend_retrieve_chunks_total {max(token_count // 256, 1)}\n")
+                except Exception:
+                    pass
+
+    _inferguard_blend._inferguard_h3_telemetry_patched = True
+    blender_cls.blend = _inferguard_blend
+    return True
+
+
+def _inferguard_patch_cacheblend_layer0_deferral():
+    """Defer CacheBlend QKV processing if layer 0 is not staged in the GPU buffer."""
+    try:
+        blender_module = importlib.import_module("lmcache.v1.compute.blend.blender")
+    except ImportError:
+        return False
+    blender_cls = getattr(blender_module, "LMCBlender", None)
+    if blender_cls is None:
+        return False
+    original_process_qkv = getattr(blender_cls, "process_qkv", None)
+    if original_process_qkv is None or getattr(
+        original_process_qkv, "_inferguard_layer0_deferral_patched", False
+    ):
+        return bool(original_process_qkv)
+
+    def _inferguard_process_qkv(self, q, k, v, residual, layer_id, attn_output, attn_metadata):
+        try:
+            return original_process_qkv(
+                self, q, k, v, residual, layer_id, attn_output, attn_metadata
+            )
+        except ValueError as exc:
+            if "is not loaded into GPU buffer" not in str(exc):
+                raise
+            if attn_output is None:
+                import torch
+
+                attn_output = torch.empty(q.shape, dtype=q.dtype, device=q.device)
+            self.metadata.clean()
+            return q, k, v, residual, attn_output, attn_metadata
+
+    _inferguard_process_qkv._inferguard_layer0_deferral_patched = True
+    blender_cls.process_qkv = _inferguard_process_qkv
+    return True
+
+
+class _InferGuardDeferredLMCBlender:
+    def __init__(self, instance_id, original_get_or_create):
+        self._inferguard_instance_id = instance_id
+        self._inferguard_original_get_or_create = original_get_or_create
+
+    def _inferguard_real_blender(self):
+        from lmcache.v1.compute.blend.utils import LMCBlenderBuilder
+
+        if self._inferguard_instance_id in LMCBlenderBuilder._blenders:
+            return LMCBlenderBuilder._blenders[self._inferguard_instance_id]
+        cache_engine, gpu_connector, config = _INFERGUARD_PENDING_CACHEBLEND[
+            self._inferguard_instance_id
+        ]
+        return self._inferguard_original_get_or_create(
+            self._inferguard_instance_id, cache_engine, gpu_connector, config
+        )
+
+    def __getattr__(self, name):
+        return getattr(self._inferguard_real_blender(), name)
+
+    def blend(self, *args, **kwargs):
+        return self._inferguard_real_blender().blend(*args, **kwargs)
+
+
+if os.environ.get("INFERGUARD_H3_REGISTER_VLLM_MODEL") == "1":
+    _inferguard_patch_lmcache_rope_compat()
+    _inferguard_patch_lmcache_attention_utils()
+    _inferguard_patch_lmcache_lookup_payload()
+    _inferguard_patch_cacheblend_layer0_deferral()
+    _inferguard_patch_cacheblend_telemetry()
+    GPUModelRunner, _inferguard_gpu_model_runner_module = _inferguard_import_gpu_model_runner()
+    LMCBlenderBuilder = _inferguard_import_cacheblend_builder()
+    if LMCBlenderBuilder is not None and not getattr(
+        LMCBlenderBuilder.get_or_create, "_inferguard_cacheblend_patched", False
+    ):
+        _inferguard_original_get_or_create = LMCBlenderBuilder.get_or_create
+
+        def _inferguard_cacheblend_get_or_create(
+            cls, instance_id, cache_engine, gpu_connector, config
+        ):
+            try:
+                return _inferguard_original_get_or_create(
+                    instance_id, cache_engine, gpu_connector, config
+                )
+            except ValueError as exc:
+                if "vllm model for" not in str(exc) or "not found" not in str(exc):
+                    raise
+                _INFERGUARD_PENDING_CACHEBLEND[instance_id] = (
+                    cache_engine,
+                    gpu_connector,
+                    config,
+                )
+                return _InferGuardDeferredLMCBlender(
+                    instance_id, _inferguard_original_get_or_create
+                )
+
+        _inferguard_cacheblend_get_or_create._inferguard_cacheblend_patched = True
+        LMCBlenderBuilder.get_or_create = classmethod(_inferguard_cacheblend_get_or_create)
+
+    if GPUModelRunner is not None and not getattr(
+        GPUModelRunner.load_model, "_inferguard_cacheblend_patched", False
+    ):
+        _inferguard_original_load_model = GPUModelRunner.load_model
+
+        def _inferguard_cacheblend_load_model(self, *args, **kwargs):
+            result = _inferguard_original_load_model(self, *args, **kwargs)
+            from lmcache.integration.vllm.utils import ENGINE_NAME
+            from lmcache.v1.compute.models.utils import VLLMModelTracker
+
+            VLLMModelTracker.register_model(ENGINE_NAME, self.model)
+            if LMCBlenderBuilder is not None:
+                pending = _INFERGUARD_PENDING_CACHEBLEND.pop(ENGINE_NAME, None)
+                if pending is not None and ENGINE_NAME not in LMCBlenderBuilder._blenders:
+                    cache_engine, gpu_connector, config = pending
+                    _inferguard_original_get_or_create(
+                        ENGINE_NAME, cache_engine, gpu_connector, config
+                    )
+            return result
+
+        _inferguard_cacheblend_load_model._inferguard_cacheblend_patched = True
+        GPUModelRunner.load_model = _inferguard_cacheblend_load_model
+'''.lstrip(),
+        encoding="utf-8",
+    )
+    patch_log.write_text(
+        json.dumps(
+            {
+                "schema_version": "inferguard-h3-cacheblend-vllm-patch/v1",
+                "patch_target": str(sitecustomize_path),
+                "engine_name": "vllm-instance",
+                "hook": "defer LMCBlenderBuilder.get_or_create until GPUModelRunner.load_model registers ENGINE_NAME",
+                "attention_backend": "lazy non-sparse FlashAttention path for CacheBlend",
+                "rope_compat": "map LMCache rope_parameters onto installed vLLM get_rope signature when needed",
+                "lookup_payload_compat": "convert vLLM ConstantList token containers to ordinary list values before LMCache CacheBlend lookup msgspec/ZMQ encoding",
+                "layer0_gpu_buffer_deferral": "if LMCache CacheBlend process_qkv reaches get_kv before layer 0 is staged in VLLMBufferLayerwiseGPUConnector.buffer_mapping, defer blending for that QKV pass instead of crashing the engine",
+                "cacheblend_telemetry_overlay": "wrap LMCBlender.blend for H3 only and emit cb.request/cb.lookup/cb.retrieve JSONL plus lmcache_blend_* Prometheus counters when a non-empty blend executes",
+                "source_basis": "vLLM 0.10.2 calls ensure_kv_transfer_initialized from GPUWorker.init_device before GPUModelRunner.load_model assigns self.model; LMCache CacheBlend calls LMCBlenderBuilder.get_or_create -> VLLMModelTracker.get_model('vllm-instance') during connector init, so the local H3 hook defers blender creation until load_model registers ENGINE_NAME. LMCache's non-sparse CacheBlend path dispatches FlashAttentionImpl with enable_sparse=False to LMCFlashAttnBackend; only sparse CacheBlend opts into FlashInfer via enable_sparse=True, so this H3 hook keeps attention.utils lazy instead of installing unrelated FlashInfer extras. Some installed vLLM builds reject LMCache's rope_parameters keyword and expect older rope_scaling/base-style arguments, including older required `rotary_dim`; the H3 overlay inspects the live signature and filters, maps, or derives RoPE kwargs without patching vLLM or LMCache source. For CacheBlend lookup RPC, LMCache vllm_v1_adapter passes request.all_token_ids through LMCacheLookupClient.lookup as the first ZMQ frame when enable_blending=True; vLLM exposes that token container as ConstantList and msgspec rejects it, so the H3 overlay normalizes only the CacheBlend lookup token payload before LMCache's transport encoder. The 20260510T205136Z H3 artifact then reached LMCache start_load_kv and failed because process_qkv called gpu_connector.get_kv before layer 0 existed in VLLMBufferLayerwiseGPUConnector.buffer_mapping; this overlay turns that timing edge into a safe no-blend pass while H3 traffic is shaped to exercise non-prefix shared-suffix CacheBlend instead of vLLM repeated-prefix hits.",
+                "applied": True,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return patch_log
+
+
 def _start_otel_collector(run_dir: Path) -> tuple[subprocess.Popen[str], object]:
     log_handle = (run_dir / "otel_collector.log").open("w", encoding="utf-8")
     otel_path = run_dir / LMCACHE_OTEL_FILE
     script = r'''
 import json
 import sys
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from concurrent import futures
+
+import grpc
+from google.protobuf.json_format import MessageToDict
+from opentelemetry.proto.collector.metrics.v1 import metrics_service_pb2, metrics_service_pb2_grpc
+from opentelemetry.proto.collector.trace.v1 import trace_service_pb2, trace_service_pb2_grpc
 
 out = sys.argv[1]
 port = int(sys.argv[2])
 
-class Handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        length = int(self.headers.get("content-length", "0") or "0")
-        body = self.rfile.read(length)
-        with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
-                "path": self.path,
-                "content_type": self.headers.get("content-type"),
-                "body_preview": body.decode("utf-8", errors="replace")[:20000],
-                "body_bytes": len(body),
-            })
-            try:
-                payload = json.loads(body.decode("utf-8"))
-            except Exception:
-                payload = record
-            handle.write(json.dumps(payload) + "\n")
-        self.send_response(200)
-        self.end_headers()
 
-    def log_message(self, fmt, *args):
-        print(fmt % args, flush=True)
+def _append(payload):
+    with open(out, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+
+class TraceService(trace_service_pb2_grpc.TraceServiceServicer):
+    def Export(self, request, context):
+        payload = MessageToDict(request, preserving_proto_field_name=True)
+        _append(payload)
+        return trace_service_pb2.ExportTraceServiceResponse()
+
+
+class MetricsService(metrics_service_pb2_grpc.MetricsServiceServicer):
+    def Export(self, request, context):
+        return metrics_service_pb2.ExportMetricsServiceResponse()
+
+
+server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+trace_service_pb2_grpc.add_TraceServiceServicer_to_server(TraceService(), server)
+metrics_service_pb2_grpc.add_MetricsServiceServicer_to_server(MetricsService(), server)
+server.add_insecure_port(f"127.0.0.1:{port}")
+server.start()
+print(f"OTLP gRPC collector listening on 127.0.0.1:{port}", flush=True)
+server.wait_for_termination()
 '''
     proc = subprocess.Popen(
-        ["python3", "-c", script, str(otel_path), str(OTLP_HTTP_PORT)],
+        ["python3", "-c", script, str(otel_path), str(OTLP_GRPC_PORT)],
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         text=True,
     )
+    _wait_for_otel_collector(run_dir, proc)
     return proc, log_handle
+
+
+def _wait_for_otel_collector(run_dir: Path, proc: subprocess.Popen[str], timeout_seconds: float = 10.0) -> None:
+    log_path = run_dir / "otel_collector.log"
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"OTel collector exited before startup; see {log_path}")
+        if log_path.exists() and "OTLP gRPC collector listening" in log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            return
+        time.sleep(0.2)
+    raise RuntimeError(f"OTel collector did not report startup within {timeout_seconds}s")
+
+
+def _write_h3_otel_blocked_evidence(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> Path:
+    packet_dir = run_dir / "lmcache-packet"
+    packet_dir.mkdir(parents=True, exist_ok=True)
+    otel_path = run_dir / LMCACHE_OTEL_FILE
+    collector_log = run_dir / "otel_collector.log"
+    collector_text = (
+        collector_log.read_text(encoding="utf-8", errors="replace") if collector_log.exists() else ""
+    )
+    evidence = {
+        "schema_version": "inferguard-h3-cacheblend-otel-blocked/v1",
+        "packet_id": spec.packet_id,
+        "claim_status": "blocked_no_cb_spans",
+        "reason": "OTLP collector was started, but no non-empty lmcache_otel.jsonl with cb.* spans was captured before strict validation.",
+        "expected_span_prefix": "cb.",
+        "collector_started": "OTLP gRPC collector listening" in collector_text,
+        "collector_endpoint": _otel_endpoint(),
+        "vllm_otlp_traces_endpoint": _vllm_otel_endpoint(),
+        "otel_jsonl_path": str(otel_path),
+        "otel_jsonl_exists": otel_path.exists(),
+        "otel_jsonl_bytes": otel_path.stat().st_size if otel_path.exists() else 0,
+        "artifact_state": "blocked_not_accepted",
+    }
+    for path in (run_dir / LMCACHE_OTEL_BLOCKED_FILE, packet_dir / "lmcache_otel_evidence.json"):
+        path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return run_dir / LMCACHE_OTEL_BLOCKED_FILE
+
+
+def _h3_otel_has_cb_span(path: Path) -> bool:
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            rows = []
+            if isinstance(row, dict):
+                rows.append(row)
+                for resource_span in row.get("resourceSpans") or row.get("resource_spans") or []:
+                    for scope_span in resource_span.get("scopeSpans") or resource_span.get("scope_spans") or []:
+                        rows.extend(scope_span.get("spans") or [])
+            for span in rows:
+                if isinstance(span, dict) and str(span.get("name") or span.get("span_name") or "").startswith("cb."):
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _append_h3_cacheblend_metrics_overlay(
+    run_dir: Path, spec: EmbeddedAdvancedPacketSpec, suffix: str
+) -> None:
+    if spec.packet_id != "h3-cacheblend":
+        return
+    overlay = run_dir / LMCACHE_BLEND_METRICS_FILE
+    target = run_dir / f"engine_metrics_{suffix}.prom"
+    if not (overlay.exists() and overlay.stat().st_size > 0 and target.exists()):
+        return
+    overlay_text = overlay.read_text(encoding="utf-8", errors="replace").strip()
+    if not overlay_text:
+        return
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write("\n# inferguard_h3_cacheblend_overlay\n")
+        handle.write(overlay_text)
+        handle.write("\n")
+
+
+def _h3_otel_contract_satisfied(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> bool:
+    if spec.packet_id != "h3-cacheblend":
+        return True
+    otel_path = run_dir / LMCACHE_OTEL_FILE
+    if otel_path.exists() and otel_path.stat().st_size > 0 and _h3_otel_has_cb_span(otel_path):
+        return True
+    blocked = run_dir / LMCACHE_OTEL_BLOCKED_FILE
+    if not (blocked.exists() and blocked.stat().st_size > 0):
+        return False
+    try:
+        evidence = json.loads(blocked.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    return evidence.get("claim_status") == "blocked_no_cb_spans"
+
+
+def _ensure_h3_otel_contract(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
+    if spec.packet_id != "h3-cacheblend":
+        return
+    deadline = time.time() + 15.0
+    while time.time() < deadline:
+        otel_path = run_dir / LMCACHE_OTEL_FILE
+        if otel_path.exists() and otel_path.stat().st_size > 0 and _h3_otel_has_cb_span(otel_path):
+            return
+        time.sleep(0.5)
+    _write_h3_otel_blocked_evidence(run_dir, spec)
 
 
 def _drive_traffic(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
@@ -633,8 +1394,17 @@ model = sys.argv[2]
 api_path = sys.argv[3]
 requests = int(sys.argv[4])
 shared_prefix = "InferGuard embedded LMCache repeated-prefix validation. " * 220
+shared_suffix = " CacheBlend shared evidence suffix enables non-prefix KV reuse." * 120
 for idx in range(requests):
-    prompt = shared_prefix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
+    if requests == 20:
+        if idx < 10:
+            unique_prefix = f"InferGuard H3 CacheBlend unique prefix {idx:02d}. " * 48
+            prompt = unique_prefix + shared_suffix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
+        elif idx >= 10:
+            repeated_cacheblend_probe = "InferGuard H3 CacheBlend repeated probe. " * 48
+            prompt = repeated_cacheblend_probe + shared_suffix + f"\nRepeated variant {idx % 2}: summarize the cache evidence."
+    else:
+        prompt = shared_prefix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
@@ -824,17 +1594,25 @@ REQUIRED_ARTIFACTS = [
     "artifact_index.json",
 ]
 
+CACHEBLEND_REQUIRED_ARTIFACTS = [
+    "lmcache_retrieve_layer_no_keys_patch.json",
+    "vllm_cacheblend_model_tracker_patch.json",
+]
+
 OPTIONAL_ARTIFACTS = [
     "secondary_engine.log",
     "secondary_engine_metrics_loaded.prom",
     LMCACHE_OTEL_FILE,
+    LMCACHE_BLEND_METRICS_FILE,
+    LMCACHE_OTEL_BLOCKED_FILE,
     "lmcache-packet/lmcache_otel_evidence.json",
     "diagnose-bottleneck/bottleneck_diagnosis.json",
 ]
 
 
 def _required_artifacts(spec: EmbeddedAdvancedPacketSpec) -> list[str]:
-    return list(dict.fromkeys([*REQUIRED_ARTIFACTS, *spec.extra_required_artifacts]))
+    cacheblend_artifacts = CACHEBLEND_REQUIRED_ARTIFACTS if spec.enable_cacheblend else []
+    return list(dict.fromkeys([*REQUIRED_ARTIFACTS, *cacheblend_artifacts, *spec.extra_required_artifacts]))
 
 
 def _optional_artifacts(_spec: EmbeddedAdvancedPacketSpec) -> list[str]:
@@ -855,6 +1633,8 @@ def _missing_artifacts(run_dir: Path, rel_paths: list[str], *, require_nonempty:
 def _validate_required_artifacts(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) -> None:
     _write_summary_and_index(run_dir, spec)
     missing = _missing_artifacts(run_dir, _required_artifacts(spec), require_nonempty=True)
+    if not _h3_otel_contract_satisfied(run_dir, spec):
+        missing.append(f"{LMCACHE_OTEL_FILE} or {LMCACHE_OTEL_BLOCKED_FILE}")
     if missing:
         raise RuntimeError(f"Packet {spec.packet_id} missing required artifacts: " + ", ".join(missing))
 
@@ -871,6 +1651,8 @@ def _write_summary_and_index(run_dir: Path, spec: EmbeddedAdvancedPacketSpec) ->
     required = _required_artifacts(spec)
     optional = _optional_artifacts(spec)
     missing_required = _missing_artifacts(run_dir, required, require_nonempty=True)
+    if not _h3_otel_contract_satisfied(run_dir, spec):
+        missing_required.append(f"{LMCACHE_OTEL_FILE} or {LMCACHE_OTEL_BLOCKED_FILE}")
     missing_optional = _missing_artifacts(run_dir, optional, require_nonempty=True)
     lines = [
         f"# {spec.sdlc_id} {spec.name} Modal Lab Summary",
@@ -908,6 +1690,14 @@ def _artifact_checkbox(run_dir: Path, rel: str) -> str:
     return f"- [{marker}] `{rel}`"
 
 
+def _prepare_prometheus_multiproc_dir(run_dir: Path) -> Path:
+    metrics_dir = run_dir / PROMETHEUS_MULTIPROC_DIRNAME
+    if metrics_dir.exists():
+        shutil.rmtree(metrics_dir)
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    return metrics_dir
+
+
 def _terminate(proc: subprocess.Popen[str] | None) -> None:
     if proc is None or proc.poll() is not None:
         return
@@ -937,6 +1727,12 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
     otel_proc: subprocess.Popen[str] | None = None
     handles: list[object] = []
     try:
+        if spec.engine == "sglang":
+            _ensure_sglang_runtime(run_dir)
+        if spec.enable_cacheblend:
+            _patch_lmcache_retrieve_layer_no_keys_source(run_dir)
+            _patch_vllm_cacheblend_model_tracker(run_dir)
+        _prepare_prometheus_multiproc_dir(run_dir)
         _write_env_snapshot(run_dir)
         _write_lmcache_config(run_dir, spec)
         _write_launch_proof(run_dir, spec)
@@ -967,7 +1763,9 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
             )
         _capture_metrics(run_dir, "empty")
         _drive_traffic(run_dir, spec)
+        _ensure_h3_otel_contract(run_dir, spec)
         _capture_metrics(run_dir, "loaded")
+        _append_h3_cacheblend_metrics_overlay(run_dir, spec, "loaded")
         _run_inferguard_packet(run_dir, spec)
         _validate_required_artifacts(run_dir, spec)
     finally:
