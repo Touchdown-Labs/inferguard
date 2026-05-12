@@ -234,6 +234,7 @@ def build_observability_coverage_report(
     surfaces["sglang_kv_events"] = sglang_kv_row
     gaps = _coverage_gaps(engine_families, lmcache_report)
     kv_cache_offload = _kv_cache_offload_report(samples)
+    sglang_lmcache_embedded = _sglang_lmcache_embedded_support_report(lmcache_report)
     sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(lmcache_report)
     return {
         "schema_version": SCHEMA_VERSION,
@@ -257,6 +258,7 @@ def build_observability_coverage_report(
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
+        "sglang_lmcache_embedded_support": sglang_lmcache_embedded,
         "sglang_lmcache_mp_observability": sglang_lmcache_mp,
         "sglang_kv_events_evidence": sglang_kv_events_evidence,
         "coverage_gaps": gaps,
@@ -333,6 +335,41 @@ def build_observability_coverage_report_from_urls(
 def write_observability_coverage_report(report: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(output, report)
+
+
+def _sglang_lmcache_embedded_support_report(lmcache_report: dict[str, Any]) -> dict[str, Any]:
+    architecture = lmcache_report.get("detected_architecture") or {}
+    classification = str(architecture.get("label") or "unknown")
+    observed = lmcache_report.get("observed") if isinstance(lmcache_report.get("observed"), dict) else {}
+    has_embedded_metrics = bool(observed.get("lmcache_embedded"))
+    is_sglang_embedded = classification == "sglang_embedded_lmcache"
+    claim_status = "measured" if is_sglang_embedded and has_embedded_metrics else "source_backed"
+    live_validation = "artifact_present" if claim_status == "measured" else "pending"
+    return {
+        "support_status": "source_backed",
+        "classification": classification,
+        "claim_status": claim_status,
+        "upstream_state": "documented_existing_embedded_support",
+        "sglang_docs": "https://docs.lmcache.ai/getting_started/quickstart.html#sglang",
+        "lmcache_adapter_source": "lmcache/integration/sglang/sglang_adapter.py",
+        "configuration_source": "lmcache/integration/sglang/utils.py",
+        "live_validation": live_validation,
+        "required_launch_flags": ["--enable-lmcache"],
+        "required_environment": ["LMCACHE_CONFIG_FILE or LMCache environment configuration"],
+        "runtime_contract": [
+            "SGLang enables the LMCache integration with --enable-lmcache.",
+            "LMCache reads configuration from LMCACHE_CONFIG_FILE or environment variables.",
+            "The SGLang LMCache adapter initializes an LMCacheEngine for EngineType.SGLANG.",
+            "The adapter calls LMCache lookup/retrieve and store paths during prefill/store lifecycle.",
+        ],
+        "non_claims": [
+            "not LMCache MP support",
+            "not performance validated",
+            "not production support without live artifacts",
+            "InferGuard does not enable runtime cache behavior; it only captures and classifies evidence",
+        ],
+    }
+
 
 
 def _sglang_lmcache_mp_observability_report(lmcache_report: dict[str, Any]) -> dict[str, Any]:

@@ -83,6 +83,67 @@ lmcache_mp_lookup_hit_tokens_total 50
     assert report["surfaces"]["vllm"]["status"] == "not_applicable"
 
 
+def test_observability_coverage_marks_sglang_embedded_lmcache_as_existing_source_backed() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",connector="LMCacheLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:time_to_first_token_seconds_sum 1
+sglang:time_to_first_token_seconds_count 5
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+sglang:num_running_reqs 1
+sglang:num_queue_reqs 0
+sglang:cache_hit_rate 0.5
+sglang:token_usage 0.7
+""",
+        lmcache_text="""
+lmcache:lookup_requests_total 2
+lmcache:retrieve_requests_total 1
+lmcache:store_requests_total 2
+lmcache:num_retrieve_tokens_total 64
+lmcache:num_store_tokens_total 128
+lmcache:local_cpu_cache_usage 0.25
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="embedded",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_embedded_support"]
+    assert report["detected_engines"] == ["sglang"]
+    assert report["detected_lmcache_mode"] == "embedded"
+    assert architecture["label"] == "sglang_embedded_lmcache"
+    assert architecture["claim_status"] == "measured"
+    assert support["support_status"] == "source_backed"
+    assert support["claim_status"] == "measured"
+    assert support["upstream_state"] == "documented_existing_embedded_support"
+    assert support["required_launch_flags"] == ["--enable-lmcache"]
+    assert "not LMCache MP support" in support["non_claims"]
+    assert "InferGuard does not enable runtime cache behavior; it only captures and classifies evidence" in support[
+        "non_claims"
+    ]
+    assert report["sglang_lmcache_mp_observability"]["claim_status"] == "not_proven"
+
+
+def test_sglang_lmcache_embedded_launch_signal_without_lmcache_metrics_is_source_backed_only() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",connector="LMCacheLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="embedded",
+    )
+
+    architecture = report["lmcache_compat"]["detected_architecture"]
+    support = report["sglang_lmcache_embedded_support"]
+    assert architecture["label"] == "sglang_embedded_lmcache"
+    assert architecture["claim_status"] == "inferred"
+    assert support["claim_status"] == "source_backed"
+    assert support["live_validation"] == "pending"
+
+
 def test_sglang_lmcache_mp_observability_is_fixture_tested_pending_live_validation() -> None:
     report = build_observability_coverage_report(
         engine_text="""
