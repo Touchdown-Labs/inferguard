@@ -202,12 +202,47 @@ For SGLang embedded mode, current mainline source evidence points to:
 - SGLang metrics such as `sglang:cache_hit_rate`, queue gauges, HiCache
   host-token gauges, KV-transfer histograms, and storage metrics.
 
-No current-mainline SGLang MP connector contract has been proven yet. InferGuard
-must not mark SGLang MP as supported until source and a live fixture prove it.
-SGLang HiCache-only metrics are not LMCache proof; InferGuard keeps them as
-SGLang cache/storage context unless `--enable-lmcache`,
-`LMCacheLayerwiseConnector`, `LMCRadixCache`, or `lmcache:*` evidence is also
-present.
+For the SGLang + LMCache MP branch set validated on 2026-05-12, source evidence
+points to:
+
+- SGLang launched with `--enable-lmcache`, `--lmcache-mp-host`, and
+  `--lmcache-mp-port`;
+- no `--disable-radix-cache`, so SGLang's `LMCRadixCache` path remains active;
+- LMCache `LMCacheMPLayerwiseConnector` selected by the patched SGLang MP path;
+- standalone LMCache `/metrics` exposing MP evidence families.
+
+HiCache-only metrics are not LMCache MP proof. InferGuard keeps them as SGLang
+cache/storage context unless MP launch/config evidence and LMCache MP metrics are
+also present.
+
+### SGLang + LMCache MP replay/acceptance note
+
+For accepted SGLang MP artifacts, run `collect-lmcache` with SGLang engine
+metrics, LMCache metrics, both logs, `--expected-engine sglang`, and
+`--expect-mode mp`:
+
+```bash
+inferguard collect-lmcache \
+  --output-dir /path/to/artifact/inferguard_lmcache_packet \
+  --engine-metrics-file /path/to/artifact/sglang_metrics.prom \
+  --lmcache-metrics-file /path/to/artifact/lmcache_metrics.prom \
+  --lmcache-http-base-url http://127.0.0.1:9090 \
+  --engine-log-file /path/to/artifact/sglang.log \
+  --lmcache-log-file /path/to/artifact/lmcache.log \
+  --expected-engine sglang \
+  --expect-mode mp \
+  --mp-prometheus-port 9090 \
+  --json
+```
+
+The accepted H100 artifact for this branch set is
+`/artifacts/ocwc22_lmcache_mp/20260512T095222Z` from Modal run
+`https://modal.com/apps/ocwc22/main/ap-3vjXTB0zufbdBRDTPAbUqd`. Acceptance means
+`acceptance_state=complete`, `detected_mode=mp`, and `acceptance_blockers=[]`.
+Required LMCache MP families are `storage_manager`, `lookup_tokens`,
+`l1_counters`, and `l1_memory`. If the result is mixed or incomplete, check
+LMCache `/metrics` readiness, accidental `--disable-radix-cache`, workload length,
+and connector fallback before making an operator recommendation.
 
 ### Standalone MP `lmcache_mp_*`
 
