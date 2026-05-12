@@ -202,13 +202,16 @@ For SGLang embedded mode, current mainline source evidence points to:
 - SGLang metrics such as `sglang:cache_hit_rate`, queue gauges, HiCache
   host-token gauges, KV-transfer histograms, and storage metrics.
 
-For the SGLang + LMCache MP branch set validated on 2026-05-12, source evidence
-points to:
+For the SGLang + LMCache MP artifacts validated on 2026-05-12, no SGLang
+repository changes are required by this closeout. InferGuard treats SGLang as the
+serving engine that supplies runtime metrics/logs using existing launch flags,
+while LMCache provides the MP observability surface. Evidence points to:
 
 - SGLang launched with `--enable-lmcache`, `--lmcache-mp-host`, and
   `--lmcache-mp-port`;
 - no `--disable-radix-cache`, so SGLang's `LMCRadixCache` path remains active;
-- LMCache `LMCacheMPLayerwiseConnector` selected by the patched SGLang MP path;
+- SGLang runtime logs/launch metadata showing traffic was sent to the standalone
+  LMCache MP server through the existing LMCache flags;
 - standalone LMCache `/metrics` exposing MP evidence families.
 
 HiCache-only metrics are not LMCache MP proof. InferGuard keeps them as SGLang
@@ -235,14 +238,15 @@ inferguard collect-lmcache \
   --json
 ```
 
-The accepted H100 artifact for this branch set is
+The accepted H100 artifact for the LMCache + InferGuard closeout is
 `/artifacts/ocwc22_lmcache_mp/20260512T095222Z` from Modal run
 `https://modal.com/apps/ocwc22/main/ap-3vjXTB0zufbdBRDTPAbUqd`. Acceptance means
 `acceptance_state=complete`, `detected_mode=mp`, and `acceptance_blockers=[]`.
 Required LMCache MP families are `storage_manager`, `lookup_tokens`,
 `l1_counters`, and `l1_memory`. If the result is mixed or incomplete, check
 LMCache `/metrics` readiness, accidental `--disable-radix-cache`, workload length,
-and connector fallback before making an operator recommendation.
+and connector/runtime fallback before making an operator recommendation. Do not
+require or recommend SGLang repository modifications for this closeout.
 
 ### Standalone MP `lmcache_mp_*`
 

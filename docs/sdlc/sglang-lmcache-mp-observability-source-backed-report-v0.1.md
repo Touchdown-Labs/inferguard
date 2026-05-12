@@ -10,18 +10,18 @@ InferGuard now recognizes SGLang + LMCache MP observability when fixture or repo
 
 - SGLang metrics or launch-manifest evidence.
 - LMCache MP metrics.
-- PR-backed SGLang MP launch/source evidence for `--enable-lmcache`, `--lmcache-mp-host`, and `--lmcache-mp-port`.
+- SGLang runtime launch evidence using existing `--enable-lmcache`, `--lmcache-mp-host`, and `--lmcache-mp-port` flags.
 
 ## Upstream state
 
-The SGLang and LMCache MP path is source-backed by open, unmerged upstream PRs:
+This closeout is source-backed by LMCache MP observability and InferGuard ingestion/replay changes. SGLang is only the serving engine source of runtime metrics/logs and is launched with existing LMCache flags; it is not a repo to modify for this closeout.
 
-- SGLang PR #24089: <https://github.com/sgl-project/sglang/pull/24089>
-- LMCache PR #3166: <https://github.com/LMCache/LMCache/pull/3166>
+- LMCache observability surface: standalone MP metrics/logs/HTTP evidence.
+- InferGuard ingestion/replay: classification and acceptance gating over SGLang runtime metrics plus LMCache MP evidence.
 
 ## Non-claims
 
-This report does not claim live validation, merged upstream support, performance validation, or production support for SGLang + LMCache MP.
+This report does not claim merged upstream SGLang changes, performance validation, or production support for SGLang + LMCache MP.
 
 ## Verification scope
 
