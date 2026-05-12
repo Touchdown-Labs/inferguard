@@ -9,7 +9,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from inferguard.compat import _read_l0_boundary_evidence, build_compat_report
+from inferguard.compat import (
+    _read_l0_boundary_evidence,
+    build_compat_report,
+    read_sglang_kv_events_evidence,
+)
 from inferguard.io import atomic_write_json
 from inferguard.metrics_core import parse_labeled_prometheus_text
 
@@ -128,7 +132,7 @@ ENGINE_REGISTRY: tuple[ObservabilityFamily, ...] = (
     ObservabilityFamily(
         "sglang",
         "queue",
-        ("sglang:num_running_reqs", "sglang:num_queue_reqs"),
+        ("sglang:num_running_reqs", "sglang:num_queue_reqs", "sglang:num_preemptions_total"),
     ),
     ObservabilityFamily(
         "sglang",
@@ -138,7 +142,16 @@ ENGINE_REGISTRY: tuple[ObservabilityFamily, ...] = (
     ObservabilityFamily(
         "sglang",
         "kv_cache",
-        ("sglang:token_usage", "sglang:num_used_tokens"),
+        (
+            "sglang:token_usage",
+            "sglang:num_used_tokens",
+            "sglang:hicache_l1_hit_count_total",
+            "sglang:hicache_l2_hit_count_total",
+            "sglang:hicache_l3_hit_count_total",
+            "sglang:hicache_lookup_count_total",
+            "sglang:hicache_l2_bytes",
+            "sglang:hicache_l3_bytes",
+        ),
     ),
     ObservabilityFamily(
         "sglang",
@@ -179,6 +192,7 @@ def build_observability_coverage_report(
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
     lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
+    sglang_kv_events_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a single coverage report for engine and LMCache telemetry."""
 
@@ -216,6 +230,8 @@ def build_observability_coverage_report(
     surfaces = _surface_rows(engine_families)
     for surface, row in lmcache_report.get("surfaces", {}).items():
         surfaces[str(surface)] = row
+    sglang_kv_row = _sglang_kv_events_surface_row(sglang_kv_events_evidence)
+    surfaces["sglang_kv_events"] = sglang_kv_row
     gaps = _coverage_gaps(engine_families, lmcache_report)
     kv_cache_offload = _kv_cache_offload_report(samples)
     return {
@@ -240,6 +256,7 @@ def build_observability_coverage_report(
         "surfaces": surfaces,
         "families": engine_families,
         "lmcache_compat": lmcache_report,
+        "sglang_kv_events_evidence": sglang_kv_events_evidence,
         "coverage_gaps": gaps,
     }
 
@@ -255,6 +272,7 @@ def build_observability_coverage_report_from_paths(
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
     lmcache_l0_boundary_evidence_file: Path | None = None,
+    sglang_kv_events_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -273,6 +291,7 @@ def build_observability_coverage_report_from_paths(
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
         lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        sglang_kv_events_evidence=read_sglang_kv_events_evidence(sglang_kv_events_evidence_file),
         **kwargs,
     )
 
@@ -289,6 +308,7 @@ def build_observability_coverage_report_from_urls(
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
     lmcache_l0_boundary_evidence_file: Path | None = None,
+    sglang_kv_events_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -303,6 +323,7 @@ def build_observability_coverage_report_from_urls(
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
         lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        sglang_kv_events_evidence=read_sglang_kv_events_evidence(sglang_kv_events_evidence_file),
         **kwargs,
     )
 
@@ -473,6 +494,21 @@ def _hist_avg(samples: list[Any], prefix: str) -> float | None:
     if count <= 0:
         return None
     return total / count
+
+
+def _sglang_kv_events_surface_row(evidence: dict[str, Any] | None) -> dict[str, Any]:
+    populated = 1 if evidence and evidence.get("claim_status") == "measured" else 0
+    zero = 1 if evidence and evidence.get("present") and not populated else 0
+    missing = 0 if evidence else 1
+    status = "complete" if populated else ("zero" if zero else "missing")
+    return {
+        "family_count": 1,
+        "populated": populated,
+        "zero": zero,
+        "missing": missing,
+        "not_applicable": 0,
+        "status": status,
+    }
 
 
 def _coverage_gaps(

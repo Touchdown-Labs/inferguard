@@ -22,6 +22,8 @@ def build_sglang_command(
     mem_fraction_static: float = 0.9,
     enable_metrics: bool = False,
     enable_cache_report: bool = True,
+    enable_lmcache: bool = False,
+    kv_events_config: str | None = None,
     chunked_prefill_size: int | None = None,
     hardware: str | None = None,
     quantization: str | None = None,
@@ -55,6 +57,10 @@ def build_sglang_command(
         argv.append("--enable-metrics")
     if enable_cache_report:
         argv.append("--enable-cache-report")
+    if enable_lmcache:
+        argv.append("--enable-lmcache")
+    if kv_events_config:
+        argv.extend(["--kv-events-config", kv_events_config])
     if resolved_chunked_prefill_size is not None:
         argv.extend(["--chunked-prefill-size", str(resolved_chunked_prefill_size)])
     if quantization:

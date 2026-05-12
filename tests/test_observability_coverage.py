@@ -8,7 +8,8 @@ from typer.testing import CliRunner
 from inferguard.cli import app
 from inferguard.observability_coverage import build_observability_coverage_report
 
-LMCACHE_FIXTURES = Path(__file__).parent / "fixtures" / "lmcache_metrics"
+FIXTURES = Path(__file__).parent / "fixtures"
+LMCACHE_FIXTURES = FIXTURES / "lmcache_metrics"
 
 
 def _lmcache_fixture(name: str) -> str:
@@ -503,6 +504,38 @@ def test_sglang_hicache_only_fixture_does_not_claim_lmcache() -> None:
     assert architecture["signals"]["sglang_lmcache_connector_label"] is False
     assert architecture["signals"]["sglang_enable_lmcache_label"] is False
     assert "sglang_hicache_not_lmcache" in codes
+
+
+def test_observability_coverage_accepts_redacted_sglang_kv_events(tmp_path: Path) -> None:
+    output = tmp_path / "coverage.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "observability-coverage",
+            "--engine-metrics-file",
+            str(LMCACHE_FIXTURES / "sglang_lmcache_embedded.prom"),
+            "--expected-engine",
+            "sglang",
+            "--expect-lmcache-mode",
+            "embedded",
+            "--sglang-kv-events-evidence-file",
+            str(FIXTURES / "sglang_kv_events.jsonl"),
+            "--output",
+            str(output),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["surfaces"]["sglang_kv_events"]["status"] == "complete"
+    evidence = payload["sglang_kv_events_evidence"]
+    assert evidence["raw_token_id_values_recorded"] is False
+    assert evidence["raw_block_hash_values_recorded"] is False
+    rendered = json.dumps(payload, sort_keys=True)
+    assert "token_ids" not in rendered
+    assert "hash-a" not in rendered
+    assert "parent-hash" not in rendered
 
 
 def test_lmcache_mp_l0_lifecycle_populated_when_block_metrics_present() -> None:

@@ -22,6 +22,30 @@ def test_sglang_defaults_enable_cache_report() -> None:
     assert "--enable-cache-report" in argv
 
 
+def test_sglang_lmcache_and_kv_events_flags_are_source_backed() -> None:
+    config = '{"publisher": "zmq", "topic": "kv-events"}'
+    argv = build_sglang_command(
+        "Qwen/Qwen3-8B",
+        host="0.0.0.0",
+        port=30000,
+        enable_lmcache=True,
+        kv_events_config=config,
+    )
+
+    assert argv[:7] == [
+        "python",
+        "-m",
+        "sglang.launch_server",
+        "--model-path",
+        "Qwen/Qwen3-8B",
+        "--host",
+    ]
+    assert argv[argv.index("--host") + 1] == "0.0.0.0"
+    assert argv[argv.index("--port") + 1] == "30000"
+    assert "--enable-lmcache" in argv
+    assert argv[argv.index("--kv-events-config") + 1] == config
+
+
 def test_b200_fp8_chunked_prefill_always_explicit() -> None:
     argv = build_sglang_command(
         "deepseek-ai/DeepSeek-V4-Pro",

@@ -2132,6 +2132,10 @@ def observability_coverage_cmd(
         Path | None,
         typer.Option("--lmcache-l0-boundary-evidence-file", help="Optional LMCache PR3255 L0 block boundary JSONL or summary JSON."),
     ] = None,
+    sglang_kv_events_evidence_file: Annotated[
+        Path | None,
+        typer.Option("--sglang-kv-events-evidence-file", help="Optional SGLang KV-events JSON/JSONL evidence; raw token/hash fields are redacted."),
+    ] = None,
     expected_engine: Annotated[
         str,
         typer.Option("--expected-engine", help="Expected engine: auto, vllm, or sglang."),
@@ -2225,6 +2229,7 @@ def observability_coverage_cmd(
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
             lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
+            sglang_kv_events_evidence_file=sglang_kv_events_evidence_file,
             **kwargs,
         )
     else:
@@ -2238,6 +2243,7 @@ def observability_coverage_cmd(
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
             lmcache_l0_boundary_evidence_file=lmcache_l0_boundary_evidence_file,
+            sglang_kv_events_evidence_file=sglang_kv_events_evidence_file,
             **kwargs,
         )
     if output is not None:

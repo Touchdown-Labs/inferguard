@@ -24,6 +24,8 @@ L0_BOUNDARY_FORBIDDEN_FIELDS = (
     "raw_block_ids",
     "gpu_block_ids",
 )
+SGLANG_KV_EVENTS_SCHEMA_VERSION = "inferguard-sglang-kv-events-evidence/v1"
+SGLANG_KV_EVENTS_FORBIDDEN_FIELDS = ("token id lists", "block hash lists", "parent block hash")
 
 
 class ExpectMode(StrEnum):
@@ -1639,6 +1641,107 @@ def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
     }
 
 
+def read_sglang_kv_events_evidence(path: Path | None) -> dict[str, Any] | None:
+    """Read SGLang KV events and return redacted aggregate evidence only."""
+
+    if path is None:
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {
+            "present": False,
+            "claim_status": "blocked",
+            "failure_reasons": [
+                {"code": "sglang_kv_events_file_unreadable", "message": f"Could not read {path}"}
+            ],
+        }
+    records: list[Any]
+    if path.suffix == ".jsonl":
+        records = []
+        for line in text.splitlines():
+            if line.strip():
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    records.append({"_inferguard_malformed_json": True})
+    else:
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            records = [{"_inferguard_malformed_json": True}]
+        else:
+            records = payload if isinstance(payload, list) else [payload]
+    return summarize_sglang_kv_events(records)
+
+
+def summarize_sglang_kv_events(records: list[Any]) -> dict[str, Any]:
+    """Summarize SGLang/LMCache KV-event payloads without persisting raw token or hash data."""
+
+    event_batch_count = 0
+    block_stored_count = 0
+    block_removed_count = 0
+    block_count = 0
+    has_parent_relationships = 0
+    raw_token_ids_seen = False
+    raw_block_hashes_seen = False
+    malformed_count = 0
+    publishers: set[str] = set()
+    topics: set[str] = set()
+    for record in records:
+        if not isinstance(record, dict):
+            malformed_count += 1
+            continue
+        if record.get("_inferguard_malformed_json"):
+            malformed_count += 1
+            continue
+        event_batch_count += 1
+        if record.get("publisher"):
+            publishers.add(str(record["publisher"]))
+        if record.get("topic"):
+            topics.add(str(record["topic"]))
+        events = record.get("events") if isinstance(record.get("events"), list) else [record]
+        for event in events:
+            if not isinstance(event, dict):
+                malformed_count += 1
+                continue
+            event_type = str(event.get("type") or event.get("event_type") or event.get("event") or "")
+            raw_token_ids_seen = raw_token_ids_seen or "token_ids" in event
+            raw_block_hashes_seen = raw_block_hashes_seen or "block_hashes" in event or "parent_block_hash" in event
+            event_blocks = event.get("block_hashes")
+            if isinstance(event_blocks, list):
+                block_count += len(event_blocks)
+            elif event.get("block_hash") is not None:
+                block_count += 1
+                raw_block_hashes_seen = True
+            if event.get("parent_block_hash") is not None:
+                has_parent_relationships += 1
+            if event_type.endswith("BlockStored") or event_type == "BlockStored":
+                block_stored_count += 1
+            elif event_type.endswith("BlockRemoved") or event_type == "BlockRemoved":
+                block_removed_count += 1
+    present = bool(event_batch_count or block_stored_count or block_removed_count or block_count)
+    return {
+        "schema_version": SGLANG_KV_EVENTS_SCHEMA_VERSION,
+        "source_engine": "sglang",
+        "publisher": sorted(publishers)[0] if len(publishers) == 1 else None,
+        "topic": sorted(topics)[0] if len(topics) == 1 else None,
+        "event_batch_count": event_batch_count,
+        "block_stored_count": block_stored_count,
+        "block_removed_count": block_removed_count,
+        "block_count": block_count,
+        "has_parent_relationships": has_parent_relationships,
+        "raw_token_id_values_seen": raw_token_ids_seen,
+        "raw_block_hash_values_seen": raw_block_hashes_seen,
+        "raw_token_id_values_recorded": False,
+        "raw_block_hash_values_recorded": False,
+        "redacted_fields": list(SGLANG_KV_EVENTS_FORBIDDEN_FIELDS),
+        "malformed_count": malformed_count,
+        "present": present,
+        "claim_status": "measured" if present and not malformed_count else ("blocked" if malformed_count else "not_proven"),
+    }
+
+
 def _read_url(url: str, timeout_seconds: float) -> str:
     with urllib.request.urlopen(url, timeout=timeout_seconds) as response:  # noqa: S310  # nosec B310 - operator-supplied metrics URL.
         return response.read().decode("utf-8", errors="replace")
@@ -1940,8 +2043,11 @@ __all__ = [
     "ExpectMode",
     "FailOn",
     "SCHEMA_VERSION",
+    "SGLANG_KV_EVENTS_SCHEMA_VERSION",
     "build_compat_report",
     "build_compat_report_from_paths",
     "build_compat_report_from_urls",
+    "read_sglang_kv_events_evidence",
+    "summarize_sglang_kv_events",
     "write_compat_report",
 ]

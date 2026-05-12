@@ -65,6 +65,13 @@ SGLANG_LOCKED_METRICS: tuple[str, ...] = (
     "sglang:time_per_output_token_seconds",
     "sglang:func_latency_seconds",
     "sglang:estimated_flops_per_gpu_total",
+    "sglang:num_preemptions_total",
+    "sglang:hicache_l1_hit_count_total",
+    "sglang:hicache_l2_hit_count_total",
+    "sglang:hicache_l3_hit_count_total",
+    "sglang:hicache_lookup_count_total",
+    "sglang:hicache_l2_bytes",
+    "sglang:hicache_l3_bytes",
 )
 
 LMCACHE_LOCKED_METRICS: tuple[str, ...] = (
@@ -165,6 +172,7 @@ ENGINE_SOURCE_METRICS: dict[str, tuple[str, ...]] = {
         "vllm:request_queue_time_seconds",
         "sglang:num_running_reqs",
         "sglang:num_queue_reqs",
+        "sglang:num_preemptions_total",
     ),
     "kv_cache": (
         "vllm:kv_cache_usage_perc",
@@ -183,6 +191,12 @@ ENGINE_SOURCE_METRICS: dict[str, tuple[str, ...]] = {
         "vllm:simple_cpu_offload_pending_stores",
         "sglang:token_usage",
         "sglang:num_used_tokens",
+        "sglang:hicache_l1_hit_count_total",
+        "sglang:hicache_l2_hit_count_total",
+        "sglang:hicache_l3_hit_count_total",
+        "sglang:hicache_lookup_count_total",
+        "sglang:hicache_l2_bytes",
+        "sglang:hicache_l3_bytes",
         "vllm:kv_transfer_sent_bytes_total",
         "vllm:kv_transfer_recv_bytes_total",
         "vllm:kv_transfer_errors_total",
@@ -485,6 +499,7 @@ def _queue_group(
         request_queue_time_seconds=_hist_value(samples, "vllm:request_queue_time_seconds"),
         running_source=_source_for(observed, "vllm:num_requests_running", "sglang:num_running_reqs"),
         waiting_source=_source_for(observed, "vllm:num_requests_waiting", "sglang:num_queue_reqs"),
+        num_preemptions_total=_sum_metric(samples, "sglang:num_preemptions_total"),
     )
 
 
@@ -509,6 +524,12 @@ def _kv_cache_group(
         usage_fraction_source=usage_source,
         token_usage=token_usage,
         num_used_tokens=_sum_metric(samples, "sglang:num_used_tokens"),
+        hicache_l1_hit_count_total=_sum_metric(samples, "sglang:hicache_l1_hit_count_total"),
+        hicache_l2_hit_count_total=_sum_metric(samples, "sglang:hicache_l2_hit_count_total"),
+        hicache_l3_hit_count_total=_sum_metric(samples, "sglang:hicache_l3_hit_count_total"),
+        hicache_lookup_count_total=_sum_metric(samples, "sglang:hicache_lookup_count_total"),
+        hicache_l2_bytes=_max_metric(samples, "sglang:hicache_l2_bytes"),
+        hicache_l3_bytes=_max_metric(samples, "sglang:hicache_l3_bytes"),
         kv_block_lifetime_seconds=_hist_value(samples, "vllm:kv_block_lifetime_seconds"),
         kv_block_idle_before_evict_seconds=_hist_value(
             samples, "vllm:kv_block_idle_before_evict_seconds"
