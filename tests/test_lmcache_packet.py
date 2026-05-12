@@ -162,6 +162,7 @@ def test_collect_lmcache_packet_writes_sglang_lmcache_mp_coverage(tmp_path: Path
     engine_metrics.write_text(
         '\n'.join(
             [
+                'sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1',
                 'sglang:prompt_tokens_total 8',
                 'sglang:generation_tokens_total 4',
                 'sglang:num_requests_total{state="running"} 1',
@@ -199,8 +200,11 @@ def test_collect_lmcache_packet_writes_sglang_lmcache_mp_coverage(tmp_path: Path
     assert coverage["expected_engine"] == "sglang"
     assert coverage["expect_lmcache_mode"] == "mp"
     sglang_mp = coverage["sglang_lmcache_mp_observability"]
-    assert sglang_mp["classification"] == "sglang_mp_lmcache_candidate"
-    assert sglang_mp["claim_status"] == "not_proven"
+    assert sglang_mp["classification"] == "sglang_mp_lmcache_observability"
+    assert sglang_mp["claim_status"] == "fixture_tested"
+    assert sglang_mp["acceptance_state"] == "complete"
+    assert sglang_mp["acceptance_blockers"] == []
+    assert all(row["status"] == "populated" for row in sglang_mp["mp_family_breakdown"]["required"].values())
     assert coverage["surfaces"]["lmcache_mp"]["status"] == "complete"
 
 

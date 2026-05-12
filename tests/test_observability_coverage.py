@@ -187,6 +187,15 @@ sglang:token_usage 0.7
     assert architecture["claim_status"] == "fixture_tested"
     assert support["support_status"] == "source_backed_fixture_tested"
     assert support["claim_status"] == "fixture_tested"
+    assert support["acceptance_state"] == "complete"
+    assert support["acceptance_blockers"] == []
+    assert support["sglang_mp_launch_evidence_present"] is True
+    assert support["sglang_mp_connector_evidence_present"] is True
+    required = support["mp_family_breakdown"]["required"]
+    assert set(required) == {"storage_manager", "lookup_tokens", "l1_counters", "l1_memory"}
+    assert all(row["status"] == "populated" for row in required.values())
+    assert "l1_failures" in support["mp_family_breakdown"]["lifecycle_error_abort_when_present"]
+    assert "l0_lifecycle" in support["mp_family_breakdown"]["lifecycle_error_abort_when_present"]
     assert support["upstream_state"] == "open_prs_not_merged"
     assert provenance["prs"][0]["number"] == 24089
     assert provenance["prs"][0]["opened_at"] == "2026-04-29T21:01:46Z"
@@ -228,7 +237,36 @@ sglang:token_usage 0.7
     assert architecture["claim_status"] == "inferred"
     assert support["classification"] == "sglang_mp_lmcache_candidate"
     assert support["claim_status"] == "not_proven"
+    assert support["acceptance_state"] == "incomplete"
+    assert "missing_sglang_mp_launch_evidence" in support["acceptance_blockers"]
+    assert "missing_sglang_mp_connector_evidence" in support["acceptance_blockers"]
     assert support["live_validation"] == "pending"
+
+
+def test_sglang_lmcache_mp_missing_required_family_is_incomplete() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+sglang:launch_config_info{enable_lmcache="true",lmcache_mp_host="127.0.0.1",lmcache_mp_port="5556",connector="LMCacheMPLayerwiseConnector",radix_cache="LMCRadixCache"} 1
+sglang:prompt_tokens_total 100
+sglang:generation_tokens_total 50
+""",
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_lookup_requested_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 100
+lmcache_mp_lookup_hit_tokens_total{model_name="Qwen/Qwen2.5-1.5B-Instruct",cache_salt="fixture"} 50
+""",
+        expected_engine="sglang",
+        expect_lmcache_mode="mp",
+    )
+
+    support = report["sglang_lmcache_mp_observability"]
+    assert support["classification"] == "sglang_mp_lmcache_observability"
+    assert support["claim_status"] == "not_proven"
+    assert support["acceptance_state"] == "incomplete"
+    assert "missing_required_family:l1_memory" in support["acceptance_blockers"]
+    assert support["mp_family_breakdown"]["required"]["l1_memory"]["status"] == "missing"
 
 
 def test_observability_coverage_cli_writes_report(tmp_path: Path) -> None:

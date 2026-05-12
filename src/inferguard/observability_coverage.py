@@ -241,6 +241,7 @@ def build_observability_coverage_report(
     )
     sglang_lmcache_mp = _sglang_lmcache_mp_observability_report(
         lmcache_report,
+        expect_lmcache_mode=expect_lmcache_mode,
         version_provenance=sglang_lmcache_version_provenance,
     )
     return {
@@ -511,15 +512,56 @@ def _sglang_lmcache_embedded_support_report(
 def _sglang_lmcache_mp_observability_report(
     lmcache_report: dict[str, Any],
     *,
+    expect_lmcache_mode: str,
     version_provenance: dict[str, Any],
 ) -> dict[str, Any]:
     architecture = lmcache_report.get("detected_architecture") or {}
     classification = str(architecture.get("label") or "unknown")
-    claim_status = "fixture_tested" if classification == "sglang_mp_lmcache_observability" else "not_proven"
+    signals = architecture.get("signals") if isinstance(architecture.get("signals"), dict) else {}
+    families = lmcache_report.get("families") if isinstance(lmcache_report.get("families"), list) else []
+    family_breakdown = _sglang_lmcache_mp_family_breakdown(families)
+    required_families_present = all(
+        row["status"] == "populated" for row in family_breakdown["required"].values()
+    )
+    expected_mode_is_mp = expect_lmcache_mode == "mp"
+    detected_mode_is_mp = lmcache_report.get("detected_mode") == "mp"
+    launch_evidence_present = bool(signals.get("sglang_lmcache_mp_launch_evidence"))
+    connector_evidence_present = bool(signals.get("sglang_mp_lmcache_connector_label"))
+    complete = all(
+        [
+            expected_mode_is_mp,
+            detected_mode_is_mp,
+            classification == "sglang_mp_lmcache_observability",
+            launch_evidence_present,
+            connector_evidence_present,
+            required_families_present,
+        ]
+    )
+    blockers = []
+    if not expected_mode_is_mp:
+        blockers.append("expected_mode_not_mp")
+    if not detected_mode_is_mp:
+        blockers.append("detected_mode_not_mp")
+    if not launch_evidence_present:
+        blockers.append("missing_sglang_mp_launch_evidence")
+    if not connector_evidence_present:
+        blockers.append("missing_sglang_mp_connector_evidence")
+    for family, row in family_breakdown["required"].items():
+        if row["status"] != "populated":
+            blockers.append(f"missing_required_family:{family}")
+    claim_status = "fixture_tested" if complete else "not_proven"
+    acceptance_state = "complete" if complete else ("incomplete" if detected_mode_is_mp else "mixed_or_not_proven")
     return {
         "support_status": "source_backed_fixture_tested",
         "classification": classification,
         "claim_status": claim_status,
+        "acceptance_state": acceptance_state,
+        "acceptance_blockers": blockers,
+        "expected_mode_is_mp": expected_mode_is_mp,
+        "detected_mode_is_mp": detected_mode_is_mp,
+        "sglang_mp_launch_evidence_present": launch_evidence_present,
+        "sglang_mp_connector_evidence_present": connector_evidence_present,
+        "mp_family_breakdown": family_breakdown,
         "upstream_state": "open_prs_not_merged",
         "sglang_pr": "https://github.com/sgl-project/sglang/pull/24089",
         "lmcache_pr": "https://github.com/LMCache/LMCache/pull/3166",
@@ -536,6 +578,40 @@ def _sglang_lmcache_mp_observability_report(
             "not performance validated",
             "not production support",
         ],
+    }
+
+
+def _sglang_lmcache_mp_family_breakdown(families: list[Any]) -> dict[str, Any]:
+    required_names = ("storage_manager", "lookup_tokens", "l1_counters", "l1_memory")
+    optional_names = (
+        "l1_failures",
+        "l1_lifecycle",
+        "l0_lifecycle",
+        "l0_allocation_counters",
+        "real_reuse",
+        "event_bus",
+    )
+    by_name = {
+        str(row.get("family")): row
+        for row in families
+        if isinstance(row, dict) and row.get("surface") == "lmcache_mp"
+    }
+
+    def summarize(name: str) -> dict[str, Any]:
+        row = by_name.get(name) or {}
+        return {
+            "status": str(row.get("status") or "missing"),
+            "required_when": str(row.get("required_when") or "always"),
+            "matched_metrics": list(row.get("matched_metrics") or []),
+        }
+
+    return {
+        "required": {name: summarize(name) for name in required_names},
+        "lifecycle_error_abort_when_present": {
+            name: summarize(name)
+            for name in optional_names
+            if summarize(name)["status"] in {"populated", "zero"}
+        },
     }
 
 
