@@ -11,6 +11,7 @@ from typing import Any
 
 from inferguard.compat import build_compat_report
 from inferguard.io import atomic_write_json
+from inferguard.lmcache_cacheblend_boundary import read_cacheblend_boundary_evidence_jsonl
 from inferguard.metrics_core import parse_labeled_prometheus_text
 
 SCHEMA_VERSION = "inferguard-observability-coverage/v1"
@@ -178,6 +179,7 @@ def build_observability_coverage_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
+    lmcache_cacheblend_boundary_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a single coverage report for engine and LMCache telemetry."""
 
@@ -210,6 +212,7 @@ def build_observability_coverage_report(
         lmcache_otel_evidence=lmcache_otel_evidence,
         lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
         lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+        lmcache_cacheblend_boundary_evidence=lmcache_cacheblend_boundary_evidence,
     )
     surfaces = _surface_rows(engine_families)
     for surface, row in lmcache_report.get("surfaces", {}).items():
@@ -252,6 +255,7 @@ def build_observability_coverage_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -269,6 +273,9 @@ def build_observability_coverage_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
         **kwargs,
     )
 
@@ -284,6 +291,7 @@ def build_observability_coverage_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     return build_observability_coverage_report(
@@ -297,6 +305,9 @@ def build_observability_coverage_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
         **kwargs,
     )
 

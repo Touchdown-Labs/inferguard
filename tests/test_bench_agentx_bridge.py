@@ -1,13 +1,12 @@
 import json
 
-from typer.testing import CliRunner
-
 from inferguard.bench.agentx_bridge import AgentXReplayConfig, run_agentx_replay
 from inferguard.cli import app
+from typer.testing import CliRunner
 
 
 def test_agentx_replay_help_surfaces_required_flags() -> None:
-    result = CliRunner().invoke(app, ["bench", "agentx-replay", "--help"])
+    result = CliRunner(mix_stderr=False).invoke(app, ["bench", "agentx-replay", "--help"])
 
     assert result.exit_code == 0
     assert "--trace-source" in result.stdout
@@ -15,7 +14,7 @@ def test_agentx_replay_help_surfaces_required_flags() -> None:
 
 
 def test_agentx_replay_requires_tester_without_network_clone(tmp_path) -> None:
-    result = CliRunner().invoke(
+    result = CliRunner(mix_stderr=False).invoke(
         app,
         [
             "bench",

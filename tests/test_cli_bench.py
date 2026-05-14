@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from inferguard.cli import app
+from typer.testing import CliRunner
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -24,7 +23,7 @@ def test_bench_replay_help() -> None:
 
 
 def test_bench_kv_stress_help() -> None:
-    result = CliRunner().invoke(app, ["bench", "kv-stress", "--help"])
+    result = CliRunner(mix_stderr=False).invoke(app, ["bench", "kv-stress", "--help"])
 
     assert result.exit_code == 0
     assert "--context-lengths" in result.stdout
@@ -32,7 +31,7 @@ def test_bench_kv_stress_help() -> None:
 
 
 def test_bench_replay_missing_trace_dir_exits_cleanly(tmp_path) -> None:
-    result = CliRunner().invoke(
+    result = CliRunner(mix_stderr=False).invoke(
         app,
         [
             "bench",
@@ -61,7 +60,7 @@ def test_bench_replay_rejects_endpoint_query(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    result = CliRunner().invoke(
+    result = CliRunner(mix_stderr=False).invoke(
         app,
         [
             "bench",
