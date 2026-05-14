@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import time
+from importlib import import_module
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
@@ -28,7 +29,6 @@ from inferguard.analyze import (
     exit_code_for_report,
     render_plots,
 )
-from inferguard.analyze.exporters import emit_agentx_shape
 from inferguard.bench import (
     AgentXReplayConfig,
     BenchConfig,
@@ -46,7 +46,6 @@ from inferguard.config import HTTP_TIMEOUT_SECONDS
 from inferguard.disagg.adapters import scrape
 from inferguard.disagg.detect import evaluate
 from inferguard.disagg.types import DisaggFinding, DisaggStatus, EngineName
-from inferguard.harness.agent_trace import AgentTracer
 from inferguard.harness.cluster_daemon import ClusterDaemon
 from inferguard.harness.daemon import DEFAULT_DAEMON_PORT, Daemon
 from inferguard.harness.telemetry import NEVER_COLLECTED_KEYS, TelemetryClient, default_config_dir
@@ -424,7 +423,8 @@ def analyze_cmd(
             )
             raise typer.Exit(code=3) from exc
     if emit_agentx_shape_dir is not None:
-        emit_agentx_shape(report, emit_agentx_shape_dir)
+        exporters = import_module("inferguard.analyze.exporters")
+        exporters.emit_agentx_shape(report, emit_agentx_shape_dir)
     if json_out:
         sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
     raise typer.Exit(code=exit_code_for_report(report, fail_on))
@@ -2322,10 +2322,7 @@ def agentx_ingest_cmd(
     ] = None,
 ) -> None:
     """Convert AgentX result CSV outputs into canonical InferGuard schemas."""
-    from inferguard.agentx_adapter import (
-        convert_agentx_result_to_canonical,
-        ingest_agentx_results_dir,
-    )
+    adapter = import_module("inferguard.agentx_adapter")
 
     if agentx_results_dir is None and agentx_result is None:
         raise typer.BadParameter("--agentx-results-dir or --agentx-result is required for ingest-agentx")
@@ -2333,7 +2330,7 @@ def agentx_ingest_cmd(
         raise typer.BadParameter("provide only one of --agentx-results-dir or --agentx-result")
     if agentx_results_dir is not None:
         try:
-            artifacts = ingest_agentx_results_dir(
+            artifacts = adapter.ingest_agentx_results_dir(
                 agentx_results_dir,
                 output_dir=output_dir,
                 job_id=job_id,
@@ -2352,7 +2349,7 @@ def agentx_ingest_cmd(
             "model_profile": model_profile or model,
             "concurrency": int(concurrency or 1),
         }
-        artifacts = convert_agentx_result_to_canonical(agentx_result, metadata)
+        artifacts = adapter.convert_agentx_result_to_canonical(agentx_result, metadata)
     typer.echo(artifacts.summary.summary_line())
     raise typer.Exit(code=0 if artifacts.summary.status == "ingested" else 1)
 
@@ -2543,15 +2540,15 @@ def diagnose_bottleneck_cmd(
     ] = False,
 ) -> None:
     """Diagnose one completed job into a bottleneck verdict."""
-    from inferguard.diagnose_bottleneck import diagnose, write_diagnosis
+    diagnose_module = import_module("inferguard.diagnose_bottleneck")
 
-    diagnosis = diagnose(
+    diagnosis = diagnose_module.diagnose(
         job_dir,
         validation_report=validation_report,
         rule_config=rule_config,
     )
     target = output_dir or job_dir / "diagnosis"
-    write_diagnosis(diagnosis, target, json_only=json_only)
+    diagnose_module.write_diagnosis(diagnosis, target, json_only=json_only)
     typer.echo(diagnosis.summary_line())
     if strict and diagnosis.to_dict()["verdict"] == "not_enough_evidence":
         raise typer.Exit(code=1)
@@ -3073,7 +3070,8 @@ def agent_trace_cmd(
             "subprocess argv is required; pass it after options, e.g. "
             "`inferguard agent trace --output-dir traces -- python agent.py`"
         )
-    tracer = AgentTracer(
+    trace_module = import_module("inferguard.harness.agent_trace")
+    tracer = trace_module.AgentTracer(
         output_dir=output_dir,
         framework=_validated_agent_framework(framework),
         save_prompts=save_prompts,
