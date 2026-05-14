@@ -5,8 +5,15 @@ from inferguard.cli import app
 from typer.testing import CliRunner
 
 
+def _stderr(result):
+    try:
+        return result.stderr
+    except ValueError:
+        return result.output
+
+
 def test_agentx_replay_help_surfaces_required_flags() -> None:
-    result = CliRunner(mix_stderr=False).invoke(app, ["bench", "agentx-replay", "--help"])
+    result = CliRunner().invoke(app, ["bench", "agentx-replay", "--help"])
 
     assert result.exit_code == 0
     assert "--trace-source" in result.stdout
@@ -14,7 +21,7 @@ def test_agentx_replay_help_surfaces_required_flags() -> None:
 
 
 def test_agentx_replay_requires_tester_without_network_clone(tmp_path) -> None:
-    result = CliRunner(mix_stderr=False).invoke(
+    result = CliRunner().invoke(
         app,
         [
             "bench",
@@ -31,8 +38,8 @@ def test_agentx_replay_requires_tester_without_network_clone(tmp_path) -> None:
     )
 
     assert result.exit_code == 3
-    assert "Pass --tester-path" in result.stderr
-    assert "--allow-network-clone" in result.stderr
+    assert "Pass --tester-path" in _stderr(result)
+    assert "--allow-network-clone" in _stderr(result)
 
 
 def test_agentx_replay_smoke_with_fake_tester(tmp_path) -> None:

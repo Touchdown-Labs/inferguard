@@ -3,6 +3,13 @@ from pathlib import Path
 from inferguard.cli import app
 from typer.testing import CliRunner
 
+
+def _stderr(result):
+    try:
+        return result.stderr
+    except ValueError:
+        return result.output
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -23,7 +30,7 @@ def test_bench_replay_help() -> None:
 
 
 def test_bench_kv_stress_help() -> None:
-    result = CliRunner(mix_stderr=False).invoke(app, ["bench", "kv-stress", "--help"])
+    result = CliRunner().invoke(app, ["bench", "kv-stress", "--help"])
 
     assert result.exit_code == 0
     assert "--context-lengths" in result.stdout
@@ -31,7 +38,7 @@ def test_bench_kv_stress_help() -> None:
 
 
 def test_bench_replay_missing_trace_dir_exits_cleanly(tmp_path) -> None:
-    result = CliRunner(mix_stderr=False).invoke(
+    result = CliRunner().invoke(
         app,
         [
             "bench",
@@ -48,7 +55,7 @@ def test_bench_replay_missing_trace_dir_exits_cleanly(tmp_path) -> None:
     )
 
     assert result.exit_code == 3
-    assert "trace-dir does not exist" in result.stderr
+    assert "trace-dir does not exist" in _stderr(result)
 
 
 def test_bench_replay_rejects_endpoint_query(tmp_path) -> None:
@@ -60,7 +67,7 @@ def test_bench_replay_rejects_endpoint_query(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    result = CliRunner(mix_stderr=False).invoke(
+    result = CliRunner().invoke(
         app,
         [
             "bench",
@@ -77,7 +84,7 @@ def test_bench_replay_rejects_endpoint_query(tmp_path) -> None:
     )
 
     assert result.exit_code == 3
-    assert "must not include userinfo" in result.stderr
+    assert "must not include userinfo" in _stderr(result)
 
 
 def test_preflight_command_surfaces_hma_warning() -> None:
