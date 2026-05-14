@@ -133,7 +133,7 @@ for workload_class in "${WORKLOAD_CLASSES[@]}"; do
     --duration-seconds "$DURATION_SECONDS" \
     --timeout "$TIMEOUT" \
     --output-dir "$class_output_dir" \
-    "${redact_args[@]}"; then
+    ${redact_args[@]+"${redact_args[@]}"}; then
     STATUS_BY_CLASS+=("ok")
   else
     STATUS_BY_CLASS+=("failed")
