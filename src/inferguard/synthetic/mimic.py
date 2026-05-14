@@ -444,14 +444,14 @@ def make_job(
         "GMI_MODEL_HF_REPO": model_profile.get("hf_repo", ""),
         "GMI_MODEL_ARCHITECTURE_CLASS": model_profile.get("architecture_class", "unknown"),
         "GMI_MODEL_CLAIM_LEVEL": model_profile.get("claim_level", "operator_supplied"),
-        "GMI_MODEL_PATH": env_or_placeholder(
+        "GMI_MODEL_PATH": env_or_fallback(
             cluster.get("model_path_env"), model_profile.get("hf_repo", "MODEL_PATH_FROM_ENV")
         ),
-        "GMI_MODEL_CONFIG_PATH": env_or_placeholder(cluster.get("model_config_path_env"), ""),
-        "GMI_CONTAINER_IMAGE": env_or_placeholder(
+        "GMI_MODEL_CONFIG_PATH": env_or_fallback(cluster.get("model_config_path_env"), ""),
+        "GMI_CONTAINER_IMAGE": env_or_fallback(
             cluster.get("container_image_env"), "CONTAINER_IMAGE_FROM_ENV"
         ),
-        "GMI_ENDPOINT": env_or_placeholder(
+        "GMI_ENDPOINT": env_or_fallback(
             cluster.get("endpoint_env"),
             cluster.get("default_endpoint", "http://127.0.0.1:8000/v1/chat/completions"),
         ),
@@ -491,10 +491,10 @@ def make_job(
     }
 
 
-def env_or_placeholder(env_name: str | None, placeholder: str) -> str:
+def env_or_fallback(env_name: str | None, fallback_template: str) -> str:
     if not env_name:
-        return placeholder
-    return os.environ.get(env_name, f"${{{env_name}}}" if placeholder else "")
+        return fallback_template
+    return os.environ.get(env_name, f"${{{env_name}}}" if fallback_template else "")
 
 
 def optional_env(env: dict[str, Any], key: str, source_env: str | None) -> None:
