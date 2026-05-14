@@ -96,6 +96,7 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
     "lmcache_mp_l1_memory_usage_bytes",
 )
 PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
+CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE = "cacheblend_l0_boundary_evidence.jsonl"
 AGENT_KV_OFFLOAD_REPORT_FILE = "agent_kv_offload_report.json"
 WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
 PACKET_B_TRACE_SOURCE = "traces/isb1-dsv4-agent"
@@ -789,6 +790,10 @@ def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[st
         )
     if spec.lmcache_log_level:
         env["LMCACHE_LOG_LEVEL"] = spec.lmcache_log_level
+    if spec.packet_id == "b":
+        env["INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"] = str(
+            run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE
+        )
     return env
 
 
@@ -1462,6 +1467,13 @@ def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) ->
         cmd.append("--l2-configured")
     if spec.enable_otel:
         cmd.append("--mp-tracing-enabled")
+    if spec.packet_id == "b":
+        cmd.extend(
+            [
+                "--lmcache-cacheblend-boundary-evidence-file",
+                str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
+            ]
+        )
     _maybe_add_existing(cmd, "--lmcache-periodic-thread-file", run_dir / "http" / "periodic_thread.json")
     _maybe_add_existing(cmd, "--lmcache-otel-file", run_dir / LMCACHE_OTEL_FILE)
     _maybe_add_existing(cmd, "--lmcache-trace-replay-output", run_dir / TRACE_REPLAY_DIR)
@@ -1504,6 +1516,13 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
         cmd.append("--l2-configured")
     if spec.enable_otel:
         cmd.append("--mp-tracing-enabled")
+    if spec.packet_id == "b":
+        cmd.extend(
+            [
+                "--lmcache-cacheblend-boundary-evidence-file",
+                str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
+            ]
+        )
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
@@ -1537,6 +1556,13 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
     ]
     if spec.l2_configured:
         cmd.append("--l2-configured")
+    if spec.packet_id == "b":
+        cmd.extend(
+            [
+                "--lmcache-cacheblend-boundary-evidence-file",
+                str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
+            ]
+        )
     _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
     _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")

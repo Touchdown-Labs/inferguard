@@ -330,6 +330,22 @@ def test_packet_b_uses_sampled_lifecycle_reuse_eviction_workload(tmp_path: Path)
     assert "traffic_requests.jsonl" in lab._optional_artifacts(spec)
 
 
+def test_packet_b_wires_cacheblend_l0_boundary_evidence(tmp_path: Path) -> None:
+    lab = _load_lab_module()
+    spec = lab.PACKETS["b"]
+
+    env = lab._build_lmcache_env(tmp_path, spec)
+    collect = lab._build_collect_lmcache_cmd(tmp_path, spec)
+    compat = lab._build_lmcache_compat_cmd(tmp_path, spec)
+    coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
+
+    evidence_path = tmp_path / lab.CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE
+    assert env["INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"] == str(evidence_path)
+    for cmd in (collect, compat, coverage):
+        assert "--lmcache-cacheblend-boundary-evidence-file" in cmd
+        assert cmd[cmd.index("--lmcache-cacheblend-boundary-evidence-file") + 1] == str(evidence_path)
+
+
 def test_capture_metrics_uses_lmcache_prometheus_fallback(tmp_path: Path) -> None:
     lab = _load_lab_module()
     attempted: list[str] = []

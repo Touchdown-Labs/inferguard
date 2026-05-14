@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 
 from inferguard.compat import build_compat_report, write_compat_report
 from inferguard.io import atomic_write_json, atomic_write_text
+from inferguard.lmcache_cacheblend_boundary import read_cacheblend_boundary_evidence_jsonl
 from inferguard.lmcache_http import parse_lmcache_http_payloads
 from inferguard.lmcache_logs import parse_lmcache_logs
 from inferguard.lmcache_otel import parse_lmcache_otel_jsonl
@@ -62,6 +63,7 @@ class LmcachePacketOptions:
     lmcache_otel_file: Path | None = None
     lmcache_trace_replay_output: Path | None = None
     lmcache_lookup_hash_path: Path | None = None
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None
     expect_mode: str = "auto"
     l2_configured: bool = False
     timeout_seconds: float = 10.0
@@ -375,6 +377,16 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         sources=sources,
         errors=errors,
     )
+    cacheblend_boundary_evidence = read_cacheblend_boundary_evidence_jsonl(
+        options.lmcache_cacheblend_boundary_evidence_file
+    )
+    if cacheblend_boundary_evidence is not None:
+        boundary_evidence_path = output_dir / "lmcache_cacheblend_boundary_evidence.json"
+        atomic_write_json(boundary_evidence_path, cacheblend_boundary_evidence)
+        artifacts["lmcache_cacheblend_boundary_evidence"] = str(boundary_evidence_path)
+        sources["lmcache_cacheblend_boundary_evidence"] = str(
+            options.lmcache_cacheblend_boundary_evidence_file
+        )
 
     report = build_compat_report(
         engine_text=engine_text,
@@ -390,6 +402,7 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         lmcache_otel_evidence=otel_evidence,
         lmcache_trace_replay_evidence=trace_replay_evidence,
         lmcache_lookup_hash_evidence=lookup_hash_evidence,
+        lmcache_cacheblend_boundary_evidence=cacheblend_boundary_evidence,
     )
     compat_path = output_dir / "lmcache_compat_report.json"
     write_compat_report(report, compat_path)
@@ -417,6 +430,7 @@ def collect_lmcache_packet(options: LmcachePacketOptions) -> dict[str, Any]:
         "otel_evidence": otel_evidence,
         "trace_replay_evidence": trace_replay_evidence,
         "lookup_hash_evidence": lookup_hash_evidence,
+        "cacheblend_boundary_evidence": cacheblend_boundary_evidence,
     }
     manifest_path = output_dir / "packet_manifest.json"
     atomic_write_json(manifest_path, manifest)

@@ -1903,6 +1903,13 @@ def collect_lmcache_cmd(
             help="Optional lookup_hashes_*.jsonl file or lookup-hash directory to copy and parse if supported.",
         ),
     ] = None,
+    lmcache_cacheblend_boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--lmcache-cacheblend-boundary-evidence-file",
+            help="Optional CacheBlend L0 boundary evidence JSONL file to summarize.",
+        ),
+    ] = None,
     expect_mode: Annotated[
         str,
         typer.Option("--expect-mode", help="Expected LMCache mode: auto, mp, or embedded."),
@@ -2020,6 +2027,7 @@ def collect_lmcache_cmd(
             lmcache_otel_file,
             lmcache_trace_replay_output,
             lmcache_lookup_hash_path,
+            lmcache_cacheblend_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter("pass at least one URL or file input to collect")
@@ -2060,6 +2068,7 @@ def collect_lmcache_cmd(
             lmcache_otel_file=lmcache_otel_file,
             lmcache_trace_replay_output=lmcache_trace_replay_output,
             lmcache_lookup_hash_path=lmcache_lookup_hash_path,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             timeout_seconds=timeout_seconds,
