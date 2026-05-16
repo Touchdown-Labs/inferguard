@@ -991,7 +991,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
             label="primary engine",
             max_wait_seconds=30 * 60,
             proc=primary_proc,
-            service_log_path=run_dir / "primary_engine.log",
+            service_log_path=run_dir / "engine.log",
         )
         if spec.secondary_port is not None:
             _wait_for_http(

@@ -288,7 +288,7 @@ def test_summary_marks_missing_required_and_score_status(tmp_path: Path) -> None
 
 def test_health_failure_message_includes_service_log_tail(tmp_path: Path, capsys) -> None:
     lab = _load_lab_module()
-    service_log = tmp_path / "primary_engine.log"
+    service_log = tmp_path / "engine.log"
     service_log.write_text("line1\nline2\nline3\n", encoding="utf-8")
 
     message = lab._health_failure_message(
@@ -298,7 +298,7 @@ def test_health_failure_message_includes_service_log_tail(tmp_path: Path, capsys
     )
 
     captured = capsys.readouterr()
-    assert "primary_engine.log" in message
+    assert "engine.log" in message
     assert "line1" in message
     assert "line3" in message
     assert "--- primary engine log tail:" in captured.err
