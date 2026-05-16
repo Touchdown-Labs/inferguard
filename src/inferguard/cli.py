@@ -1484,6 +1484,46 @@ def collect_metrics_cmd(
     raise typer.Exit(code=0)
 
 
+@app.command("cacheblend-report")
+def cacheblend_report_cmd(
+    metrics_file: Annotated[
+        Path,
+        typer.Option(
+            "--metrics-file",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Prometheus text scrape containing lmcache_blend metrics.",
+        ),
+    ],
+    boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--boundary-evidence-file",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Optional CacheBlend L0 boundary evidence JSONL file.",
+        ),
+    ] = None,
+) -> None:
+    """Summarize CacheBlend metrics, serde transforms, and L0 lifecycle evidence."""
+    from inferguard.lmcache_blend_lifecycle import analyze_cacheblend_lifecycle
+    from inferguard.lmcache_blend_metrics import analyze_cacheblend_metrics
+    from inferguard.lmcache_blend_serde import analyze_cacheblend_serde_metrics
+
+    metrics_text = metrics_file.read_text(encoding="utf-8")
+    payload = {
+        "cacheblend_metrics": analyze_cacheblend_metrics(metrics_text).to_dict(),
+        "serde": analyze_cacheblend_serde_metrics(metrics_text).to_dict(),
+        "lifecycle": analyze_cacheblend_lifecycle(
+            metrics_text,
+            boundary_evidence_path=boundary_evidence_file,
+        ).to_dict(),
+    }
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
 @app.command("lmcache-compat")
 def lmcache_compat_cmd(
     engine_metrics_url: Annotated[

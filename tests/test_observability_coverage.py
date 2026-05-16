@@ -614,3 +614,70 @@ def test_lmcache_compat_promotes_parser_only_p2p_pd_log_findings() -> None:
     assert by_code["lmcache_log_p2p_transfer_failure"]["evidence_status"] == "parser_only"
     assert by_code["lmcache_log_pd_role_mismatch"]["evidence_status"] == "parser_only"
     assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
+
+
+def test_lmcache_embedded_backend_families_zero_when_series_are_all_zero() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 0
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 0
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["support_level"] == "parser_only"
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "zero"
+
+
+def test_lmcache_embedded_backend_surface_partial_with_populated_and_zero_backends() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 1
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 1024
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    assert families[("lmcache_embedded", "production_requests")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "partial"
+
+
+def test_lmcache_mp_backend_coverage_zero_and_partial_surfaces() -> None:
+    zero_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 0
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 0
+""",
+        expect_lmcache_mode="mp",
+    )
+    partial_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 2048
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    zero_families = {(row["surface"], row["family"]): row for row in zero_report["lmcache_compat"]["families"]}
+    partial_families = {(row["surface"], row["family"]): row for row in partial_report["lmcache_compat"]["families"]}
+    assert zero_families[("lmcache_mp", "storage_manager")]["status"] == "zero"
+    assert zero_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert zero_report["surfaces"]["lmcache_mp"]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "storage_manager")]["status"] == "populated"
+    assert partial_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "l1_memory")]["status"] == "populated"
+    assert partial_report["surfaces"]["lmcache_mp"]["status"] == "partial"
