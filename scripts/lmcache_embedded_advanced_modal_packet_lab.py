@@ -431,8 +431,8 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
                 "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
                 "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/json",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/protobuf",
                 "OTEL_SERVICE_NAME": "inferguard-h3-cacheblend",
             }
         )
@@ -619,12 +619,12 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length", "0") or "0")
         body = self.rfile.read(length)
         with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
+            record = {
                 "path": self.path,
                 "content_type": self.headers.get("content-type"),
                 "body_preview": body.decode("utf-8", errors="replace")[:20000],
                 "body_bytes": len(body),
-            })
+            }
             try:
                 payload = json.loads(body.decode("utf-8"))
             except Exception:

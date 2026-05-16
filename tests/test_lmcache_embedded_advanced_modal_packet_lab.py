@@ -183,7 +183,7 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
 
     assert env["LMCACHE_ENABLE_CACHEBLEND"] == "True"
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
-    assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/json"
+    assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/protobuf"
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )
