@@ -1,8 +1,14 @@
 import json
 
+from inferguard.cli import app
 from typer.testing import CliRunner
 
-from inferguard.cli import app
+
+def _stderr(result):
+    try:
+        return result.stderr
+    except ValueError:
+        return result.output
 
 
 def _write_native_bench_fixture(root):
@@ -54,7 +60,7 @@ def test_analyze_no_artifacts_exits_3(tmp_path) -> None:
     result = CliRunner().invoke(app, ["analyze", str(tmp_path)])
 
     assert result.exit_code == 3
-    assert "no supported benchmark artifacts" in result.stderr
+    assert "no supported benchmark artifacts" in _stderr(result)
 
 
 def test_analyze_valid_agg_json_produces_report(tmp_path) -> None:

@@ -251,8 +251,13 @@ class DisaggSnapshot:
     lmcache_blend_lookup_requests: int | None = None
     lmcache_blend_lookup_fingerprint_hits: int | None = None
     lmcache_blend_lookup_storage_hits: int | None = None
+    lmcache_blend_lookup_requested_tokens: int | None = None
+    lmcache_blend_lookup_hit_tokens: int | None = None
     lmcache_blend_lookup_stale_chunks: int | None = None
     lmcache_blend_lookup_no_gpu_context_errors: int | None = None
+    lmcache_blend_l0_gpu_operation_duration_seconds: float | None = None
+    lmcache_blend_l0_gpu_transfer_chunks: int | None = None
+    lmcache_blend_l0_gpu_transfer_tokens: int | None = None
     lmcache_blend_retrieve_requests: int | None = None
     lmcache_blend_retrieve_chunks: int | None = None
     lmcache_blend_retrieve_failures: int | None = None
@@ -482,8 +487,13 @@ class DisaggSnapshot:
             "lmcache_blend_lookup_requests": self.lmcache_blend_lookup_requests,
             "lmcache_blend_lookup_fingerprint_hits": self.lmcache_blend_lookup_fingerprint_hits,
             "lmcache_blend_lookup_storage_hits": self.lmcache_blend_lookup_storage_hits,
+            "lmcache_blend_lookup_requested_tokens": self.lmcache_blend_lookup_requested_tokens,
+            "lmcache_blend_lookup_hit_tokens": self.lmcache_blend_lookup_hit_tokens,
             "lmcache_blend_lookup_stale_chunks": self.lmcache_blend_lookup_stale_chunks,
             "lmcache_blend_lookup_no_gpu_context_errors": self.lmcache_blend_lookup_no_gpu_context_errors,
+            "lmcache_blend_l0_gpu_operation_duration_seconds": self.lmcache_blend_l0_gpu_operation_duration_seconds,
+            "lmcache_blend_l0_gpu_transfer_chunks": self.lmcache_blend_l0_gpu_transfer_chunks,
+            "lmcache_blend_l0_gpu_transfer_tokens": self.lmcache_blend_l0_gpu_transfer_tokens,
             "lmcache_blend_retrieve_requests": self.lmcache_blend_retrieve_requests,
             "lmcache_blend_retrieve_chunks": self.lmcache_blend_retrieve_chunks,
             "lmcache_blend_retrieve_failures": self.lmcache_blend_retrieve_failures,

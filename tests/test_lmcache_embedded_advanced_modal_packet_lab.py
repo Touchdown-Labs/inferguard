@@ -89,9 +89,17 @@ def test_embedded_advanced_image_installs_current_local_inferguard_source() -> N
     calls = lab.image.calls
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "inferguard" not in pip_install_args
+    assert pip_install_args == lab._modal_runtime_packages()
     assert "vllm" in pip_install_args
     assert "lmcache" in pip_install_args
     assert "sglang" in pip_install_args
+    assert lab._modal_runtime_packages({lab.MODAL_ENGINE_PACKAGES_ENV: "vllm"}) == (
+        "vllm",
+        "lmcache",
+        "hf-transfer",
+        "huggingface-hub",
+        "nvidia-cuda-runtime-cu12",
+    )
 
     add_local_dir = next(kwargs for name, _args, kwargs in calls if name == "add_local_dir")
     assert add_local_dir == {
@@ -175,7 +183,7 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
 
     assert env["LMCACHE_ENABLE_CACHEBLEND"] == "True"
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
-    assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/json"
+    assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/protobuf"
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )
@@ -276,6 +284,25 @@ def test_summary_marks_missing_required_and_score_status(tmp_path: Path) -> None
     assert "## Missing Required" in summary
     assert "`engine.log`" in summary
     assert any(item["path"] == "env.txt" for item in index)
+
+
+def test_health_failure_message_includes_service_log_tail(tmp_path: Path, capsys) -> None:
+    lab = _load_lab_module()
+    service_log = tmp_path / "engine.log"
+    service_log.write_text("line1\nline2\nline3\n", encoding="utf-8")
+
+    message = lab._health_failure_message(
+        "primary engine",
+        "primary engine exited before health passed with code 1",
+        service_log,
+    )
+
+    captured = capsys.readouterr()
+    assert "engine.log" in message
+    assert "line1" in message
+    assert "line3" in message
+    assert "--- primary engine log tail:" in captured.err
+    assert "line3" in captured.err
 
 
 def test_embedded_advanced_packet_command_script_lists_exact_modal_functions() -> None:

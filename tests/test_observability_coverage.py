@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from inferguard.cli import app
-from inferguard.observability_coverage import build_observability_coverage_report
+from inferguard.observability_coverage import (
+    build_observability_coverage_report,
+    read_cacheblend_boundary_evidence_jsonl,
+)
+from typer.testing import CliRunner
 
 LMCACHE_FIXTURES = Path(__file__).parent / "fixtures" / "lmcache_metrics"
 
@@ -275,6 +277,51 @@ lmcache_blend_chunks_evicted_total 2
     assert families[("lmcache_cacheblend", "stale")]["status"] == "populated"
     assert any(item["code"] == "lmcache_cacheblend_failures" for item in compat["diagnostic_findings"])
     assert not any(gap["surface"] == "lmcache_cacheblend" for gap in report["coverage_gaps"])
+
+
+def test_lmcache_cacheblend_l0_gpu_lifecycle_is_fixture_backed_not_live_validated() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_blend_l0_gpu_operation_duration_seconds_sum{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 1.2
+lmcache_blend_l0_gpu_operation_duration_seconds_count{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 3
+lmcache_blend_l0_gpu_transfer_chunks_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 7
+lmcache_blend_l0_gpu_transfer_tokens_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 700
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    row = families[("lmcache_cacheblend", "l0_gpu_lifecycle")]
+    assert row["status"] == "populated"
+    assert row["support_level"] == "fixture_backed"
+    assert row["support_level"] != "live_validated"
+    assert report["surfaces"]["lmcache_cacheblend"]["status"] == "complete"
+
+
+def test_lmcache_cacheblend_boundary_jsonl_is_sanitized_and_reported() -> None:
+    evidence = read_cacheblend_boundary_evidence_jsonl(
+        Path(__file__).parent / "fixtures" / "lmcache_cacheblend_boundary_evidence.jsonl"
+    )
+
+    assert evidence["present"] is True
+    assert evidence["claim_status"] == "measured"
+    assert evidence["row_count"] == 6
+    assert evidence["event_counts"] == {
+        "store_pre_computed.submitted": 1,
+        "store_pre_computed.start": 1,
+        "retrieve_pre_computed.start": 1,
+        "retrieve_pre_computed.end": 1,
+        "store_final.submitted": 1,
+        "store_final.end": 1,
+    }
+    assert evidence["stages"] == ["retrieve_pre_computed", "store_final", "store_pre_computed"]
+    encoded = json.dumps(evidence)
+    for forbidden in ["token_ids", "block_ids", "hashes", "object_keys", "tok-raw", "block-raw", "hash-raw", "s3://raw-key"]:
+        assert forbidden not in encoded
+
+    report = build_observability_coverage_report(lmcache_cacheblend_boundary_evidence=evidence)
+    assert report["surfaces"]["lmcache_cacheblend_boundary"]["status"] == "complete"
+    assert report["lmcache_compat"]["lmcache_cacheblend_boundary_evidence"] == evidence
 
 
 def test_lmcache_cacheblend_surface_is_optional_when_absent() -> None:
@@ -567,3 +614,70 @@ def test_lmcache_compat_promotes_parser_only_p2p_pd_log_findings() -> None:
     assert by_code["lmcache_log_p2p_transfer_failure"]["evidence_status"] == "parser_only"
     assert by_code["lmcache_log_pd_role_mismatch"]["evidence_status"] == "parser_only"
     assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
+
+
+def test_lmcache_embedded_backend_families_zero_when_series_are_all_zero() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 0
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 0
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["support_level"] == "parser_only"
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "zero"
+
+
+def test_lmcache_embedded_backend_surface_partial_with_populated_and_zero_backends() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 1
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 1024
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    assert families[("lmcache_embedded", "production_requests")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "partial"
+
+
+def test_lmcache_mp_backend_coverage_zero_and_partial_surfaces() -> None:
+    zero_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 0
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 0
+""",
+        expect_lmcache_mode="mp",
+    )
+    partial_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 2048
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    zero_families = {(row["surface"], row["family"]): row for row in zero_report["lmcache_compat"]["families"]}
+    partial_families = {(row["surface"], row["family"]): row for row in partial_report["lmcache_compat"]["families"]}
+    assert zero_families[("lmcache_mp", "storage_manager")]["status"] == "zero"
+    assert zero_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert zero_report["surfaces"]["lmcache_mp"]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "storage_manager")]["status"] == "populated"
+    assert partial_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "l1_memory")]["status"] == "populated"
+    assert partial_report["surfaces"]["lmcache_mp"]["status"] == "partial"

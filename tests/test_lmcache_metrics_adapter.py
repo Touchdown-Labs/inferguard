@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from inferguard.compat import build_compat_report
 from inferguard.disagg.adapters import _parse_lmcache
 from inferguard.disagg.adapters.lmcache import parse_lmcache_prometheus
@@ -611,6 +610,33 @@ lmcache:chunk_statistics_chunks 8
     assert metrics.lmcache_storage_events_not_found_count == 7
     assert metrics.lmcache_chunk_statistics_count == 8
     assert metrics.raw_metrics_extra["lmcache_blend_future_source_only_total"] == 99
+
+
+def test_lmcache_cacheblend_l0_gpu_lifecycle_metrics_parse() -> None:
+    metrics = parse_lmcache_prometheus(
+        """
+lmcache_blend_l0_gpu_operation_duration_seconds_sum{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 1.2
+lmcache_blend_l0_gpu_operation_duration_seconds_count{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 3
+lmcache_blend_l0_gpu_transfer_chunks_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 7
+lmcache_blend_l0_gpu_transfer_chunks_total{operation="store_final",direction="cpu_to_gpu",instance_id="worker-1"} 5
+lmcache_blend_l0_gpu_transfer_tokens_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 700
+lmcache_blend_l0_gpu_transfer_tokens_total{operation="store_final",direction="cpu_to_gpu",instance_id="worker-1"} 500
+lmcache_blend_lookup_requested_tokens_total 1200
+lmcache_blend_lookup_hit_tokens_total 900
+lmcache_blend_lookup_fingerprint_hits_total 9
+lmcache_blend_lookup_storage_hits_total 8
+lmcache_blend_lookup_stale_chunks_total 1
+"""
+    )
+
+    assert metrics.lmcache_blend_l0_gpu_operation_duration_seconds == 0.4
+    assert metrics.lmcache_blend_l0_gpu_transfer_chunks == 12
+    assert metrics.lmcache_blend_l0_gpu_transfer_tokens == 1200
+    assert metrics.lmcache_blend_lookup_requested_tokens == 1200
+    assert metrics.lmcache_blend_lookup_hit_tokens == 900
+    assert metrics.lmcache_blend_lookup_fingerprint_hits == 9
+    assert metrics.lmcache_blend_lookup_storage_hits == 8
+    assert metrics.lmcache_blend_lookup_stale_chunks == 1
 
 
 def test_lmcache_cacheblend_summary_aggregates_metrics_for_diagnostics() -> None:

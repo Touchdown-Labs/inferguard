@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from inferguard.collect_metrics.normalize import LMCACHE_LOCKED_METRICS, VLLM_LOCKED_METRICS
+from inferguard.lmcache_cacheblend_boundary import read_cacheblend_boundary_evidence_jsonl
 from inferguard.metrics_core import LabeledSample, parse_labeled_prometheus_text
 
 SCHEMA_VERSION = "inferguard-observability-compat/v1"
@@ -297,8 +298,20 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lookup",
         (
             "lmcache_blend_lookup_requests*",
+            "lmcache_blend_lookup_requested_tokens*",
+            "lmcache_blend_lookup_hit_tokens*",
             "lmcache_blend_lookup_fingerprint_hits*",
             "lmcache_blend_lookup_storage_hits*",
+        ),
+        required_when="cacheblend_observed",
+    ),
+    MetricFamilySpec(
+        "lmcache_cacheblend",
+        "l0_gpu_lifecycle",
+        (
+            "lmcache_blend_l0_gpu_operation_duration_seconds*",
+            "lmcache_blend_l0_gpu_transfer_chunks*",
+            "lmcache_blend_l0_gpu_transfer_tokens*",
         ),
         required_when="cacheblend_observed",
     ),
@@ -383,6 +396,7 @@ def build_compat_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
+    lmcache_cacheblend_boundary_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
@@ -430,6 +444,7 @@ def build_compat_report(
             lmcache_otel_evidence=lmcache_otel_evidence,
             lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
             lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
+            lmcache_cacheblend_boundary_evidence=lmcache_cacheblend_boundary_evidence,
         )
     )
     diagnostic_findings = _diagnostic_findings(
@@ -501,6 +516,7 @@ def build_compat_report(
         "lmcache_otel_evidence": lmcache_otel_evidence,
         "lmcache_trace_replay_evidence": lmcache_trace_replay_evidence,
         "lmcache_lookup_hash_evidence": lmcache_lookup_hash_evidence,
+        "lmcache_cacheblend_boundary_evidence": lmcache_cacheblend_boundary_evidence,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -523,6 +539,7 @@ def build_compat_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -542,6 +559,9 @@ def build_compat_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
     )
 
 
@@ -559,6 +579,7 @@ def build_compat_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -574,6 +595,9 @@ def build_compat_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
     )
 
 
@@ -617,14 +641,18 @@ def _family_row(
     status = "missing"
     if not applicable:
         status = "not_applicable"
+    elif spec.surface == "lmcache_cacheblend" and not matched_names:
+        status = "not_applicable"
     elif matched_names and nonzero_names:
         status = "populated"
     elif matched_names:
         status = "zero"
+    support_level = _support_level(status)
     return {
         **asdict(spec),
         "applicable": applicable,
         "status": status,
+        "support_level": support_level,
         "series_count": len(matched_names),
         "populated_series_count": len(nonzero_names),
         "matched_metrics": matched_names,
@@ -667,6 +695,7 @@ def _evidence_family_rows(
     lmcache_otel_evidence: dict[str, Any] | None,
     lmcache_trace_replay_evidence: dict[str, Any] | None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None,
+    lmcache_cacheblend_boundary_evidence: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     return [
         _evidence_family_row("lmcache_http", "mp_http_api", lmcache_http_evidence),
@@ -675,6 +704,11 @@ def _evidence_family_rows(
         _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
         _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
         _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
+        _evidence_family_row(
+            "lmcache_cacheblend_boundary",
+            "boundary_jsonl",
+            lmcache_cacheblend_boundary_evidence,
+        ),
     ]
 
 
@@ -704,10 +738,21 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
         "required_when": "optional",
         "applicable": True,
         "status": status,
+        "support_level": _support_level(status),
         "series_count": count,
         "populated_series_count": populated,
         "matched_metrics": [],
     }
+
+
+def _support_level(status: str) -> str:
+    if status == "not_applicable":
+        return "not_applicable"
+    if status == "populated":
+        return "fixture_backed"
+    if status == "zero":
+        return "parser_only"
+    return "not_started"
 
 
 def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -> str:

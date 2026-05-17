@@ -1,4 +1,5 @@
 """Typer-based CLI entrypoint for InferGuard diagnostics and benchmarks."""
+# ruff: noqa: UP007  # Typer/click in this test matrix cannot parse PEP 604 unions in CLI signatures.
 
 from __future__ import annotations
 
@@ -9,8 +10,9 @@ import signal
 import subprocess
 import sys
 import time
+from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import typer
 from rich.console import Console
@@ -27,7 +29,6 @@ from inferguard.analyze import (
     exit_code_for_report,
     render_plots,
 )
-from inferguard.analyze.exporters import emit_agentx_shape
 from inferguard.bench import (
     AgentXReplayConfig,
     BenchConfig,
@@ -45,7 +46,6 @@ from inferguard.config import HTTP_TIMEOUT_SECONDS
 from inferguard.disagg.adapters import scrape
 from inferguard.disagg.detect import evaluate
 from inferguard.disagg.types import DisaggFinding, DisaggStatus, EngineName
-from inferguard.harness.agent_trace import AgentTracer
 from inferguard.harness.cluster_daemon import ClusterDaemon
 from inferguard.harness.daemon import DEFAULT_DAEMON_PORT, Daemon
 from inferguard.harness.telemetry import NEVER_COLLECTED_KEYS, TelemetryClient, default_config_dir
@@ -150,7 +150,7 @@ def install_signal_handlers() -> None:
     _SIGNAL_HANDLERS_INSTALLED = True
 
 
-def _shared_shutdown_handler(signum: int, _frame: object | None) -> None:
+def _shared_shutdown_handler(signum: int, _frame: Optional[object]) -> None:
     """Flush live artifacts, emit partial summaries, terminate engines, then exit."""
 
     global _SIGNAL_ALREADY_HANDLED
@@ -186,7 +186,7 @@ def preflight_cmd(
         typer.Option("--engine", help="Engine hint: vllm, sglang, dynamo, lmcache, llm-d, or auto."),
     ] = "vllm",
     kv_offloading_backend: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--kv-offloading-backend", help="KV offload backend, e.g. native when OFFLOADING=cpu."),
     ] = None,
     disable_hybrid_kv_cache_manager: Annotated[
@@ -197,7 +197,7 @@ def preflight_cmd(
         ),
     ] = False,
     config: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--config", help="Optional config.json/run config containing topology/preflight fields."),
     ] = None,
     detect_tokenizer_mismatch: Annotated[
@@ -205,7 +205,7 @@ def preflight_cmd(
         typer.Option("--detect-tokenizer-mismatch", help="Probe client/server tokenizer-count drift before rollout."),
     ] = False,
     endpoint: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--endpoint", help="Optional OpenAI-compatible /v1/chat/completions endpoint for tokenizer probe."),
     ] = None,
     sample_text: Annotated[
@@ -217,11 +217,11 @@ def preflight_cmd(
         typer.Option("--client-tokenizer", help="Client tokenizer label/version used for preflight evidence."),
     ] = "inferguard-estimator",
     server_tokenizer: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--server-tokenizer", help="Optional server tokenizer label/version used for preflight evidence."),
     ] = None,
     client_token_count: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--client-token-count", help="Optional explicit client token count for tokenizer probe/testing."),
     ] = None,
     json_out: Annotated[
@@ -337,7 +337,7 @@ def preflight_cmd(
 def analyze_cmd(
     results_dir: Annotated[Path, typer.Argument(help="Directory containing benchmark artifacts.")],
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Destination for generated reports."),
     ] = None,
     output_format: Annotated[
@@ -357,15 +357,15 @@ def analyze_cmd(
         typer.Option("--timeline-glob", help="Discovery pattern for timeline JSONL files."),
     ] = "**/inferguard_timeline.jsonl",
     cost_per_gpu_hour: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--cost-per-gpu-hour", help="GPU-hour cost for cost-per-task accounting."),
     ] = None,
     gpus: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--gpus", help="GPU count for cost-per-task accounting."),
     ] = None,
     operator_brief: Annotated[
-        bool | None,
+        Optional[bool],
         typer.Option("--operator-brief/--no-operator-brief", help="Emit operator_brief.{json,md}; defaults on when --gpus is provided."),
     ] = None,
     cost_currency: Annotated[
@@ -377,7 +377,7 @@ def analyze_cmd(
         typer.Option("--plots", help="After report writes, render SVG plots into <output-dir>/plots/."),
     ] = False,
     emit_agentx_shape_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--emit-agentx-shape", help="Write per-cell agg_*.json files in AgentX/InferenceX shape."),
     ] = None,
     json_out: Annotated[
@@ -423,7 +423,8 @@ def analyze_cmd(
             )
             raise typer.Exit(code=3) from exc
     if emit_agentx_shape_dir is not None:
-        emit_agentx_shape(report, emit_agentx_shape_dir)
+        exporters = import_module("inferguard.analyze.exporters")
+        exporters.emit_agentx_shape(report, emit_agentx_shape_dir)
     if json_out:
         sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
     raise typer.Exit(code=exit_code_for_report(report, fail_on))
@@ -438,11 +439,11 @@ def workload_analyze_cmd(
         typer.Option("--format", help="Input format. Currently: openai-jsonl."),
     ] = "openai-jsonl",
     emit: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--emit", help="Write workload fingerprint JSON."),
     ] = None,
     emit_md: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--emit-md", help="Write human-readable workload report markdown."),
     ] = None,
     privacy_class: Annotated[
@@ -484,23 +485,23 @@ def workload_analyze_cmd(
 def router_classify_cmd(
     run_dir: Annotated[Path, typer.Argument(help="Directory containing InferGuard or AgentX artifacts.")],
     workload_fingerprint: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--workload-fingerprint", help="Fingerprint JSON from `inferguard workload analyze`."),
     ] = None,
     slo: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--slo", help="Comma-separated SLOs, e.g. p95_ttft_ms=1000,error_rate_max=0.01."),
     ] = None,
     hardware_fleet: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--hardware-fleet", help="Comma-separated hardware labels, e.g. h200,b200,gb200."),
     ] = None,
     emit: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--emit", help="Write router verdict JSON."),
     ] = None,
     emit_md: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--emit-md", help="Write router verdict markdown."),
     ] = None,
     json_out: Annotated[
@@ -674,7 +675,7 @@ def bench_replay_cmd(
         typer.Option("--timeout", help="HTTP timeout per request in seconds."),
     ] = 300.0,
     duration_seconds: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
     ] = None,
     warmup_seconds: Annotated[
@@ -682,7 +683,7 @@ def bench_replay_cmd(
         typer.Option("--warmup-seconds", help="Exclude this many initial seconds per level from summary metrics."),
     ] = 0.0,
     metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
     ] = None,
     metrics_interval: Annotated[
@@ -718,7 +719,7 @@ def bench_replay_cmd(
         typer.Option("--idle-window-seconds", help="Idle traffic window length for --idle-active-mix-mode."),
     ] = 30.0,
     inject_giant_prefill_tokens: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--inject-giant-prefill-tokens", help="Inject one oversized prefill request; requires --allow-chaos."),
     ] = None,
     allow_chaos: Annotated[
@@ -726,11 +727,11 @@ def bench_replay_cmd(
         typer.Option("--allow-chaos", help="Allow chaos-mode replay injections."),
     ] = False,
     canary_eval_set: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--canary-eval-set", help="Held-out eval set path or HuggingFace dataset id for canary quality scoring."),
     ] = None,
     tool_call_schema: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--tool-call-schema", help="JSON schema describing expected tool-call response format."),
     ] = None,
     json_out: Annotated[
@@ -787,11 +788,11 @@ def bench_upstream_cmd(
         typer.Option("--num-prompts", help="Number of prompts passed to the upstream bench."),
     ] = 100,
     request_rate: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--request-rate", help="Optional upstream request-rate limit."),
     ] = None,
     dataset_path: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--dataset-path", help="Optional upstream dataset path for dataset-backed profiles."),
     ] = None,
     output_dir: Annotated[
@@ -803,7 +804,7 @@ def bench_upstream_cmd(
         typer.Option("--timeout", help="Subprocess timeout in seconds."),
     ] = 300.0,
     enable_radix_cache: Annotated[
-        bool | None,
+        Optional[bool],
         typer.Option(
             "--enable-radix-cache/--disable-radix-cache",
             help="Set SGLANG_ENABLE_RADIX_CACHE=1/0 for SGLang upstream runs.",
@@ -858,11 +859,11 @@ def bench_compare_cmd(
         typer.Option("--output-dir", help="Directory for compare.json and compare.md."),
     ] = Path("inferguard_bench_compare"),
     label_a: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--label-a", help="Display label for the first run, e.g. vllm."),
     ] = None,
     label_b: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--label-b", help="Display label for the second run, e.g. sglang."),
     ] = None,
     min_identity_overlap: Annotated[
@@ -874,11 +875,11 @@ def bench_compare_cmd(
         typer.Option("--strict-identity", help="Fail instead of warning when trace identity overlap is too low."),
     ] = False,
     cost_per_gpu_hour: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--cost-per-gpu-hour", help="Optional GPU-hour cost for cost-per-task deltas."),
     ] = None,
     gpus: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--gpus", help="GPU count for cost-per-task deltas."),
     ] = None,
     blue_green: Annotated[
@@ -933,7 +934,7 @@ def bench_agentx_replay_cmd(
         typer.Option("--output-dir", help="Directory for InferGuard AgentX replay artifacts."),
     ] = Path("inferguard_bench_agentx_replay"),
     tester_path: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--tester-path", help="Path to trace_replay_tester.py or a kv-cache-tester checkout."),
     ] = None,
     allow_network_clone: Annotated[
@@ -999,7 +1000,7 @@ def bench_kv_stress_cmd(
         typer.Option("--timeout", help="HTTP timeout per request in seconds."),
     ] = 300.0,
     duration_seconds: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
     ] = None,
     warmup_seconds: Annotated[
@@ -1007,7 +1008,7 @@ def bench_kv_stress_cmd(
         typer.Option("--warmup-seconds", help="Exclude this many initial seconds per level from summary metrics."),
     ] = 0.0,
     metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
     ] = None,
     metrics_interval: Annotated[
@@ -1087,7 +1088,7 @@ def bench_kvcast_cmd(
     ] = Path("inferguard_bench_kvcast"),
     timeout: Annotated[float, typer.Option("--timeout", help="HTTP timeout per request in seconds.")] = 300.0,
     duration_seconds: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
     ] = None,
     warmup_seconds: Annotated[
@@ -1099,11 +1100,11 @@ def bench_kvcast_cmd(
         typer.Option("--arrival-mode", help="Arrival scheduler: steady or poisson."),
     ] = "steady",
     arrival_rate_rps: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--arrival-rate-rps", help="Mean request arrivals per second for --arrival-mode poisson."),
     ] = None,
     metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
     ] = None,
     metrics_interval: Annotated[
@@ -1127,7 +1128,7 @@ def bench_kvcast_cmd(
         typer.Option("--customers", help="Customer count for --mode multi-tenant-storm."),
     ] = 1,
     sla_tiers: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--sla-tiers", help="Comma-separated SLA tier policies, e.g. premium=p99<2s,standard=p99<5s."),
     ] = None,
     track_cache_lineage: Annotated[
@@ -1147,7 +1148,7 @@ def bench_kvcast_cmd(
         typer.Option("--baseline-rps", help="Retry-storm baseline request rate before/after burst."),
     ] = 4.0,
     inject_crash_after_seconds: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--inject-crash-after-seconds", help="Test-only crash injection delay; requires --allow-chaos."),
     ] = None,
     allow_chaos: Annotated[
@@ -1192,13 +1193,13 @@ def bench_kvcast_cmd(
 def bench_cold_start_cmd(
     endpoint: Annotated[str, typer.Option("--endpoint", help="OpenAI-compatible /v1/chat/completions endpoint.")],
     model: Annotated[str, typer.Option("--model", help="Model name sent in chat requests.")],
-    trace_dir: Annotated[Path | None, typer.Option("--trace-dir", help="Optional InferGuard trace JSONL directory.")] = None,
+    trace_dir: Annotated[Optional[Path], typer.Option("--trace-dir", help="Optional InferGuard trace JSONL directory.")] = None,
     output_dir: Annotated[Path, typer.Option("--output-dir", help="Directory for cold-start artifacts.")] = Path("inferguard_bench_cold_start"),
     capture_seconds: Annotated[float, typer.Option("--capture-seconds", help="Cold-start capture window from process spawn/readiness.")] = 60.0,
     context_lengths: Annotated[str, typer.Option("--context-lengths", help="Synthetic context lengths when --trace-dir is omitted.")] = "1024",
     concurrency: Annotated[str, typer.Option("--concurrency", help="Comma-separated concurrency levels.")] = "1",
     output_tokens: Annotated[int, typer.Option("--output-tokens", help="Max streamed output tokens per request.")] = 64,
-    metrics_url: Annotated[str | None, typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during cold start.")] = None,
+    metrics_url: Annotated[Optional[str], typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during cold start.")] = None,
     metrics_interval: Annotated[float, typer.Option("--metrics-interval", help="Seconds between engine metrics scrapes.")] = 5.0,
     metrics_engine: Annotated[str, typer.Option("--metrics-engine", help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.")] = "auto",
     force: Annotated[bool, typer.Option("--force", help="Allow writing into a non-empty output directory.")] = False,
@@ -1232,15 +1233,15 @@ def validate_completed_cmd(
         typer.Option("--results-root", help="Run directory to validate."),
     ] = ...,
     matrix_plan: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--matrix-plan", help="Override matrix_plan.json location."),
     ] = None,
     artifact_contract: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--artifact-contract", help="Override expected_artifact_contract.json location."),
     ] = None,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for validation artifacts."),
     ] = None,
     strict: Annotated[
@@ -1248,7 +1249,7 @@ def validate_completed_cmd(
         typer.Option("--strict", help="Return non-zero unless the run is live_complete."),
     ] = False,
     label_overrides: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--label-overrides", help="JSON {claim_id: claim_status} for human-reviewed downgrades."),
     ] = None,
     json_only: Annotated[
@@ -1311,7 +1312,7 @@ def request_profile_cmd(
         typer.Option("--input-jsonl", help="JSONL request/profile input file."),
     ] = ...,
     concurrency: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--concurrency", help="Closed-loop concurrency level."),
     ] = None,
     timeout_seconds: Annotated[
@@ -1319,19 +1320,19 @@ def request_profile_cmd(
         typer.Option("--timeout-seconds", help="HTTP timeout per request."),
     ] = 300.0,
     arrival_mode: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--arrival-mode", help="Arrival mode: closed_loop or poisson."),
     ] = None,
     rate_rps: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--rate-rps", help="Poisson arrival rate in requests per second."),
     ] = None,
     max_requests: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--max-requests", help="Maximum request rows to issue."),
     ] = None,
     api_key: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--api-key", help="Optional bearer token for the endpoint."),
     ] = None,
     stream: Annotated[
@@ -1347,11 +1348,11 @@ def request_profile_cmd(
         typer.Option("--continuous-usage-stats", help="Request continuous usage stats when supported."),
     ] = False,
     workload_label: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--workload-label", help="Workload label stamped into artifacts."),
     ] = None,
     job_id: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--job-id", help="Optional job id stamped into artifacts."),
     ] = None,
     seed: Annotated[
@@ -1359,11 +1360,11 @@ def request_profile_cmd(
         typer.Option("--seed", help="Deterministic scheduler seed."),
     ] = 0,
     engine: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--engine", help="Engine label stamped into artifacts."),
     ] = None,
     model_profile: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model-profile", help="Model architecture/profile label."),
     ] = None,
 ) -> None:
@@ -1417,7 +1418,7 @@ def collect_metrics_cmd(
         typer.Option("--engine-metrics-url", help="Serving-engine Prometheus metrics URL."),
     ] = ...,
     dcgm_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--dcgm-metrics-url", help="DCGM exporter Prometheus metrics URL."),
     ] = None,
     duration_seconds: Annotated[
@@ -1433,19 +1434,19 @@ def collect_metrics_cmd(
         typer.Option("--dcgm-interval-seconds", help="DCGM timestamp window in seconds."),
     ] = 5.0,
     lmcache_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-metrics-url", help="Optional LMCache metrics URL."),
     ] = None,
     label_job_id: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--label-job-id", help="Job id label for normalized metrics."),
     ] = None,
     label_engine_version: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--label-engine-version", help="Engine version label for normalized metrics."),
     ] = None,
     label_hardware: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--label-hardware", help="Hardware label for normalized metrics."),
     ] = None,
     keep_raw_samples: Annotated[
@@ -1483,50 +1484,97 @@ def collect_metrics_cmd(
     raise typer.Exit(code=0)
 
 
+@app.command("cacheblend-report")
+def cacheblend_report_cmd(
+    metrics_file: Annotated[
+        Path,
+        typer.Option(
+            "--metrics-file",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Prometheus text scrape containing lmcache_blend metrics.",
+        ),
+    ],
+    boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--boundary-evidence-file",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="Optional CacheBlend L0 boundary evidence JSONL file.",
+        ),
+    ] = None,
+) -> None:
+    """Summarize CacheBlend metrics, serde transforms, and L0 lifecycle evidence."""
+    from inferguard.lmcache_blend_lifecycle import analyze_cacheblend_lifecycle
+    from inferguard.lmcache_blend_metrics import analyze_cacheblend_metrics
+    from inferguard.lmcache_blend_serde import analyze_cacheblend_serde_metrics
+
+    metrics_text = metrics_file.read_text(encoding="utf-8")
+    payload = {
+        "cacheblend_metrics": analyze_cacheblend_metrics(metrics_text).to_dict(),
+        "serde": analyze_cacheblend_serde_metrics(metrics_text).to_dict(),
+        "lifecycle": analyze_cacheblend_lifecycle(
+            metrics_text,
+            boundary_evidence_path=boundary_evidence_file,
+        ).to_dict(),
+    }
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+
+
 @app.command("lmcache-compat")
 def lmcache_compat_cmd(
     engine_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--engine-metrics-url", help="Optional vLLM/SGLang Prometheus metrics URL."),
     ] = None,
     lmcache_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-metrics-url", help="Optional LMCache Prometheus metrics URL."),
     ] = None,
     engine_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--engine-metrics-file", help="Optional saved engine metrics scrape."),
     ] = None,
     lmcache_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache metrics scrape."),
     ] = None,
     lmcache_http_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
     ] = None,
     lmcache_log_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-log-evidence-file", help="Optional LMCache log evidence JSON."),
     ] = None,
     lmcache_trace_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
     ] = None,
     lmcache_otel_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
     ] = None,
     lmcache_trace_replay_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
     ] = None,
     lmcache_lookup_hash_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
     ] = None,
+    lmcache_cacheblend_boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--lmcache-cacheblend-boundary-evidence-file",
+            help="Optional CacheBlend boundary lifecycle evidence JSONL.",
+        ),
+    ] = None,
     output: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output", help="Optional JSON report path."),
     ] = None,
     expect_mode: Annotated[
@@ -1538,19 +1586,19 @@ def lmcache_compat_cmd(
         typer.Option("--l2-configured", help="Treat MP L2 metric families as expected."),
     ] = False,
     mp_prometheus_port: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--mp-prometheus-port", help="LMCache MP Prometheus port from launch/config."),
     ] = None,
     mp_event_bus_queue_size: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
     ] = None,
     mp_metrics_sample_rate: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
     ] = None,
     mp_service_instance_id: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
     ] = None,
     mp_observability_disabled: Annotated[
@@ -1625,6 +1673,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -1661,6 +1710,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
         )
     else:
         report = build_compat_report_from_paths(
@@ -1675,6 +1725,7 @@ def lmcache_compat_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
         )
     if output is not None:
         write_compat_report(report, output)
@@ -1730,166 +1781,173 @@ def collect_lmcache_cmd(
         typer.Option("--output-dir", help="Output directory for the LMCache evidence packet."),
     ] = ...,
     engine_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--engine-metrics-url", help="Optional serving-engine Prometheus metrics URL."),
     ] = None,
     lmcache_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-metrics-url", help="Optional LMCache Prometheus metrics URL."),
     ] = None,
     engine_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--engine-metrics-file", help="Optional saved engine Prometheus scrape."),
     ] = None,
     lmcache_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache Prometheus scrape."),
     ] = None,
     lmcache_http_base_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option(
             "--lmcache-http-base-url",
             help="Optional LMCache MP HTTP base URL; fetches safe read-only endpoints.",
         ),
     ] = None,
     lmcache_http_thread_name: Annotated[
-        str | None,
+        Optional[str],
         typer.Option(
             "--lmcache-http-thread-name",
             help="Optional periodic thread name to fetch from /periodic-threads/{thread_name}.",
         ),
     ] = None,
     lmcache_health_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-health-url", help="Optional LMCache MP HTTP healthcheck URL."),
     ] = None,
     lmcache_health_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-health-file", help="Optional saved LMCache MP healthcheck response."),
     ] = None,
     lmcache_status_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-status-url", help="Optional LMCache MP HTTP status URL."),
     ] = None,
     lmcache_status_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-status-file", help="Optional saved LMCache MP status response."),
     ] = None,
     lmcache_conf_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-conf-url", help="Optional LMCache MP /conf URL."),
     ] = None,
     lmcache_conf_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-conf-file", help="Optional saved LMCache MP /conf response."),
     ] = None,
     lmcache_threads_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-threads-url", help="Optional LMCache MP /threads URL."),
     ] = None,
     lmcache_threads_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-threads-file", help="Optional saved LMCache MP /threads response."),
     ] = None,
     lmcache_periodic_threads_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-periodic-threads-url", help="Optional LMCache MP /periodic-threads URL."),
     ] = None,
     lmcache_periodic_threads_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option(
             "--lmcache-periodic-threads-file",
             help="Optional saved LMCache MP /periodic-threads response.",
         ),
     ] = None,
     lmcache_periodic_thread_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option(
             "--lmcache-periodic-thread-url",
             help="Optional LMCache MP /periodic-threads/{thread_name} URL.",
         ),
     ] = None,
     lmcache_periodic_thread_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option(
             "--lmcache-periodic-thread-file",
             help="Optional saved LMCache MP /periodic-threads/{thread_name} response.",
         ),
     ] = None,
     lmcache_periodic_threads_health_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option(
             "--lmcache-periodic-threads-health-url",
             help="Optional LMCache MP /periodic-threads-health URL.",
         ),
     ] = None,
     lmcache_periodic_threads_health_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option(
             "--lmcache-periodic-threads-health-file",
             help="Optional saved LMCache MP /periodic-threads-health response.",
         ),
     ] = None,
     lmcache_version_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-version-url", help="Optional LMCache MP /version URL."),
     ] = None,
     lmcache_version_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-version-file", help="Optional saved LMCache MP /version response."),
     ] = None,
     lmcache_lmc_version_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-lmc-version-url", help="Optional LMCache MP /lmc_version URL."),
     ] = None,
     lmcache_lmc_version_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-lmc-version-file", help="Optional saved LMCache MP /lmc_version response."),
     ] = None,
     lmcache_commit_id_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-commit-id-url", help="Optional LMCache MP /commit_id URL."),
     ] = None,
     lmcache_commit_id_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-commit-id-file", help="Optional saved LMCache MP /commit_id response."),
     ] = None,
     lmcache_quota_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-quota-url", help="Optional LMCache MP GET /api/quota URL."),
     ] = None,
     lmcache_quota_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-quota-file", help="Optional saved LMCache MP GET /api/quota response."),
     ] = None,
     engine_log_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--engine-log-file", help="Optional engine log file to copy into the packet."),
     ] = None,
     lmcache_log_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-log-file", help="Optional LMCache log file to copy into the packet."),
     ] = None,
     lmcache_trace_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-trace-file", help="Optional LMCache MP .lct trace recording file."),
     ] = None,
     lmcache_otel_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-otel-file", help="Optional JSONL export of LMCache OTel spans."),
     ] = None,
     lmcache_trace_replay_output: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option(
             "--lmcache-trace-replay-output",
             help="Optional LMCache trace replay output file or directory to copy and parse if supported.",
         ),
     ] = None,
     lmcache_lookup_hash_path: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option(
             "--lmcache-lookup-hash-path",
             help="Optional lookup_hashes_*.jsonl file or lookup-hash directory to copy and parse if supported.",
+        ),
+    ] = None,
+    lmcache_cacheblend_boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--lmcache-cacheblend-boundary-evidence-file",
+            help="Optional CacheBlend L0 boundary evidence JSONL file to summarize.",
         ),
     ] = None,
     expect_mode: Annotated[
@@ -1905,19 +1963,19 @@ def collect_lmcache_cmd(
         typer.Option("--timeout-seconds", help="HTTP timeout per scrape."),
     ] = 10.0,
     mp_prometheus_port: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--mp-prometheus-port", help="LMCache MP Prometheus port from launch/config."),
     ] = None,
     mp_event_bus_queue_size: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
     ] = None,
     mp_metrics_sample_rate: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
     ] = None,
     mp_service_instance_id: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
     ] = None,
     mp_observability_disabled: Annotated[
@@ -2009,6 +2067,7 @@ def collect_lmcache_cmd(
             lmcache_otel_file,
             lmcache_trace_replay_output,
             lmcache_lookup_hash_path,
+            lmcache_cacheblend_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter("pass at least one URL or file input to collect")
@@ -2049,6 +2108,7 @@ def collect_lmcache_cmd(
             lmcache_otel_file=lmcache_otel_file,
             lmcache_trace_replay_output=lmcache_trace_replay_output,
             lmcache_lookup_hash_path=lmcache_lookup_hash_path,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
             expect_mode=expect_mode,
             l2_configured=l2_configured,
             timeout_seconds=timeout_seconds,
@@ -2082,44 +2142,51 @@ def collect_lmcache_cmd(
 @app.command("observability-coverage")
 def observability_coverage_cmd(
     engine_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--engine-metrics-url", help="Optional vLLM/SGLang Prometheus metrics URL."),
     ] = None,
     lmcache_metrics_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--lmcache-metrics-url", help="Optional LMCache Prometheus metrics URL."),
     ] = None,
     engine_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--engine-metrics-file", help="Optional saved vLLM/SGLang metrics scrape."),
     ] = None,
     lmcache_metrics_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-metrics-file", help="Optional saved LMCache metrics scrape."),
     ] = None,
     lmcache_http_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-http-evidence-file", help="Optional LMCache HTTP evidence JSON."),
     ] = None,
     lmcache_log_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-log-evidence-file", help="Optional LMCache log evidence JSON."),
     ] = None,
     lmcache_trace_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
     ] = None,
     lmcache_otel_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-otel-evidence-file", help="Optional LMCache OTel evidence JSON."),
     ] = None,
     lmcache_trace_replay_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
     ] = None,
     lmcache_lookup_hash_evidence_file: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
+    ] = None,
+    lmcache_cacheblend_boundary_evidence_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--lmcache-cacheblend-boundary-evidence-file",
+            help="Optional CacheBlend boundary lifecycle evidence JSONL.",
+        ),
     ] = None,
     expected_engine: Annotated[
         str,
@@ -2153,7 +2220,7 @@ def observability_coverage_cmd(
         typer.Option("--timeout-seconds", help="HTTP timeout per scrape."),
     ] = 10.0,
     output: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output", help="Optional JSON report path."),
     ] = None,
     json_out: Annotated[
@@ -2187,6 +2254,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file,
         ]
     ):
         raise typer.BadParameter(
@@ -2212,6 +2280,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
             **kwargs,
         )
     else:
@@ -2224,6 +2293,7 @@ def observability_coverage_cmd(
             lmcache_otel_evidence_file=lmcache_otel_evidence_file,
             lmcache_trace_replay_evidence_file=lmcache_trace_replay_evidence_file,
             lmcache_lookup_hash_evidence_file=lmcache_lookup_hash_evidence_file,
+            lmcache_cacheblend_boundary_evidence_file=lmcache_cacheblend_boundary_evidence_file,
             **kwargs,
         )
     if output is not None:
@@ -2268,43 +2338,40 @@ def agentx_ingest_cmd(
         typer.Option("--output-dir", help="Output directory for canonical InferGuard artifacts."),
     ] = ...,
     agentx_results_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--agentx-results-dir", help="AgentX result directory containing metadata and CSV output."),
     ] = None,
     agentx_result: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--agentx-result", help="Single AgentX detailed result CSV."),
     ] = None,
     job_id: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--job-id", help="Optional job id stamped into artifacts."),
     ] = None,
     engine: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--engine", help="Engine label stamped into artifacts."),
     ] = None,
     workload_label: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--workload-label", help="Workload label stamped into artifacts."),
     ] = None,
     model_profile: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model-profile", help="Model architecture/profile label."),
     ] = None,
     model: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model", help="Fallback model/profile label for single CSV ingest."),
     ] = None,
     concurrency: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--concurrency", help="Concurrency label for single CSV ingest."),
     ] = None,
 ) -> None:
     """Convert AgentX result CSV outputs into canonical InferGuard schemas."""
-    from inferguard.agentx_adapter import (
-        convert_agentx_result_to_canonical,
-        ingest_agentx_results_dir,
-    )
+    adapter = import_module("inferguard.agentx_adapter")
 
     if agentx_results_dir is None and agentx_result is None:
         raise typer.BadParameter("--agentx-results-dir or --agentx-result is required for ingest-agentx")
@@ -2312,7 +2379,7 @@ def agentx_ingest_cmd(
         raise typer.BadParameter("provide only one of --agentx-results-dir or --agentx-result")
     if agentx_results_dir is not None:
         try:
-            artifacts = ingest_agentx_results_dir(
+            artifacts = adapter.ingest_agentx_results_dir(
                 agentx_results_dir,
                 output_dir=output_dir,
                 job_id=job_id,
@@ -2331,7 +2398,7 @@ def agentx_ingest_cmd(
             "model_profile": model_profile or model,
             "concurrency": int(concurrency or 1),
         }
-        artifacts = convert_agentx_result_to_canonical(agentx_result, metadata)
+        artifacts = adapter.convert_agentx_result_to_canonical(agentx_result, metadata)
     typer.echo(artifacts.summary.summary_line())
     raise typer.Exit(code=0 if artifacts.summary.status == "ingested" else 1)
 
@@ -2351,19 +2418,19 @@ def launch_engine_cmd(
         typer.Option("--external-launch", help="Validate an already-launched endpoint instead of spawning."),
     ] = False,
     endpoint_url: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--endpoint-url", "--endpoint", help="Endpoint URL for external-launch or healthcheck."),
     ] = None,
     model_path: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model-path", help="Model path or id passed to the serving engine."),
     ] = None,
     host: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--host", help="Engine bind host."),
     ] = None,
     port: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--port", help="Engine bind port."),
     ] = None,
     tensor_parallel_size: Annotated[
@@ -2379,7 +2446,7 @@ def launch_engine_cmd(
         typer.Option("--data-parallel-size", help="Data parallel size."),
     ] = 1,
     max_model_len: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--max-model-len", help="Maximum model context length."),
     ] = None,
     gpu_memory_utilization: Annotated[
@@ -2399,7 +2466,7 @@ def launch_engine_cmd(
         typer.Option("--enable-chunked-prefill", help="Enable chunked prefill when supported."),
     ] = False,
     chunked_prefill_size: Annotated[
-        int | None,
+        Optional[int],
         typer.Option("--chunked-prefill-size", help="Chunked prefill size."),
     ] = None,
     enable_cache_report: Annotated[
@@ -2411,19 +2478,19 @@ def launch_engine_cmd(
         typer.Option("--enable-metrics", help="Enable engine metrics flags."),
     ] = False,
     kv_cache_dtype: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--kv-cache-dtype", help="KV cache dtype."),
     ] = None,
     quantization: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--quantization", help="Quantization mode."),
     ] = None,
     hardware: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--hardware", help="Hardware label for launch warnings."),
     ] = None,
     kv_transfer_config: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--kv-transfer-config", help="KV transfer configuration JSON/string."),
     ] = None,
     healthcheck_timeout_seconds: Annotated[
@@ -2439,7 +2506,7 @@ def launch_engine_cmd(
         typer.Option("--canary-completion-tokens", help="Healthcheck canary completion tokens."),
     ] = 16,
     extra_args: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--extra-args", help="Extra engine CLI arguments."),
     ] = None,
 ) -> None:
@@ -2501,15 +2568,15 @@ def diagnose_bottleneck_cmd(
         typer.Option("--job-dir", help="Completed job directory to diagnose."),
     ] = ...,
     validation_report: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--validation-report", help="Optional validation report path."),
     ] = None,
     rule_config: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--rule-config", help="Optional bottleneck rule config."),
     ] = None,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for diagnosis artifacts."),
     ] = None,
     strict: Annotated[
@@ -2522,15 +2589,15 @@ def diagnose_bottleneck_cmd(
     ] = False,
 ) -> None:
     """Diagnose one completed job into a bottleneck verdict."""
-    from inferguard.diagnose_bottleneck import diagnose, write_diagnosis
+    diagnose_module = import_module("inferguard.diagnose_bottleneck")
 
-    diagnosis = diagnose(
+    diagnosis = diagnose_module.diagnose(
         job_dir,
         validation_report=validation_report,
         rule_config=rule_config,
     )
     target = output_dir or job_dir / "diagnosis"
-    write_diagnosis(diagnosis, target, json_only=json_only)
+    diagnose_module.write_diagnosis(diagnosis, target, json_only=json_only)
     typer.echo(diagnosis.summary_line())
     if strict and diagnosis.to_dict()["verdict"] == "not_enough_evidence":
         raise typer.Exit(code=1)
@@ -2544,7 +2611,7 @@ def classify_failures_cmd(
         typer.Option("--job-dir", help="Completed or failed job directory to classify."),
     ] = ...,
     regex_config: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--regex-config", help="Optional regex classification config."),
     ] = None,
     max_failures: Annotated[
@@ -2552,7 +2619,7 @@ def classify_failures_cmd(
         typer.Option("--max-failures", help="Maximum ranked failures to emit."),
     ] = 20,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for classification artifacts."),
     ] = None,
     json_only: Annotated[
@@ -2587,7 +2654,7 @@ def report_completed_cmd(
         typer.Option("--results-root", help="Completed run root to summarize."),
     ] = ...,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for recommendation artifacts."),
     ] = None,
     strict: Annotated[
@@ -2599,19 +2666,19 @@ def report_completed_cmd(
         typer.Option("--json-only", help="Skip markdown rendering."),
     ] = False,
     cost_input: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--cost-input", help='JSON {"<sku>": <usd_per_gpu_hour>} for cost claims.'),
     ] = None,
     workload_fingerprint: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--workload-fingerprint", help="Optional WorkloadFingerprint JSON."),
     ] = None,
     slo: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--slo", help="Optional SLO JSON."),
     ] = None,
     useful_task_definition: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--useful-task-definition", help="Optional useful-task criteria JSON."),
     ] = None,
     useful_task_min_tokens: Annotated[
@@ -2619,15 +2686,15 @@ def report_completed_cmd(
         typer.Option("--useful-task-min-tokens", help="Minimum completion tokens for a useful task."),
     ] = 1,
     useful_task_slo_ttft_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--useful-task-slo-ttft-ms", help="Useful-task TTFT SLO in milliseconds."),
     ] = None,
     slo_ttft_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--slo-ttft-ms", help="TTFT SLO in milliseconds."),
     ] = None,
     slo_e2e_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--slo-e2e-ms", help="E2E latency SLO in milliseconds."),
     ] = None,
     slo_success_rate: Annotated[
@@ -2698,7 +2765,7 @@ def compute_cost_cmd(
         typer.Option("--cost-input", help='JSON {"<sku>": <usd_per_gpu_hour>} for cost claims.'),
     ] = ...,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for cost artifacts."),
     ] = None,
     json_only: Annotated[
@@ -2706,11 +2773,11 @@ def compute_cost_cmd(
         typer.Option("--json-only", help="Skip markdown rendering."),
     ] = False,
     slo: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--slo", help="Optional SLO JSON."),
     ] = None,
     useful_task_definition: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--useful-task-definition", help="Optional useful-task criteria JSON."),
     ] = None,
     useful_task_min_tokens: Annotated[
@@ -2718,15 +2785,15 @@ def compute_cost_cmd(
         typer.Option("--useful-task-min-tokens", help="Minimum completion tokens for a useful task."),
     ] = 1,
     useful_task_slo_ttft_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--useful-task-slo-ttft-ms", help="Useful-task TTFT SLO in milliseconds."),
     ] = None,
     slo_ttft_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--slo-ttft-ms", help="TTFT SLO in milliseconds."),
     ] = None,
     slo_e2e_ms: Annotated[
-        float | None,
+        Optional[float],
         typer.Option("--slo-e2e-ms", help="E2E latency SLO in milliseconds."),
     ] = None,
     slo_success_rate: Annotated[
@@ -2781,11 +2848,11 @@ def find_cliffs_cmd(
         typer.Option("--results-root", help="Completed sweep root to analyze."),
     ] = ...,
     output_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--output-dir", help="Output directory for capacity cliff artifacts."),
     ] = None,
     cliffs: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--cliffs", help="Comma-separated capacity cliff subset; default is all."),
     ] = None,
     ttft_p99_floor_ms: Annotated[
@@ -2878,20 +2945,20 @@ def _summary_nullable(value: object) -> str:
 @app.command("simulate-gpu")
 def simulate_gpu_cmd(
     results_root: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--results-root", help="Run directory where matrix and synthetic GPU artifacts will be written."),
     ] = None,
     plan: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--plan", help="Existing matrix_plan.json to simulate. Preserves the legacy gmi_gpu_mimic.py flag."),
     ] = None,
     gpu_profiles: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--gpu-profiles", "--gpu-mimic-profile", help="Optional GPU mimic profile catalog JSON."),
     ] = None,
     provider: Annotated[str, typer.Option("--provider", help="Provider profile. Currently only gmi.")] = "gmi",
     cluster_profile: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--cluster-profile", help="Optional standalone JSON/YAML cluster profile."),
     ] = None,
     stage: Annotated[str, typer.Option("--stage", help="Matrix stage label.")] = "single-node-smoke",
@@ -2904,11 +2971,11 @@ def simulate_gpu_cmd(
     ] = "dsv4-pro",
     workload: Annotated[str, typer.Option("--workload", help="Workload alias, e.g. long_context_chat.")] = "long_context_chat",
     context_lengths: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--context-lengths", help="Comma-separated context lengths. Defaults to 8192."),
     ] = None,
     concurrency: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--concurrency", help="Comma-separated concurrency levels. Defaults to 1."),
     ] = None,
     arrival_mode: Annotated[str, typer.Option("--arrival-mode", help="Arrival mode label.")] = "closed_loop",
@@ -2949,11 +3016,11 @@ def serve_mimic_cmd(
     host: Annotated[str, typer.Option("--host", help="Bind host for the synthetic endpoint.")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", help="Bind port for the synthetic endpoint.")] = 8000,
     model: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model", help="Model id returned by the OpenAI-compatible endpoint."),
     ] = None,
     model_profile: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--model-profile", help="Fallback model id/profile label."),
     ] = None,
 ) -> None:
@@ -2982,7 +3049,7 @@ def _main_callback(
 def disagg_status_cmd(
     prefill: str = typer.Option(..., "--prefill", help="Prefill endpoint base URL."),
     decode: str = typer.Option(..., "--decode", help="Decode endpoint base URL."),
-    transfer: str | None = typer.Option(
+    transfer: Optional[str] = typer.Option(
         None, "--transfer", help="Optional transfer-layer metrics URL."
     ),
     engine: str = typer.Option(
@@ -3040,7 +3107,7 @@ def agent_trace_cmd(
         ),
     ] = False,
     rig_label: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--rig-label", help="Optional rig label: h100, h200, b200, gb200, auto."),
     ] = None,
 ) -> None:
@@ -3052,7 +3119,8 @@ def agent_trace_cmd(
             "subprocess argv is required; pass it after options, e.g. "
             "`inferguard agent trace --output-dir traces -- python agent.py`"
         )
-    tracer = AgentTracer(
+    trace_module = import_module("inferguard.harness.agent_trace")
+    tracer = trace_module.AgentTracer(
         output_dir=output_dir,
         framework=_validated_agent_framework(framework),
         save_prompts=save_prompts,
@@ -3077,11 +3145,11 @@ def daemon_start_cmd(
         typer.Option("--port", help="Loopback Prometheus metrics port."),
     ] = DEFAULT_DAEMON_PORT,
     host: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--host", help="Metrics bind host; cluster leaders default to 0.0.0.0."),
     ] = None,
     watch_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--watch-dir", help="Directory containing agent-trace/v1 JSONL files."),
     ] = None,
     prometheus: Annotated[
@@ -3093,11 +3161,11 @@ def daemon_start_cmd(
         typer.Option("--leader", help="Run as a cluster fan-in leader and merge follower ranks."),
     ] = False,
     follower: Annotated[
-        str | None,
+        Optional[str],
         typer.Option("--follower", help="Run as a cluster follower and POST snapshots to LEADER_URL."),
     ] = None,
     cluster_token: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--cluster-token", help="Path to operator-generated cluster bearer token."),
     ] = None,
 ) -> None:
@@ -3109,7 +3177,7 @@ def daemon_start_cmd(
         raise typer.BadParameter("--leader requires --prometheus so followers can register")
     bind_host = host or ("0.0.0.0" if leader else "127.0.0.1")  # nosec B104 - leader must accept follower nodes.
     daemon = Daemon()
-    cluster: ClusterDaemon | None = None
+    cluster: Optional[ClusterDaemon] = None
     seen: set[Path] = set()
     loaded = _daemon_record_watch_dir(daemon, watch_dir, seen)
     try:
@@ -3179,7 +3247,7 @@ def daemon_start_cmd(
 def daemon_stop_cmd(
     port: Annotated[int, typer.Option("--port", help="Expected daemon port.")] = DEFAULT_DAEMON_PORT,
     watch_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--watch-dir", help="Expected watch directory."),
     ] = None,
     prometheus: Annotated[
@@ -3222,7 +3290,7 @@ def daemon_stop_cmd(
 def daemon_status_cmd(
     port: Annotated[int, typer.Option("--port", help="Daemon port to report.")] = DEFAULT_DAEMON_PORT,
     watch_dir: Annotated[
-        Path | None,
+        Optional[Path],
         typer.Option("--watch-dir", help="Optionally load trace files before reporting status."),
     ] = None,
     prometheus: Annotated[
@@ -3377,8 +3445,8 @@ async def _collect(
     *,
     prefill: str,
     decode: str,
-    transfer: str | None,
-    engine: EngineName | None,
+    transfer: Optional[str],
+    engine: Optional[EngineName],
     timeout: float,
 ) -> DisaggStatus:
     import httpx
@@ -3415,7 +3483,7 @@ async def _probe_server_prompt_tokens(
     model: str,
     sample_text: str,
     timeout: float,
-) -> int | None:
+) -> Optional[int]:
     import httpx
 
     payload = {
@@ -3426,7 +3494,7 @@ async def _probe_server_prompt_tokens(
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    prompt_tokens: int | None = None
+    prompt_tokens: Optional[int] = None
     async with httpx.AsyncClient(timeout=timeout) as client:
         async with client.stream("POST", endpoint, json=payload) as response:
             response.raise_for_status()
@@ -3492,22 +3560,22 @@ def _iter(status: DisaggStatus):
         yield status.transfer
 
 
-def _str(v: int | float | None) -> str:
+def _str(v: int | Optional[float]) -> str:
     return "-" if v is None else str(v)
 
 
-def _pct(v: float | None) -> str:
+def _pct(v: Optional[float]) -> str:
     return "-" if v is None else f"{v * 100:.0f}%" if v <= 1.0 else f"{v:.0f}"
 
 
-def _ms(v: float | None) -> str:
+def _ms(v: Optional[float]) -> str:
     return "-" if v is None else f"{v * 1000:.0f}"
 
 
 # --- helpers ----------------------------------------------------------------
 
 
-def _validated_engine(raw: str) -> EngineName | None:
+def _validated_engine(raw: str) -> Optional[EngineName]:
     if raw == "auto":
         return None
     if raw in ("vllm", "sglang", "dynamo", "lmcache", "llm-d"):
@@ -3582,7 +3650,7 @@ def _looks_like_inferguard_daemon(command_text: str) -> bool:
     return "inferguard" in lowered and "daemon" in lowered and "start" in lowered
 
 
-def _daemon_record_watch_dir(daemon: Daemon, watch_dir: Path | None, seen: set[Path]) -> int:
+def _daemon_record_watch_dir(daemon: Daemon, watch_dir: Optional[Path], seen: set[Path]) -> int:
     if watch_dir is None:
         return 0
     if not watch_dir.exists() or not watch_dir.is_dir():
@@ -3606,8 +3674,8 @@ def _pending_payloads(directory: Path) -> list[dict[str, object]]:
         return []
     payloads: list[dict[str, object]] = []
     for path in sorted(directory.glob("*.json"), key=lambda item: item.stat().st_mtime):
-        payload_kind: str | None = None
-        schema_version: str | None = None
+        payload_kind: Optional[str] = None
+        schema_version: Optional[str] = None
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -3679,7 +3747,7 @@ def _validated_kvcast_mode(raw: str) -> str:
     raise typer.BadParameter("--mode must be one of cold-pressure|prefix-reuse|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm")
 
 
-def _parse_sla_tiers(raw: str | None) -> dict[str, str] | None:
+def _parse_sla_tiers(raw: Optional[str]) -> dict[str, str] | None:
     if raw in (None, ""):
         return None
     tiers: dict[str, str] = {}
@@ -3699,7 +3767,7 @@ def _validated_arrival_mode(raw: str) -> str:
     raise typer.BadParameter("--arrival-mode must be one of steady|poisson")
 
 
-def _validated_metrics_engine(raw: str) -> EngineName | None:
+def _validated_metrics_engine(raw: str) -> Optional[EngineName]:
     if raw == "auto":
         return None
     if raw in ("vllm", "sglang", "dynamo", "lmcache", "llm-d"):
@@ -3719,13 +3787,13 @@ def _parse_int_csv(raw: str, option_name: str) -> list[int]:
 
 
 
-def _parse_string_csv(raw: str | None) -> list[str]:
+def _parse_string_csv(raw: Optional[str]) -> list[str]:
     if raw in (None, ""):
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def _parse_float_kv_csv(raw: str | None, option_name: str) -> dict[str, float]:
+def _parse_float_kv_csv(raw: Optional[str], option_name: str) -> dict[str, float]:
     if raw in (None, ""):
         return {}
     parsed: dict[str, float] = {}

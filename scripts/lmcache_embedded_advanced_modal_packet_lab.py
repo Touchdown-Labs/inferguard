@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Mapping
 
 import modal
 
@@ -41,6 +42,8 @@ ENGINE_HEALTH_URL = f"{ENGINE_BASE_URL}/health"
 ENGINE_METRICS_URL = f"{ENGINE_BASE_URL}/metrics"
 SECONDARY_ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{SECONDARY_ENGINE_PORT}"
 
+MODAL_ENGINE_PACKAGES_ENV = "INFERGUARD_EMBEDDED_ADVANCED_MODAL_ENGINES"
+
 LMCACHE_CONFIG_FILE = "lmcache_embedded_config.json"
 RUNNER_PROOF_FILE = "runner_launch_proof.json"
 LMCACHE_OTEL_FILE = "lmcache_otel.jsonl"
@@ -51,19 +54,31 @@ MODAL_INFERGUARD_FILES = ("pyproject.toml", "README.md", "LICENSE")
 MODAL_INFERGUARD_PACKAGE_DIR = "src/inferguard"
 INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_SOURCE}"
 
+def _modal_runtime_packages(env: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    env = env or os.environ
+    selected_engines = {
+        token.strip().lower()
+        for token in env.get(MODAL_ENGINE_PACKAGES_ENV, "vllm,sglang").split(",")
+        if token.strip()
+    }
+    packages = [
+        "vllm",
+        "lmcache",
+        "hf-transfer",
+        "huggingface-hub",
+        "nvidia-cuda-runtime-cu12",
+    ]
+    if "sglang" in selected_engines:
+        packages.append("sglang")
+    return tuple(packages)
+
+
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("curl", "git")
-    .pip_install(
-        "vllm",
-        "lmcache",
-        "sglang",
-        "hf-transfer",
-        "huggingface-hub",
-        "nvidia-cuda-runtime-cu12",
-    )
+    .pip_install(*_modal_runtime_packages())
     .add_local_file(
         local_path=str(REPO_ROOT / "pyproject.toml"),
         remote_path=f"{MODAL_INFERGUARD_SOURCE}/pyproject.toml",
@@ -300,6 +315,23 @@ def _curl_to_file(url: str, path: Path, log_path: Path, *, timeout: int = 30) ->
     return result == 0
 
 
+def _tail_text(path: Path, *, max_lines: int = 80) -> str:
+    if not path.exists():
+        return f"{path} does not exist"
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[-max_lines:])
+
+
+def _health_failure_message(label: str, message: str, service_log_path: Path | None) -> str:
+    if service_log_path is None:
+        return message
+    tail = _tail_text(service_log_path)
+    print(f"--- {label} log tail: {service_log_path} ---", file=sys.stderr)
+    print(tail, file=sys.stderr)
+    print(f"--- end {label} log tail ---", file=sys.stderr)
+    return f"{message}; {service_log_path} tail:\n{tail}"
+
+
 def _wait_for_http(
     url: str,
     log_path: Path,
@@ -307,18 +339,21 @@ def _wait_for_http(
     label: str,
     max_wait_seconds: int,
     proc: subprocess.Popen[str] | None,
+    service_log_path: Path | None = None,
 ) -> None:
     deadline = time.monotonic() + max_wait_seconds
     attempt = 0
     while time.monotonic() < deadline:
         if proc is not None and proc.poll() is not None:
-            raise RuntimeError(f"{label} exited before health passed with code {proc.returncode}")
+            message = f"{label} exited before health passed with code {proc.returncode}"
+            raise RuntimeError(_health_failure_message(label, message, service_log_path))
         attempt += 1
         if _run_best_effort(["curl", "-fsS", url], log_path, timeout=30) == 0:
             _append(log_path, f"{label} health passed after {attempt} attempts\n")
             return
         time.sleep(10)
-    raise RuntimeError(f"{label} did not become healthy at {url}")
+    message = f"{label} did not become healthy at {url}"
+    raise RuntimeError(_health_failure_message(label, message, service_log_path))
 
 
 def _write_env_snapshot(run_dir: Path) -> None:
@@ -396,8 +431,8 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
                 "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
                 "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
                 "OTEL_TRACES_EXPORTER": "otlp",
-                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/json",
+                "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/protobuf",
                 "OTEL_SERVICE_NAME": "inferguard-h3-cacheblend",
             }
         )
@@ -584,12 +619,12 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("content-length", "0") or "0")
         body = self.rfile.read(length)
         with open(out, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps({
+            record = {
                 "path": self.path,
                 "content_type": self.headers.get("content-type"),
                 "body_preview": body.decode("utf-8", errors="replace")[:20000],
                 "body_bytes": len(body),
-            })
+            }
             try:
                 payload = json.loads(body.decode("utf-8"))
             except Exception:
@@ -956,6 +991,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
             label="primary engine",
             max_wait_seconds=30 * 60,
             proc=primary_proc,
+            service_log_path=run_dir / "engine.log",
         )
         if spec.secondary_port is not None:
             _wait_for_http(
@@ -964,6 +1000,7 @@ def _run_packet(spec: EmbeddedAdvancedPacketSpec) -> str:
                 label="secondary engine",
                 max_wait_seconds=30 * 60,
                 proc=secondary_proc,
+                service_log_path=run_dir / "secondary_engine.log",
             )
         _capture_metrics(run_dir, "empty")
         _drive_traffic(run_dir, spec)
