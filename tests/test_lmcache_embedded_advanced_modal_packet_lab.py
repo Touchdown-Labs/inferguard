@@ -182,8 +182,17 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     coverage = lab._build_observability_coverage_cmd(tmp_path, spec)
 
     assert env["LMCACHE_ENABLE_CACHEBLEND"] == "True"
+    assert env["LMCACHE_ENABLE_BLENDING"] == "True"
+    assert env["LMCACHE_BLEND_SPECIAL_STR"] == " # # "
+    assert env["LMCACHE_USE_LAYERWISE"] == "True"
+    assert env["LMCACHE_BLEND_CHECK_LAYERS"] == "1"
+    assert env["LMCACHE_BLEND_RECOMPUTE_RATIOS"] == "0.15"
+    assert json.loads(env["LMCACHE_EXTRA_CONFIG"])["enable_sparse"] is True
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
     assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/protobuf"
+    cmd = lab._build_engine_command(tmp_path, spec)
+    assert cmd[cmd.index("--kv-offloading-size") + 1] == "8"
+    assert "--no-enable-prefix-caching" in cmd
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )

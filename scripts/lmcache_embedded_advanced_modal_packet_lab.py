@@ -428,6 +428,12 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
         env.update(
             {
                 "LMCACHE_ENABLE_CACHEBLEND": "True",
+                "LMCACHE_ENABLE_BLENDING": "True",
+                "LMCACHE_BLEND_SPECIAL_STR": " # # ",
+                "LMCACHE_USE_LAYERWISE": "True",
+                "LMCACHE_BLEND_CHECK_LAYERS": "1",
+                "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
+                "LMCACHE_EXTRA_CONFIG": json.dumps({"enable_sparse": True}),
                 "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
                 "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
                 "OTEL_TRACES_EXPORTER": "otlp",
@@ -472,10 +478,13 @@ def _build_vllm_embedded_command(
         MODEL,
         "--kv-offloading-backend",
         "lmcache",
+        "--kv-offloading-size",
+        "8",
         "--max-model-len",
         str(MODEL_MAX_LEN),
         "--gpu-memory-utilization",
         "0.80",
+        "--no-enable-prefix-caching",
         "--port",
         str(port),
     ]
@@ -667,9 +676,18 @@ base_url = sys.argv[1]
 model = sys.argv[2]
 api_path = sys.argv[3]
 requests = int(sys.argv[4])
-shared_prefix = "InferGuard embedded LMCache repeated-prefix validation. " * 220
+blend_sep = " # # "
+chunk_a = "CacheBlend shared chunk alpha contains stable reusable KV evidence. " * 90
+chunk_b = "CacheBlend shared chunk beta contains stable reusable KV evidence. " * 90
+chunk_c = "CacheBlend shared chunk gamma contains stable reusable KV evidence. " * 90
+chunks = [chunk_a, chunk_b, chunk_c]
 for idx in range(requests):
-    prompt = shared_prefix + f"\nRequest variant {idx % 4}: summarize the cache evidence."
+    rotated = chunks[idx % 3:] + chunks[:idx % 3]
+    prompt = (
+        "You are validating CacheBlend non-prefix reuse. "
+        + blend_sep.join(rotated)
+        + f"\nRequest variant {idx}: summarize the cache evidence."
+    )
     payload = json.dumps({
         "model": model,
         "prompt": prompt,
