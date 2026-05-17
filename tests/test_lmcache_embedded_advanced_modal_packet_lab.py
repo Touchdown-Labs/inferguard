@@ -188,6 +188,7 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     assert env["LMCACHE_BLEND_CHECK_LAYERS"] == "1"
     assert env["LMCACHE_BLEND_RECOMPUTE_RATIOS"] == "0.15"
     assert json.loads(env["LMCACHE_EXTRA_CONFIG"])["enable_sparse"] is True
+    assert env["VLLM_USE_V1"] == "0"
     assert env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"].endswith("/v1/traces")
     assert env["OTEL_EXPORTER_OTLP_PROTOCOL"] == "http/protobuf"
     cmd = lab._build_engine_command(tmp_path, spec)

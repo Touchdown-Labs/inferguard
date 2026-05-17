@@ -434,6 +434,7 @@ def _build_runner_env(run_dir: Path, spec: EmbeddedAdvancedPacketSpec, *, role: 
                 "LMCACHE_BLEND_CHECK_LAYERS": "1",
                 "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
                 "LMCACHE_EXTRA_CONFIG": json.dumps({"enable_sparse": True}),
+                "VLLM_USE_V1": "0",
                 "OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}",
                 "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"http://127.0.0.1:{OTLP_HTTP_PORT}/v1/traces",
                 "OTEL_TRACES_EXPORTER": "otlp",
