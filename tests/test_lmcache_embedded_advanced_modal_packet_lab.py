@@ -193,6 +193,7 @@ def test_h3_cacheblend_wires_otel_and_cacheblend_reports(tmp_path: Path) -> None
     cmd = lab._build_engine_command(tmp_path, spec)
     assert cmd[cmd.index("--kv-offloading-size") + 1] == "8"
     assert "--no-enable-prefix-caching" in cmd
+    assert "--disable-hybrid-kv-cache-manager" in cmd
     assert collect[collect.index("--lmcache-otel-file") + 1] == str(
         tmp_path / lab.LMCACHE_OTEL_FILE
     )

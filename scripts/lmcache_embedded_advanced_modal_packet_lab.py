@@ -485,6 +485,7 @@ def _build_vllm_embedded_command(
         "--gpu-memory-utilization",
         "0.80",
         "--no-enable-prefix-caching",
+        "--disable-hybrid-kv-cache-manager",
         "--port",
         str(port),
     ]
