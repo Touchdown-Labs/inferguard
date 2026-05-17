@@ -149,10 +149,15 @@ def analyze_cacheblend_metrics(text: str) -> CacheBlendMetricsSummary:
         fingerprint_efficiency=_safe_ratio(
             counters.get("lookup_storage_hits"), counters.get("lookup_fingerprint_hits")
         ),
-        eviction_rate=_safe_ratio(
-            counters.get("fingerprint_evicted"), counters.get("fingerprint_registered")
-        ),
+        eviction_rate=_eviction_rate(counters),
     )
+
+
+def _eviction_rate(counters: dict[str, float]) -> float | None:
+    plural = _safe_ratio(counters.get("chunks_evicted"), counters.get("fingerprints_registered"))
+    if plural is not None:
+        return plural
+    return _safe_ratio(counters.get("fingerprint_evicted"), counters.get("fingerprint_registered"))
 
 
 def _safe_ratio(numerator: float | None, denominator: float | None) -> float | None:

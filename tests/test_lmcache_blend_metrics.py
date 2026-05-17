@@ -72,30 +72,33 @@ def test_analyze_cacheblend_metrics_accepts_dotted_otel_names():
 
 def test_analyze_cacheblend_metrics_accepts_current_upstream_backend_surface_names():
     summary = analyze_cacheblend_metrics(
-        """
-lmcache_blend_retrieve_chunks_total 12
-lmcache_blend_store_pre_computed_requests_total 4
-lmcache_blend_store_pre_computed_chunks_total 9
-lmcache_blend_store_pre_computed_failures_total 2
-lmcache_blend_store_final_requests_total 3
-lmcache_blend_store_final_chunks_total 8
-lmcache_blend_store_final_failures_total 1
-lmcache_blend_fingerprints_registered_total 6
-lmcache_blend_lookup_no_gpu_context_errors_total 1
-"""
+        "\n".join(
+            [
+                "lmcache_blend_retrieve_chunks_total 7",
+                "lmcache_blend_store_pre_computed_requests_total 2",
+                "lmcache_blend_store_pre_computed_chunks_total 5",
+                "lmcache_blend_store_pre_computed_failures_total 1",
+                "lmcache_blend_store_final_requests_total 3",
+                "lmcache_blend_store_final_chunks_total 11",
+                "lmcache_blend_store_final_failures_total 1",
+                "lmcache_blend_fingerprints_registered_total 13",
+                "lmcache_blend_chunks_evicted_total 4",
+                "lmcache_blend_lookup_no_gpu_context_errors_total 1",
+            ]
+        )
     )
 
-    assert summary.present is True
-    assert summary.counters["retrieve_chunks"] == 12
-    assert summary.counters["store_pre_computed_requests"] == 4
-    assert summary.counters["store_pre_computed_chunks"] == 9
-    assert summary.counters["store_pre_computed_failures"] == 2
+    assert summary.counters["retrieve_chunks"] == 7
+    assert summary.counters["store_pre_computed_requests"] == 2
+    assert summary.counters["store_pre_computed_chunks"] == 5
+    assert summary.counters["store_pre_computed_failures"] == 1
     assert summary.counters["store_final_requests"] == 3
-    assert summary.counters["store_final_chunks"] == 8
+    assert summary.counters["store_final_chunks"] == 11
     assert summary.counters["store_final_failures"] == 1
-    assert summary.counters["fingerprints_registered"] == 6
+    assert summary.counters["fingerprints_registered"] == 13
+    assert summary.counters["chunks_evicted"] == 4
     assert summary.counters["lookup_no_gpu_context_errors"] == 1
-
+    assert summary.eviction_rate == 4 / 13
 
 def test_analyze_cacheblend_metrics_empty_text_is_not_present():
     summary = analyze_cacheblend_metrics("# HELP unrelated x\nunrelated_total 1\n")
