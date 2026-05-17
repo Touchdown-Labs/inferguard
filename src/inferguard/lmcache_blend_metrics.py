@@ -32,6 +32,10 @@ _COUNTER_ALIASES = {
         "lmcache_blend_lookup_stale_chunks_total",
         "lmcache_blend.lookup_stale_chunks",
     ),
+    "lookup_no_gpu_context_errors": (
+        "lmcache_blend_lookup_no_gpu_context_errors_total",
+        "lmcache_blend.lookup_no_gpu_context_errors",
+    ),
     "retrieve_requests": (
         "lmcache_blend_retrieve_requests_total",
         "lmcache_blend.retrieve_requests",
@@ -44,17 +48,49 @@ _COUNTER_ALIASES = {
         "lmcache_blend_retrieve_failures_total",
         "lmcache_blend.retrieve_failures",
     ),
+    "retrieve_chunks": (
+        "lmcache_blend_retrieve_chunks_total",
+        "lmcache_blend.retrieve_chunks",
+    ),
     "store_pre_computed": (
         "lmcache_blend_store_pre_computed_total",
         "lmcache_blend.store_pre_computed",
+    ),
+    "store_pre_computed_requests": (
+        "lmcache_blend_store_pre_computed_requests_total",
+        "lmcache_blend.store_pre_computed_requests",
+    ),
+    "store_pre_computed_chunks": (
+        "lmcache_blend_store_pre_computed_chunks_total",
+        "lmcache_blend.store_pre_computed_chunks",
+    ),
+    "store_pre_computed_failures": (
+        "lmcache_blend_store_pre_computed_failures_total",
+        "lmcache_blend.store_pre_computed_failures",
     ),
     "store_final": (
         "lmcache_blend_store_final_total",
         "lmcache_blend.store_final",
     ),
+    "store_final_requests": (
+        "lmcache_blend_store_final_requests_total",
+        "lmcache_blend.store_final_requests",
+    ),
+    "store_final_chunks": (
+        "lmcache_blend_store_final_chunks_total",
+        "lmcache_blend.store_final_chunks",
+    ),
+    "store_final_failures": (
+        "lmcache_blend_store_final_failures_total",
+        "lmcache_blend.store_final_failures",
+    ),
     "fingerprint_registered": (
         "lmcache_blend_fingerprint_registered_total",
         "lmcache_blend.fingerprint_registered",
+    ),
+    "fingerprints_registered": (
+        "lmcache_blend_fingerprints_registered_total",
+        "lmcache_blend.fingerprints_registered",
     ),
     "fingerprint_evicted": (
         "lmcache_blend_fingerprint_evicted_total",
