@@ -42,15 +42,19 @@ def build_lmcache_merge_ready_report(
         repos=repo_reports,
         require_cacheblend=require_cacheblend,
     )
+    blocking_blockers = [item for item in blockers if item.get("severity") == "blocking"]
+    diagnostic_findings = [item for item in blockers if item.get("severity") != "blocking"]
     return {
         "schema_version": SCHEMA_VERSION,
-        "merge_ready": not blockers,
+        "merge_ready": not blocking_blockers,
         "packets": {
             "packet_b": packet_b,
             "packet_c": packet_c,
         },
         "repos": repo_reports,
         "blockers": blockers,
+        "blocking_blockers": blocking_blockers,
+        "diagnostic_findings": diagnostic_findings,
         "commands": _suggested_commands(packet_b_dir=packet_b_dir, packet_c_dir=packet_c_dir),
     }
 

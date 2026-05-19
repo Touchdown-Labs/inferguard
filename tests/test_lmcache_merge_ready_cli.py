@@ -183,9 +183,65 @@ def test_lmcache_merge_ready_cli_summarizes_packets_repos_and_blockers(tmp_path:
     assert "repo_dirty" in blocker_codes
     assert "repo_behind_upstream" in blocker_codes
     assert "lmcache_mp_l1_failures_observed" in blocker_codes
+    assert {item["code"] for item in payload["blocking_blockers"]} == {
+        "cacheblend_not_measured",
+        "repo_dirty",
+        "repo_behind_upstream",
+    }
+    assert {item["code"] for item in payload["diagnostic_findings"]} == {
+        "lmcache_mp_l1_failures_observed"
+    }
     assert payload["repos"]["lmcache"]["dirty"] is True
     assert payload["repos"]["sglang"]["behind"] == 1
     assert output.exists()
+
+
+def test_lmcache_merge_ready_cli_treats_l1_capacity_failures_as_diagnostic(
+    tmp_path: Path,
+) -> None:
+    packet_b = _write_packet_b(tmp_path)
+    packet_c = _write_packet_c(tmp_path)
+    _write_json(
+        packet_b / "lmcache-packet" / "lmcache_cacheblend_boundary_evidence.json",
+        {
+            "present": True,
+            "claim_status": "measured",
+            "row_count": 672,
+            "event_counts": {
+                "report_block_allocation_received": 336,
+                "l0_lifecycle_subscriber_processed": 336,
+            },
+            "stages": [
+                "report_block_allocation_received",
+                "l0_lifecycle_subscriber_processed",
+            ],
+        },
+    )
+    repo = _git_repo(tmp_path / "repo")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "lmcache-merge-ready",
+            "--packet-b-dir",
+            str(packet_b),
+            "--packet-c-dir",
+            str(packet_c),
+            "--repo",
+            f"repo={repo}",
+            "--require-cacheblend",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["merge_ready"] is True
+    assert payload["blocking_blockers"] == []
+    assert {item["code"] for item in payload["diagnostic_findings"]} == {
+        "lmcache_mp_l1_failures_observed"
+    }
+    assert payload["packets"]["packet_b"]["l1_failures"] == 279.0
 
 
 def test_lmcache_merge_ready_cli_accepts_cacheblend_boundary_evidence(tmp_path: Path) -> None:
