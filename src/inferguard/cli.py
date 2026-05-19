@@ -183,11 +183,15 @@ def preflight_cmd(
     ] = "deepseek-ai/DeepSeek-V4-Pro",
     engine: Annotated[
         str,
-        typer.Option("--engine", help="Engine hint: vllm, sglang, dynamo, lmcache, llm-d, or auto."),
+        typer.Option(
+            "--engine", help="Engine hint: vllm, sglang, dynamo, lmcache, llm-d, or auto."
+        ),
     ] = "vllm",
     kv_offloading_backend: Annotated[
         Optional[str],
-        typer.Option("--kv-offloading-backend", help="KV offload backend, e.g. native when OFFLOADING=cpu."),
+        typer.Option(
+            "--kv-offloading-backend", help="KV offload backend, e.g. native when OFFLOADING=cpu."
+        ),
     ] = None,
     disable_hybrid_kv_cache_manager: Annotated[
         bool,
@@ -198,15 +202,23 @@ def preflight_cmd(
     ] = False,
     config: Annotated[
         Optional[Path],
-        typer.Option("--config", help="Optional config.json/run config containing topology/preflight fields."),
+        typer.Option(
+            "--config", help="Optional config.json/run config containing topology/preflight fields."
+        ),
     ] = None,
     detect_tokenizer_mismatch: Annotated[
         bool,
-        typer.Option("--detect-tokenizer-mismatch", help="Probe client/server tokenizer-count drift before rollout."),
+        typer.Option(
+            "--detect-tokenizer-mismatch",
+            help="Probe client/server tokenizer-count drift before rollout.",
+        ),
     ] = False,
     endpoint: Annotated[
         Optional[str],
-        typer.Option("--endpoint", help="Optional OpenAI-compatible /v1/chat/completions endpoint for tokenizer probe."),
+        typer.Option(
+            "--endpoint",
+            help="Optional OpenAI-compatible /v1/chat/completions endpoint for tokenizer probe.",
+        ),
     ] = None,
     sample_text: Annotated[
         str,
@@ -214,15 +226,23 @@ def preflight_cmd(
     ] = "Hello world\nThis is a test of tokenization.",
     client_tokenizer: Annotated[
         str,
-        typer.Option("--client-tokenizer", help="Client tokenizer label/version used for preflight evidence."),
+        typer.Option(
+            "--client-tokenizer", help="Client tokenizer label/version used for preflight evidence."
+        ),
     ] = "inferguard-estimator",
     server_tokenizer: Annotated[
         Optional[str],
-        typer.Option("--server-tokenizer", help="Optional server tokenizer label/version used for preflight evidence."),
+        typer.Option(
+            "--server-tokenizer",
+            help="Optional server tokenizer label/version used for preflight evidence.",
+        ),
     ] = None,
     client_token_count: Annotated[
         Optional[int],
-        typer.Option("--client-token-count", help="Optional explicit client token count for tokenizer probe/testing."),
+        typer.Option(
+            "--client-token-count",
+            help="Optional explicit client token count for tokenizer probe/testing.",
+        ),
     ] = None,
     json_out: Annotated[
         bool,
@@ -253,37 +273,53 @@ def preflight_cmd(
             topology = loaded.get("topology") if isinstance(loaded.get("topology"), dict) else {}
             status.update(
                 {
-                    "engine": loaded.get("framework") or topology.get("framework") or status.get("engine"),
+                    "engine": loaded.get("framework")
+                    or topology.get("framework")
+                    or status.get("engine"),
                     "kv_offloading_backend": loaded.get("kv_offloading_backend")
                     or topology.get("kv_offloading_backend")
-                    or ("native" if str(topology.get("offloading") or "").lower() == "cpu" else status.get("kv_offloading_backend")),
+                    or (
+                        "native"
+                        if str(topology.get("offloading") or "").lower() == "cpu"
+                        else status.get("kv_offloading_backend")
+                    ),
                     "disable_hybrid_kv_cache_manager": loaded.get("disable_hybrid_kv_cache_manager")
                     if loaded.get("disable_hybrid_kv_cache_manager") is not None
-                    else topology.get("disable_hybrid_kv_cache_manager", status.get("disable_hybrid_kv_cache_manager")),
+                    else topology.get(
+                        "disable_hybrid_kv_cache_manager",
+                        status.get("disable_hybrid_kv_cache_manager"),
+                    ),
                 }
             )
             model = str(loaded.get("model") or model)
             probe = loaded.get("tokenizer_mismatch") or loaded.get("tokenizer_probe")
             if isinstance(probe, dict):
-                detect_tokenizer_mismatch = detect_tokenizer_mismatch or bool(probe.get("enabled", True))
+                detect_tokenizer_mismatch = detect_tokenizer_mismatch or bool(
+                    probe.get("enabled", True)
+                )
                 tokenizer_probe.update(
                     {
                         "enabled": detect_tokenizer_mismatch,
-                        "client_tokenizer": probe.get("client_tokenizer") or tokenizer_probe["client_tokenizer"],
-                        "server_tokenizer": probe.get("server_tokenizer") or tokenizer_probe["server_tokenizer"],
+                        "client_tokenizer": probe.get("client_tokenizer")
+                        or tokenizer_probe["client_tokenizer"],
+                        "server_tokenizer": probe.get("server_tokenizer")
+                        or tokenizer_probe["server_tokenizer"],
                         "client_prompt_tokens": probe.get("client_prompt_tokens")
                         or probe.get("client_token_count")
                         or tokenizer_probe["client_prompt_tokens"],
                         "server_prompt_tokens": probe.get("server_prompt_tokens")
                         or probe.get("usage_prompt_tokens")
                         or tokenizer_probe["server_prompt_tokens"],
-                        "sample_text_length": probe.get("sample_text_length") or tokenizer_probe["sample_text_length"],
+                        "sample_text_length": probe.get("sample_text_length")
+                        or tokenizer_probe["sample_text_length"],
                     }
                 )
     findings = check_hma_offload_compat(status, model)
     if detect_tokenizer_mismatch:
         if tokenizer_probe.get("client_prompt_tokens") is None:
-            tokenizer_probe["client_prompt_tokens"] = client_token_count or estimate_text_tokens(sample_text)
+            tokenizer_probe["client_prompt_tokens"] = client_token_count or estimate_text_tokens(
+                sample_text
+            )
         if tokenizer_probe.get("server_prompt_tokens") is None and endpoint:
             try:
                 tokenizer_probe["server_prompt_tokens"] = asyncio.run(
@@ -313,7 +349,9 @@ def preflight_cmd(
                 ),
                 client_prompt_tokens=tokenizer_probe.get("client_prompt_tokens"),
                 server_prompt_tokens=tokenizer_probe.get("server_prompt_tokens"),
-                sample_text_length=int(tokenizer_probe.get("sample_text_length") or len(sample_text)),
+                sample_text_length=int(
+                    tokenizer_probe.get("sample_text_length") or len(sample_text)
+                ),
             )
         )
     payload = {
@@ -366,7 +404,10 @@ def analyze_cmd(
     ] = None,
     operator_brief: Annotated[
         Optional[bool],
-        typer.Option("--operator-brief/--no-operator-brief", help="Emit operator_brief.{json,md}; defaults on when --gpus is provided."),
+        typer.Option(
+            "--operator-brief/--no-operator-brief",
+            help="Emit operator_brief.{json,md}; defaults on when --gpus is provided.",
+        ),
     ] = None,
     cost_currency: Annotated[
         str,
@@ -374,11 +415,16 @@ def analyze_cmd(
     ] = "USD",
     plots: Annotated[
         bool,
-        typer.Option("--plots", help="After report writes, render SVG plots into <output-dir>/plots/."),
+        typer.Option(
+            "--plots", help="After report writes, render SVG plots into <output-dir>/plots/."
+        ),
     ] = False,
     emit_agentx_shape_dir: Annotated[
         Optional[Path],
-        typer.Option("--emit-agentx-shape", help="Write per-cell agg_*.json files in AgentX/InferenceX shape."),
+        typer.Option(
+            "--emit-agentx-shape",
+            help="Write per-cell agg_*.json files in AgentX/InferenceX shape.",
+        ),
     ] = None,
     json_out: Annotated[
         bool,
@@ -428,7 +474,6 @@ def analyze_cmd(
     if json_out:
         sys.stdout.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
     raise typer.Exit(code=exit_code_for_report(report, fail_on))
-
 
 
 @workload_app.command("analyze")
@@ -483,18 +528,26 @@ def workload_analyze_cmd(
 
 @router_app.command("classify")
 def router_classify_cmd(
-    run_dir: Annotated[Path, typer.Argument(help="Directory containing InferGuard or AgentX artifacts.")],
+    run_dir: Annotated[
+        Path, typer.Argument(help="Directory containing InferGuard or AgentX artifacts.")
+    ],
     workload_fingerprint: Annotated[
         Optional[Path],
-        typer.Option("--workload-fingerprint", help="Fingerprint JSON from `inferguard workload analyze`."),
+        typer.Option(
+            "--workload-fingerprint", help="Fingerprint JSON from `inferguard workload analyze`."
+        ),
     ] = None,
     slo: Annotated[
         Optional[str],
-        typer.Option("--slo", help="Comma-separated SLOs, e.g. p95_ttft_ms=1000,error_rate_max=0.01."),
+        typer.Option(
+            "--slo", help="Comma-separated SLOs, e.g. p95_ttft_ms=1000,error_rate_max=0.01."
+        ),
     ] = None,
     hardware_fleet: Annotated[
         Optional[str],
-        typer.Option("--hardware-fleet", help="Comma-separated hardware labels, e.g. h200,b200,gb200."),
+        typer.Option(
+            "--hardware-fleet", help="Comma-separated hardware labels, e.g. h200,b200,gb200."
+        ),
     ] = None,
     emit: Annotated[
         Optional[Path],
@@ -533,7 +586,9 @@ def router_classify_cmd(
 
 @app.command("emit-bundle")
 def emit_bundle_cmd(
-    verdict: Annotated[Path, typer.Argument(help="Router verdict JSON from `inferguard router classify`.")],
+    verdict: Annotated[
+        Path, typer.Argument(help="Router verdict JSON from `inferguard router classify`.")
+    ],
     output_dir: Annotated[
         Path,
         typer.Option("--output", help="Destination bundle directory."),
@@ -580,7 +635,9 @@ def profile_live_cmd(
     ] = "auto",
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for profile.jsonl/profile_summary.json/profile.md."),
+        typer.Option(
+            "--output-dir", help="Directory for profile.jsonl/profile_summary.json/profile.md."
+        ),
     ] = Path("inferguard_profile_live"),
     output_format: Annotated[
         str,
@@ -664,11 +721,16 @@ def bench_replay_cmd(
     ] = "1,4,8,16,32",
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."),
+        typer.Option(
+            "--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."
+        ),
     ] = Path("inferguard_bench_replay"),
     output_tokens: Annotated[
         int,
-        typer.Option("--output-tokens", help="Fallback max output tokens when trace does not specify expected_output_tokens."),
+        typer.Option(
+            "--output-tokens",
+            help="Fallback max output tokens when trace does not specify expected_output_tokens.",
+        ),
     ] = 512,
     timeout: Annotated[
         float,
@@ -676,15 +738,23 @@ def bench_replay_cmd(
     ] = 300.0,
     duration_seconds: Annotated[
         Optional[float],
-        typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
+        typer.Option(
+            "--duration-seconds",
+            help="Run each concurrency level for this many seconds instead of one finite pass.",
+        ),
     ] = None,
     warmup_seconds: Annotated[
         float,
-        typer.Option("--warmup-seconds", help="Exclude this many initial seconds per level from summary metrics."),
+        typer.Option(
+            "--warmup-seconds",
+            help="Exclude this many initial seconds per level from summary metrics.",
+        ),
     ] = 0.0,
     metrics_url: Annotated[
         Optional[str],
-        typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
+        typer.Option(
+            "--metrics-url", help="Optional engine metrics URL to scrape during the bench."
+        ),
     ] = None,
     metrics_interval: Annotated[
         float,
@@ -692,35 +762,56 @@ def bench_replay_cmd(
     ] = 5.0,
     metrics_engine: Annotated[
         str,
-        typer.Option("--metrics-engine", help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d."),
+        typer.Option(
+            "--metrics-engine",
+            help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.",
+        ),
     ] = "auto",
     force: Annotated[
         bool,
-        typer.Option("--force", help="Allow writing into a non-empty output directory; known artifact files may be overwritten."),
+        typer.Option(
+            "--force",
+            help="Allow writing into a non-empty output directory; known artifact files may be overwritten.",
+        ),
     ] = False,
     redact_prompts: Annotated[
         bool,
-        typer.Option("--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."),
+        typer.Option(
+            "--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."
+        ),
     ] = False,
     track_cache_lineage: Annotated[
         bool,
-        typer.Option("--track-cache-lineage", help="Track request-level prefix-cache lineage scaffold."),
+        typer.Option(
+            "--track-cache-lineage", help="Track request-level prefix-cache lineage scaffold."
+        ),
     ] = False,
     idle_active_mix_mode: Annotated[
         bool,
-        typer.Option("--idle-active-mix-mode", help="Alternate active request windows with idle windows for S-14 cost economics."),
+        typer.Option(
+            "--idle-active-mix-mode",
+            help="Alternate active request windows with idle windows for S-14 cost economics.",
+        ),
     ] = False,
     active_window_seconds: Annotated[
         float,
-        typer.Option("--active-window-seconds", help="Active traffic window length for --idle-active-mix-mode."),
+        typer.Option(
+            "--active-window-seconds",
+            help="Active traffic window length for --idle-active-mix-mode.",
+        ),
     ] = 60.0,
     idle_window_seconds: Annotated[
         float,
-        typer.Option("--idle-window-seconds", help="Idle traffic window length for --idle-active-mix-mode."),
+        typer.Option(
+            "--idle-window-seconds", help="Idle traffic window length for --idle-active-mix-mode."
+        ),
     ] = 30.0,
     inject_giant_prefill_tokens: Annotated[
         Optional[int],
-        typer.Option("--inject-giant-prefill-tokens", help="Inject one oversized prefill request; requires --allow-chaos."),
+        typer.Option(
+            "--inject-giant-prefill-tokens",
+            help="Inject one oversized prefill request; requires --allow-chaos.",
+        ),
     ] = None,
     allow_chaos: Annotated[
         bool,
@@ -728,11 +819,16 @@ def bench_replay_cmd(
     ] = False,
     canary_eval_set: Annotated[
         Optional[str],
-        typer.Option("--canary-eval-set", help="Held-out eval set path or HuggingFace dataset id for canary quality scoring."),
+        typer.Option(
+            "--canary-eval-set",
+            help="Held-out eval set path or HuggingFace dataset id for canary quality scoring.",
+        ),
     ] = None,
     tool_call_schema: Annotated[
         Optional[Path],
-        typer.Option("--tool-call-schema", help="JSON schema describing expected tool-call response format."),
+        typer.Option(
+            "--tool-call-schema", help="JSON schema describing expected tool-call response format."
+        ),
     ] = None,
     json_out: Annotated[
         bool,
@@ -776,7 +872,10 @@ def bench_upstream_cmd(
     ],
     profile: Annotated[
         str,
-        typer.Option("--profile", help="Profile: vLLM random|sharegpt|prefix-repetition|sonnet; SGLang random."),
+        typer.Option(
+            "--profile",
+            help="Profile: vLLM random|sharegpt|prefix-repetition|sonnet; SGLang random.",
+        ),
     ],
     model: Annotated[str, typer.Option("--model", help="Model name passed to the upstream bench.")],
     endpoint: Annotated[
@@ -793,11 +892,15 @@ def bench_upstream_cmd(
     ] = None,
     dataset_path: Annotated[
         Optional[Path],
-        typer.Option("--dataset-path", help="Optional upstream dataset path for dataset-backed profiles."),
+        typer.Option(
+            "--dataset-path", help="Optional upstream dataset path for dataset-backed profiles."
+        ),
     ] = None,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for run/config/requests/metrics/summary artifacts."),
+        typer.Option(
+            "--output-dir", help="Directory for run/config/requests/metrics/summary artifacts."
+        ),
     ] = Path("inferguard_bench_upstream"),
     timeout: Annotated[
         float,
@@ -868,15 +971,23 @@ def bench_compare_cmd(
     ] = None,
     min_identity_overlap: Annotated[
         float,
-        typer.Option("--min-identity-overlap", help="Required trace_id+turn_index overlap ratio; must be > this value."),
+        typer.Option(
+            "--min-identity-overlap",
+            help="Required trace_id+turn_index overlap ratio; must be > this value.",
+        ),
     ] = 0.50,
     strict_identity: Annotated[
         bool,
-        typer.Option("--strict-identity", help="Fail instead of warning when trace identity overlap is too low."),
+        typer.Option(
+            "--strict-identity",
+            help="Fail instead of warning when trace identity overlap is too low.",
+        ),
     ] = False,
     cost_per_gpu_hour: Annotated[
         Optional[float],
-        typer.Option("--cost-per-gpu-hour", help="Optional GPU-hour cost for cost-per-task deltas."),
+        typer.Option(
+            "--cost-per-gpu-hour", help="Optional GPU-hour cost for cost-per-task deltas."
+        ),
     ] = None,
     gpus: Annotated[
         Optional[int],
@@ -884,11 +995,16 @@ def bench_compare_cmd(
     ] = None,
     blue_green: Annotated[
         bool,
-        typer.Option("--blue-green", help="Treat run A as blue/baseline and run B as green/candidate; emit rollout p99 regression findings."),
+        typer.Option(
+            "--blue-green",
+            help="Treat run A as blue/baseline and run B as green/candidate; emit rollout p99 regression findings.",
+        ),
     ] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="Allow overwriting compare artifacts in a non-empty output directory."),
+        typer.Option(
+            "--force", help="Allow overwriting compare artifacts in a non-empty output directory."
+        ),
     ] = False,
     json_out: Annotated[
         bool,
@@ -923,11 +1039,15 @@ def bench_agentx_replay_cmd(
     ],
     concurrency: Annotated[
         int,
-        typer.Option("--concurrency", help="AgentX concurrent users; used for start-users and max-users."),
+        typer.Option(
+            "--concurrency", help="AgentX concurrent users; used for start-users and max-users."
+        ),
     ] = 1,
     duration_seconds: Annotated[
         int,
-        typer.Option("--duration-seconds", help="AgentX replay duration in seconds; warns below 900s/15min."),
+        typer.Option(
+            "--duration-seconds", help="AgentX replay duration in seconds; warns below 900s/15min."
+        ),
     ] = 1800,
     output_dir: Annotated[
         Path,
@@ -935,11 +1055,16 @@ def bench_agentx_replay_cmd(
     ] = Path("inferguard_bench_agentx_replay"),
     tester_path: Annotated[
         Optional[Path],
-        typer.Option("--tester-path", help="Path to trace_replay_tester.py or a kv-cache-tester checkout."),
+        typer.Option(
+            "--tester-path", help="Path to trace_replay_tester.py or a kv-cache-tester checkout."
+        ),
     ] = None,
     allow_network_clone: Annotated[
         bool,
-        typer.Option("--allow-network-clone", help="Clone kv-cache-tester into ~/.cache/inferguard/agentx-tester if missing."),
+        typer.Option(
+            "--allow-network-clone",
+            help="Clone kv-cache-tester into ~/.cache/inferguard/agentx-tester if missing.",
+        ),
     ] = False,
     json_out: Annotated[
         bool,
@@ -985,15 +1110,22 @@ def bench_kv_stress_cmd(
     ] = 512,
     mode: Annotated[
         str,
-        typer.Option("--mode", help="KVCast mode: cold-pressure, prefix-reuse, mixed-agent, eviction-probe, or fragmentation-probe."),
+        typer.Option(
+            "--mode",
+            help="KVCast mode: cold-pressure, prefix-reuse, mixed-agent, eviction-probe, or fragmentation-probe.",
+        ),
     ] = "cold-pressure",
     requests_per_level: Annotated[
         int,
-        typer.Option("--requests-per-level", help="Synthetic requests generated per context length."),
+        typer.Option(
+            "--requests-per-level", help="Synthetic requests generated per context length."
+        ),
     ] = 4,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."),
+        typer.Option(
+            "--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."
+        ),
     ] = Path("inferguard_bench_kv_stress"),
     timeout: Annotated[
         float,
@@ -1001,15 +1133,23 @@ def bench_kv_stress_cmd(
     ] = 300.0,
     duration_seconds: Annotated[
         Optional[float],
-        typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
+        typer.Option(
+            "--duration-seconds",
+            help="Run each concurrency level for this many seconds instead of one finite pass.",
+        ),
     ] = None,
     warmup_seconds: Annotated[
         float,
-        typer.Option("--warmup-seconds", help="Exclude this many initial seconds per level from summary metrics."),
+        typer.Option(
+            "--warmup-seconds",
+            help="Exclude this many initial seconds per level from summary metrics.",
+        ),
     ] = 0.0,
     metrics_url: Annotated[
         Optional[str],
-        typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
+        typer.Option(
+            "--metrics-url", help="Optional engine metrics URL to scrape during the bench."
+        ),
     ] = None,
     metrics_interval: Annotated[
         float,
@@ -1017,15 +1157,23 @@ def bench_kv_stress_cmd(
     ] = 5.0,
     metrics_engine: Annotated[
         str,
-        typer.Option("--metrics-engine", help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d."),
+        typer.Option(
+            "--metrics-engine",
+            help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.",
+        ),
     ] = "auto",
     force: Annotated[
         bool,
-        typer.Option("--force", help="Allow writing into a non-empty output directory; known artifact files may be overwritten."),
+        typer.Option(
+            "--force",
+            help="Allow writing into a non-empty output directory; known artifact files may be overwritten.",
+        ),
     ] = False,
     redact_prompts: Annotated[
         bool,
-        typer.Option("--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."),
+        typer.Option(
+            "--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."
+        ),
     ] = False,
     json_out: Annotated[
         bool,
@@ -1072,7 +1220,10 @@ def bench_kvcast_cmd(
     ] = "1,4,8,16",
     mode: Annotated[
         str,
-        typer.Option("--mode", help="KVCast mode: cold-pressure, prefix-reuse, mixed-agent, eviction-probe, fragmentation-probe, multi-tenant-storm, or retry-storm."),
+        typer.Option(
+            "--mode",
+            help="KVCast mode: cold-pressure, prefix-reuse, mixed-agent, eviction-probe, fragmentation-probe, multi-tenant-storm, or retry-storm.",
+        ),
     ] = "cold-pressure",
     output_tokens: Annotated[
         int,
@@ -1080,20 +1231,32 @@ def bench_kvcast_cmd(
     ] = 512,
     requests_per_level: Annotated[
         int,
-        typer.Option("--requests-per-level", help="Synthetic requests generated per context length."),
+        typer.Option(
+            "--requests-per-level", help="Synthetic requests generated per context length."
+        ),
     ] = 4,
     output_dir: Annotated[
         Path,
-        typer.Option("--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."),
+        typer.Option(
+            "--output-dir", help="Directory for run.json/config.json/JSONL/summary/report."
+        ),
     ] = Path("inferguard_bench_kvcast"),
-    timeout: Annotated[float, typer.Option("--timeout", help="HTTP timeout per request in seconds.")] = 300.0,
+    timeout: Annotated[
+        float, typer.Option("--timeout", help="HTTP timeout per request in seconds.")
+    ] = 300.0,
     duration_seconds: Annotated[
         Optional[float],
-        typer.Option("--duration-seconds", help="Run each concurrency level for this many seconds instead of one finite pass."),
+        typer.Option(
+            "--duration-seconds",
+            help="Run each concurrency level for this many seconds instead of one finite pass.",
+        ),
     ] = None,
     warmup_seconds: Annotated[
         float,
-        typer.Option("--warmup-seconds", help="Exclude this many initial seconds per level from summary metrics."),
+        typer.Option(
+            "--warmup-seconds",
+            help="Exclude this many initial seconds per level from summary metrics.",
+        ),
     ] = 0.0,
     arrival_mode: Annotated[
         str,
@@ -1101,11 +1264,16 @@ def bench_kvcast_cmd(
     ] = "steady",
     arrival_rate_rps: Annotated[
         Optional[float],
-        typer.Option("--arrival-rate-rps", help="Mean request arrivals per second for --arrival-mode poisson."),
+        typer.Option(
+            "--arrival-rate-rps",
+            help="Mean request arrivals per second for --arrival-mode poisson.",
+        ),
     ] = None,
     metrics_url: Annotated[
         Optional[str],
-        typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during the bench."),
+        typer.Option(
+            "--metrics-url", help="Optional engine metrics URL to scrape during the bench."
+        ),
     ] = None,
     metrics_interval: Annotated[
         float,
@@ -1113,15 +1281,23 @@ def bench_kvcast_cmd(
     ] = 5.0,
     metrics_engine: Annotated[
         str,
-        typer.Option("--metrics-engine", help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d."),
+        typer.Option(
+            "--metrics-engine",
+            help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.",
+        ),
     ] = "auto",
     force: Annotated[
         bool,
-        typer.Option("--force", help="Allow writing into a non-empty output directory; known artifact files may be overwritten."),
+        typer.Option(
+            "--force",
+            help="Allow writing into a non-empty output directory; known artifact files may be overwritten.",
+        ),
     ] = False,
     redact_prompts: Annotated[
         bool,
-        typer.Option("--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."),
+        typer.Option(
+            "--redact-prompts", help="Replace prompt content with <redacted> in requests.jsonl."
+        ),
     ] = False,
     customers: Annotated[
         int,
@@ -1129,15 +1305,22 @@ def bench_kvcast_cmd(
     ] = 1,
     sla_tiers: Annotated[
         Optional[str],
-        typer.Option("--sla-tiers", help="Comma-separated SLA tier policies, e.g. premium=p99<2s,standard=p99<5s."),
+        typer.Option(
+            "--sla-tiers",
+            help="Comma-separated SLA tier policies, e.g. premium=p99<2s,standard=p99<5s.",
+        ),
     ] = None,
     track_cache_lineage: Annotated[
         bool,
-        typer.Option("--track-cache-lineage", help="Track request-level prefix-cache lineage scaffold."),
+        typer.Option(
+            "--track-cache-lineage", help="Track request-level prefix-cache lineage scaffold."
+        ),
     ] = False,
     burst_multiplier: Annotated[
         float,
-        typer.Option("--burst-multiplier", help="Retry-storm burst QPS multiplier over --baseline-rps."),
+        typer.Option(
+            "--burst-multiplier", help="Retry-storm burst QPS multiplier over --baseline-rps."
+        ),
     ] = 50.0,
     burst_window_seconds: Annotated[
         float,
@@ -1145,11 +1328,16 @@ def bench_kvcast_cmd(
     ] = 30.0,
     baseline_rps: Annotated[
         float,
-        typer.Option("--baseline-rps", help="Retry-storm baseline request rate before/after burst."),
+        typer.Option(
+            "--baseline-rps", help="Retry-storm baseline request rate before/after burst."
+        ),
     ] = 4.0,
     inject_crash_after_seconds: Annotated[
         Optional[float],
-        typer.Option("--inject-crash-after-seconds", help="Test-only crash injection delay; requires --allow-chaos."),
+        typer.Option(
+            "--inject-crash-after-seconds",
+            help="Test-only crash injection delay; requires --allow-chaos.",
+        ),
     ] = None,
     allow_chaos: Annotated[
         bool,
@@ -1189,20 +1377,57 @@ def bench_kvcast_cmd(
     )
     _run_bench(config, run_kv_stress, json_out=json_out)
 
+
 @bench_app.command("cold-start")
 def bench_cold_start_cmd(
-    endpoint: Annotated[str, typer.Option("--endpoint", help="OpenAI-compatible /v1/chat/completions endpoint.")],
+    endpoint: Annotated[
+        str, typer.Option("--endpoint", help="OpenAI-compatible /v1/chat/completions endpoint.")
+    ],
     model: Annotated[str, typer.Option("--model", help="Model name sent in chat requests.")],
-    trace_dir: Annotated[Optional[Path], typer.Option("--trace-dir", help="Optional InferGuard trace JSONL directory.")] = None,
-    output_dir: Annotated[Path, typer.Option("--output-dir", help="Directory for cold-start artifacts.")] = Path("inferguard_bench_cold_start"),
-    capture_seconds: Annotated[float, typer.Option("--capture-seconds", help="Cold-start capture window from process spawn/readiness.")] = 60.0,
-    context_lengths: Annotated[str, typer.Option("--context-lengths", help="Synthetic context lengths when --trace-dir is omitted.")] = "1024",
-    concurrency: Annotated[str, typer.Option("--concurrency", help="Comma-separated concurrency levels.")] = "1",
-    output_tokens: Annotated[int, typer.Option("--output-tokens", help="Max streamed output tokens per request.")] = 64,
-    metrics_url: Annotated[Optional[str], typer.Option("--metrics-url", help="Optional engine metrics URL to scrape during cold start.")] = None,
-    metrics_interval: Annotated[float, typer.Option("--metrics-interval", help="Seconds between engine metrics scrapes.")] = 5.0,
-    metrics_engine: Annotated[str, typer.Option("--metrics-engine", help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.")] = "auto",
-    force: Annotated[bool, typer.Option("--force", help="Allow writing into a non-empty output directory.")] = False,
+    trace_dir: Annotated[
+        Optional[Path],
+        typer.Option("--trace-dir", help="Optional InferGuard trace JSONL directory."),
+    ] = None,
+    output_dir: Annotated[
+        Path, typer.Option("--output-dir", help="Directory for cold-start artifacts.")
+    ] = Path("inferguard_bench_cold_start"),
+    capture_seconds: Annotated[
+        float,
+        typer.Option(
+            "--capture-seconds", help="Cold-start capture window from process spawn/readiness."
+        ),
+    ] = 60.0,
+    context_lengths: Annotated[
+        str,
+        typer.Option(
+            "--context-lengths", help="Synthetic context lengths when --trace-dir is omitted."
+        ),
+    ] = "1024",
+    concurrency: Annotated[
+        str, typer.Option("--concurrency", help="Comma-separated concurrency levels.")
+    ] = "1",
+    output_tokens: Annotated[
+        int, typer.Option("--output-tokens", help="Max streamed output tokens per request.")
+    ] = 64,
+    metrics_url: Annotated[
+        Optional[str],
+        typer.Option(
+            "--metrics-url", help="Optional engine metrics URL to scrape during cold start."
+        ),
+    ] = None,
+    metrics_interval: Annotated[
+        float, typer.Option("--metrics-interval", help="Seconds between engine metrics scrapes.")
+    ] = 5.0,
+    metrics_engine: Annotated[
+        str,
+        typer.Option(
+            "--metrics-engine",
+            help="Engine hint for metrics detection: auto, vllm, sglang, dynamo, llm-d.",
+        ),
+    ] = "auto",
+    force: Annotated[
+        bool, typer.Option("--force", help="Allow writing into a non-empty output directory.")
+    ] = False,
     json_out: Annotated[bool, typer.Option("--json", help="Print summary JSON to stdout.")] = False,
 ) -> None:
     """Capture first-60s cold-start ramp from endpoint readiness."""
@@ -1225,7 +1450,6 @@ def bench_cold_start_cmd(
     _run_bench(config, run_cold_start, json_out=json_out)
 
 
-
 @app.command("validate-completed")
 def validate_completed_cmd(
     results_root: Annotated[
@@ -1238,7 +1462,9 @@ def validate_completed_cmd(
     ] = None,
     artifact_contract: Annotated[
         Optional[Path],
-        typer.Option("--artifact-contract", help="Override expected_artifact_contract.json location."),
+        typer.Option(
+            "--artifact-contract", help="Override expected_artifact_contract.json location."
+        ),
     ] = None,
     output_dir: Annotated[
         Optional[Path],
@@ -1250,7 +1476,9 @@ def validate_completed_cmd(
     ] = False,
     label_overrides: Annotated[
         Optional[Path],
-        typer.Option("--label-overrides", help="JSON {claim_id: claim_status} for human-reviewed downgrades."),
+        typer.Option(
+            "--label-overrides", help="JSON {claim_id: claim_status} for human-reviewed downgrades."
+        ),
     ] = None,
     json_only: Annotated[
         bool,
@@ -1345,7 +1573,9 @@ def request_profile_cmd(
     ] = False,
     continuous_usage_stats: Annotated[
         bool,
-        typer.Option("--continuous-usage-stats", help="Request continuous usage stats when supported."),
+        typer.Option(
+            "--continuous-usage-stats", help="Request continuous usage stats when supported."
+        ),
     ] = False,
     workload_label: Annotated[
         Optional[str],
@@ -1451,7 +1681,9 @@ def collect_metrics_cmd(
     ] = None,
     keep_raw_samples: Annotated[
         bool,
-        typer.Option("--keep-raw-samples", help="Keep raw Prometheus samples alongside normalized timelines."),
+        typer.Option(
+            "--keep-raw-samples", help="Keep raw Prometheus samples alongside normalized timelines."
+        ),
     ] = False,
 ) -> None:
     """Collect normalized engine and GPU metric timelines for live evidence."""
@@ -1460,7 +1692,9 @@ def collect_metrics_cmd(
     if engine not in {"vllm", "sglang", "lmcache", "dynamo-sglang"}:
         raise typer.BadParameter("--engine must be one of vllm|sglang|lmcache|dynamo-sglang")
     if duration_seconds <= 0:
-        raise typer.BadParameter("--duration-seconds must be a positive integer for collect-metrics")
+        raise typer.BadParameter(
+            "--duration-seconds must be a positive integer for collect-metrics"
+        )
     if interval_seconds <= 0:
         raise typer.BadParameter("--interval-seconds must be positive for collect-metrics")
     if dcgm_metrics_url and dcgm_interval_seconds <= 0:
@@ -1500,11 +1734,12 @@ def cacheblend_report_cmd(
         Optional[Path],
         typer.Option(
             "--boundary-evidence-file",
-            exists=True,
-            dir_okay=False,
-            readable=True,
             help="Optional CacheBlend L0 boundary evidence JSONL file.",
         ),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option("--output", help="Optional JSON report path for packet artifacts."),
     ] = None,
 ) -> None:
     """Summarize CacheBlend metrics, serde transforms, and L0 lifecycle evidence."""
@@ -1521,7 +1756,11 @@ def cacheblend_report_cmd(
             boundary_evidence_path=boundary_evidence_file,
         ).to_dict(),
     }
-    typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    payload_text = json.dumps(payload, indent=2, sort_keys=True)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(payload_text + "\n", encoding="utf-8")
+    typer.echo(payload_text)
 
 
 @app.command("lmcache-compat")
@@ -1552,7 +1791,9 @@ def lmcache_compat_cmd(
     ] = None,
     lmcache_trace_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
+        typer.Option(
+            "--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."
+        ),
     ] = None,
     lmcache_otel_evidence_file: Annotated[
         Optional[Path],
@@ -1560,11 +1801,17 @@ def lmcache_compat_cmd(
     ] = None,
     lmcache_trace_replay_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
+        typer.Option(
+            "--lmcache-trace-replay-evidence-file",
+            help="Optional LMCache trace replay evidence JSON.",
+        ),
     ] = None,
     lmcache_lookup_hash_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
+        typer.Option(
+            "--lmcache-lookup-hash-evidence-file",
+            help="Optional LMCache lookup-hash evidence JSON.",
+        ),
     ] = None,
     lmcache_cacheblend_boundary_evidence_file: Annotated[
         Optional[Path],
@@ -1591,15 +1838,21 @@ def lmcache_compat_cmd(
     ] = None,
     mp_event_bus_queue_size: Annotated[
         Optional[int],
-        typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
+        typer.Option(
+            "--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."
+        ),
     ] = None,
     mp_metrics_sample_rate: Annotated[
         Optional[float],
-        typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
+        typer.Option(
+            "--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."
+        ),
     ] = None,
     mp_service_instance_id: Annotated[
         Optional[str],
-        typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
+        typer.Option(
+            "--mp-service-instance-id", help="LMCache MP service instance id from launch/config."
+        ),
     ] = None,
     mp_observability_disabled: Annotated[
         bool,
@@ -1778,7 +2031,9 @@ def _lmcache_compat_exit_code(report: dict[str, Any], fail_on: str) -> int:
 def lmcache_merge_ready_cmd(
     packet_b_dir: Annotated[
         Optional[Path],
-        typer.Option("--packet-b-dir", help="Packet B lifecycle/reuse/eviction artifact directory."),
+        typer.Option(
+            "--packet-b-dir", help="Packet B lifecycle/reuse/eviction artifact directory."
+        ),
     ] = None,
     packet_c_dir: Annotated[
         Optional[Path],
@@ -1859,7 +2114,9 @@ def collect_lmcache_cmd(
     ] = ...,
     engine_metrics_url: Annotated[
         Optional[str],
-        typer.Option("--engine-metrics-url", help="Optional serving-engine Prometheus metrics URL."),
+        typer.Option(
+            "--engine-metrics-url", help="Optional serving-engine Prometheus metrics URL."
+        ),
     ] = None,
     lmcache_metrics_url: Annotated[
         Optional[str],
@@ -1893,7 +2150,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_health_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-health-file", help="Optional saved LMCache MP healthcheck response."),
+        typer.Option(
+            "--lmcache-health-file", help="Optional saved LMCache MP healthcheck response."
+        ),
     ] = None,
     lmcache_status_url: Annotated[
         Optional[str],
@@ -1921,7 +2180,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_periodic_threads_url: Annotated[
         Optional[str],
-        typer.Option("--lmcache-periodic-threads-url", help="Optional LMCache MP /periodic-threads URL."),
+        typer.Option(
+            "--lmcache-periodic-threads-url", help="Optional LMCache MP /periodic-threads URL."
+        ),
     ] = None,
     lmcache_periodic_threads_file: Annotated[
         Optional[Path],
@@ -1972,7 +2233,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_lmc_version_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-lmc-version-file", help="Optional saved LMCache MP /lmc_version response."),
+        typer.Option(
+            "--lmcache-lmc-version-file", help="Optional saved LMCache MP /lmc_version response."
+        ),
     ] = None,
     lmcache_commit_id_url: Annotated[
         Optional[str],
@@ -1980,7 +2243,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_commit_id_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-commit-id-file", help="Optional saved LMCache MP /commit_id response."),
+        typer.Option(
+            "--lmcache-commit-id-file", help="Optional saved LMCache MP /commit_id response."
+        ),
     ] = None,
     lmcache_quota_url: Annotated[
         Optional[str],
@@ -1988,7 +2253,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_quota_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-quota-file", help="Optional saved LMCache MP GET /api/quota response."),
+        typer.Option(
+            "--lmcache-quota-file", help="Optional saved LMCache MP GET /api/quota response."
+        ),
     ] = None,
     engine_log_file: Annotated[
         Optional[Path],
@@ -1996,7 +2263,9 @@ def collect_lmcache_cmd(
     ] = None,
     lmcache_log_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-log-file", help="Optional LMCache log file to copy into the packet."),
+        typer.Option(
+            "--lmcache-log-file", help="Optional LMCache log file to copy into the packet."
+        ),
     ] = None,
     lmcache_trace_file: Annotated[
         Optional[Path],
@@ -2045,15 +2314,21 @@ def collect_lmcache_cmd(
     ] = None,
     mp_event_bus_queue_size: Annotated[
         Optional[int],
-        typer.Option("--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."),
+        typer.Option(
+            "--mp-event-bus-queue-size", help="LMCache MP EventBus queue size from launch/config."
+        ),
     ] = None,
     mp_metrics_sample_rate: Annotated[
         Optional[float],
-        typer.Option("--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."),
+        typer.Option(
+            "--mp-metrics-sample-rate", help="LMCache MP metrics sample rate from launch/config."
+        ),
     ] = None,
     mp_service_instance_id: Annotated[
         Optional[str],
-        typer.Option("--mp-service-instance-id", help="LMCache MP service instance id from launch/config."),
+        typer.Option(
+            "--mp-service-instance-id", help="LMCache MP service instance id from launch/config."
+        ),
     ] = None,
     mp_observability_disabled: Annotated[
         bool,
@@ -2244,7 +2519,9 @@ def observability_coverage_cmd(
     ] = None,
     lmcache_trace_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."),
+        typer.Option(
+            "--lmcache-trace-evidence-file", help="Optional LMCache .lct trace evidence JSON."
+        ),
     ] = None,
     lmcache_otel_evidence_file: Annotated[
         Optional[Path],
@@ -2252,11 +2529,17 @@ def observability_coverage_cmd(
     ] = None,
     lmcache_trace_replay_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-trace-replay-evidence-file", help="Optional LMCache trace replay evidence JSON."),
+        typer.Option(
+            "--lmcache-trace-replay-evidence-file",
+            help="Optional LMCache trace replay evidence JSON.",
+        ),
     ] = None,
     lmcache_lookup_hash_evidence_file: Annotated[
         Optional[Path],
-        typer.Option("--lmcache-lookup-hash-evidence-file", help="Optional LMCache lookup-hash evidence JSON."),
+        typer.Option(
+            "--lmcache-lookup-hash-evidence-file",
+            help="Optional LMCache lookup-hash evidence JSON.",
+        ),
     ] = None,
     lmcache_cacheblend_boundary_evidence_file: Annotated[
         Optional[Path],
@@ -2275,7 +2558,9 @@ def observability_coverage_cmd(
     ] = "auto",
     external_cache_configured: Annotated[
         bool,
-        typer.Option("--external-cache-configured", help="Require external prefix/KV cache families."),
+        typer.Option(
+            "--external-cache-configured", help="Require external prefix/KV cache families."
+        ),
     ] = False,
     cpu_offload_configured: Annotated[
         bool,
@@ -2416,7 +2701,10 @@ def agentx_ingest_cmd(
     ] = ...,
     agentx_results_dir: Annotated[
         Optional[Path],
-        typer.Option("--agentx-results-dir", help="AgentX result directory containing metadata and CSV output."),
+        typer.Option(
+            "--agentx-results-dir",
+            help="AgentX result directory containing metadata and CSV output.",
+        ),
     ] = None,
     agentx_result: Annotated[
         Optional[Path],
@@ -2451,7 +2739,9 @@ def agentx_ingest_cmd(
     adapter = import_module("inferguard.agentx_adapter")
 
     if agentx_results_dir is None and agentx_result is None:
-        raise typer.BadParameter("--agentx-results-dir or --agentx-result is required for ingest-agentx")
+        raise typer.BadParameter(
+            "--agentx-results-dir or --agentx-result is required for ingest-agentx"
+        )
     if agentx_results_dir is not None and agentx_result is not None:
         raise typer.BadParameter("provide only one of --agentx-results-dir or --agentx-result")
     if agentx_results_dir is not None:
@@ -2492,11 +2782,15 @@ def launch_engine_cmd(
     ] = ...,
     external_launch: Annotated[
         bool,
-        typer.Option("--external-launch", help="Validate an already-launched endpoint instead of spawning."),
+        typer.Option(
+            "--external-launch", help="Validate an already-launched endpoint instead of spawning."
+        ),
     ] = False,
     endpoint_url: Annotated[
         Optional[str],
-        typer.Option("--endpoint-url", "--endpoint", help="Endpoint URL for external-launch or healthcheck."),
+        typer.Option(
+            "--endpoint-url", "--endpoint", help="Endpoint URL for external-launch or healthcheck."
+        ),
     ] = None,
     model_path: Annotated[
         Optional[str],
@@ -2736,7 +3030,9 @@ def report_completed_cmd(
     ] = None,
     strict: Annotated[
         bool,
-        typer.Option("--strict", help="Return non-zero when recommendation evidence is insufficient."),
+        typer.Option(
+            "--strict", help="Return non-zero when recommendation evidence is insufficient."
+        ),
     ] = False,
     json_only: Annotated[
         bool,
@@ -2760,7 +3056,9 @@ def report_completed_cmd(
     ] = None,
     useful_task_min_tokens: Annotated[
         int,
-        typer.Option("--useful-task-min-tokens", help="Minimum completion tokens for a useful task."),
+        typer.Option(
+            "--useful-task-min-tokens", help="Minimum completion tokens for a useful task."
+        ),
     ] = 1,
     useful_task_slo_ttft_ms: Annotated[
         Optional[float],
@@ -2859,7 +3157,9 @@ def compute_cost_cmd(
     ] = None,
     useful_task_min_tokens: Annotated[
         int,
-        typer.Option("--useful-task-min-tokens", help="Minimum completion tokens for a useful task."),
+        typer.Option(
+            "--useful-task-min-tokens", help="Minimum completion tokens for a useful task."
+        ),
     ] = 1,
     useful_task_slo_ttft_ms: Annotated[
         Optional[float],
@@ -2976,7 +3276,9 @@ def find_cliffs_cmd(
     target = output_dir or results_root
     write_capacity_cliffs(capacity, target, write_markdown=not json_only)
     typer.echo(format_stdout_summary(capacity))
-    if strict and any(cliff.reasoning.startswith("not_enough_evidence") for cliff in capacity.cliffs):
+    if strict and any(
+        cliff.reasoning.startswith("not_enough_evidence") for cliff in capacity.cliffs
+    ):
         raise typer.Exit(code=1)
     raise typer.Exit(code=0)
 
@@ -3023,39 +3325,64 @@ def _summary_nullable(value: object) -> str:
 def simulate_gpu_cmd(
     results_root: Annotated[
         Optional[Path],
-        typer.Option("--results-root", help="Run directory where matrix and synthetic GPU artifacts will be written."),
+        typer.Option(
+            "--results-root",
+            help="Run directory where matrix and synthetic GPU artifacts will be written.",
+        ),
     ] = None,
     plan: Annotated[
         Optional[Path],
-        typer.Option("--plan", help="Existing matrix_plan.json to simulate. Preserves the legacy gmi_gpu_mimic.py flag."),
+        typer.Option(
+            "--plan",
+            help="Existing matrix_plan.json to simulate. Preserves the legacy gmi_gpu_mimic.py flag.",
+        ),
     ] = None,
     gpu_profiles: Annotated[
         Optional[Path],
-        typer.Option("--gpu-profiles", "--gpu-mimic-profile", help="Optional GPU mimic profile catalog JSON."),
+        typer.Option(
+            "--gpu-profiles", "--gpu-mimic-profile", help="Optional GPU mimic profile catalog JSON."
+        ),
     ] = None,
-    provider: Annotated[str, typer.Option("--provider", help="Provider profile. Currently only gmi.")] = "gmi",
+    provider: Annotated[
+        str, typer.Option("--provider", help="Provider profile. Currently only gmi.")
+    ] = "gmi",
     cluster_profile: Annotated[
         Optional[Path],
         typer.Option("--cluster-profile", help="Optional standalone JSON/YAML cluster profile."),
     ] = None,
-    stage: Annotated[str, typer.Option("--stage", help="Matrix stage label.")] = "single-node-smoke",
-    max_jobs: Annotated[int, typer.Option("--max-jobs", help="Maximum jobs to render into the synthetic matrix.")] = 1,
-    hardware: Annotated[str, typer.Option("--hardware", help="Hardware alias: h100, h200, b200, b300, gb200, or gb300.")] = "b200",
+    stage: Annotated[
+        str, typer.Option("--stage", help="Matrix stage label.")
+    ] = "single-node-smoke",
+    max_jobs: Annotated[
+        int, typer.Option("--max-jobs", help="Maximum jobs to render into the synthetic matrix.")
+    ] = 1,
+    hardware: Annotated[
+        str,
+        typer.Option("--hardware", help="Hardware alias: h100, h200, b200, b300, gb200, or gb300."),
+    ] = "b200",
     engine: Annotated[str, typer.Option("--engine", help="Engine alias: vllm or sglang.")] = "vllm",
     model_profile: Annotated[
         str,
-        typer.Option("--model-profile", help="Model profile alias, e.g. dsv4-pro or deepseek_v4_pro."),
+        typer.Option(
+            "--model-profile", help="Model profile alias, e.g. dsv4-pro or deepseek_v4_pro."
+        ),
     ] = "dsv4-pro",
-    workload: Annotated[str, typer.Option("--workload", help="Workload alias, e.g. long_context_chat.")] = "long_context_chat",
+    workload: Annotated[
+        str, typer.Option("--workload", help="Workload alias, e.g. long_context_chat.")
+    ] = "long_context_chat",
     context_lengths: Annotated[
         Optional[str],
-        typer.Option("--context-lengths", help="Comma-separated context lengths. Defaults to 8192."),
+        typer.Option(
+            "--context-lengths", help="Comma-separated context lengths. Defaults to 8192."
+        ),
     ] = None,
     concurrency: Annotated[
         Optional[str],
         typer.Option("--concurrency", help="Comma-separated concurrency levels. Defaults to 1."),
     ] = None,
-    arrival_mode: Annotated[str, typer.Option("--arrival-mode", help="Arrival mode label.")] = "closed_loop",
+    arrival_mode: Annotated[
+        str, typer.Option("--arrival-mode", help="Arrival mode label.")
+    ] = "closed_loop",
 ) -> None:
     """Generate synthetic GPU/Slurm artifacts for local bundle smoke testing."""
     from inferguard.synthetic import SIMULATION_MODE, simulate_from_options, simulate_results
@@ -3084,14 +3411,21 @@ def simulate_gpu_cmd(
     except (OSError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=3) from exc
-    sys.stdout.write(json.dumps({"simulation_summary": summary["jobs"], "mode": SIMULATION_MODE}, indent=2) + "\n")
+    sys.stdout.write(
+        json.dumps({"simulation_summary": summary["jobs"], "mode": SIMULATION_MODE}, indent=2)
+        + "\n"
+    )
     raise typer.Exit(code=0)
 
 
 @app.command("serve-mimic")
 def serve_mimic_cmd(
-    host: Annotated[str, typer.Option("--host", help="Bind host for the synthetic endpoint.")] = "127.0.0.1",
-    port: Annotated[int, typer.Option("--port", help="Bind port for the synthetic endpoint.")] = 8000,
+    host: Annotated[
+        str, typer.Option("--host", help="Bind host for the synthetic endpoint.")
+    ] = "127.0.0.1",
+    port: Annotated[
+        int, typer.Option("--port", help="Bind port for the synthetic endpoint.")
+    ] = 8000,
     model: Annotated[
         Optional[str],
         typer.Option("--model", help="Model id returned by the OpenAI-compatible endpoint."),
@@ -3110,9 +3444,7 @@ def serve_mimic_cmd(
 @app.callback(invoke_without_command=True)
 def _main_callback(
     ctx: typer.Context,
-    version: bool = typer.Option(
-        False, "--version", help="Print version and exit.", is_eager=True
-    ),
+    version: bool = typer.Option(False, "--version", help="Print version and exit.", is_eager=True),
 ) -> None:
     if version:
         typer.echo(f"inferguard {__version__}")
@@ -3239,7 +3571,9 @@ def daemon_start_cmd(
     ] = False,
     follower: Annotated[
         Optional[str],
-        typer.Option("--follower", help="Run as a cluster follower and POST snapshots to LEADER_URL."),
+        typer.Option(
+            "--follower", help="Run as a cluster follower and POST snapshots to LEADER_URL."
+        ),
     ] = None,
     cluster_token: Annotated[
         Optional[Path],
@@ -3266,7 +3600,8 @@ def daemon_start_cmd(
                 daemon.start_metrics_server(
                     host=bind_host,
                     port=port,
-                    allow_remote=follower is not None and bind_host not in {"127.0.0.1", "localhost", "::1"},
+                    allow_remote=follower is not None
+                    and bind_host not in {"127.0.0.1", "localhost", "::1"},
                 )
                 if prometheus
                 else None
@@ -3322,7 +3657,9 @@ def daemon_start_cmd(
 
 @daemon_app.command("stop")
 def daemon_stop_cmd(
-    port: Annotated[int, typer.Option("--port", help="Expected daemon port.")] = DEFAULT_DAEMON_PORT,
+    port: Annotated[
+        int, typer.Option("--port", help="Expected daemon port.")
+    ] = DEFAULT_DAEMON_PORT,
     watch_dir: Annotated[
         Optional[Path],
         typer.Option("--watch-dir", help="Expected watch directory."),
@@ -3338,7 +3675,11 @@ def daemon_stop_cmd(
     if state is None:
         typer.echo("InferGuard daemon is not marked running.")
         return
-    expected = {"port": port, "watch_dir": str(watch_dir) if watch_dir else None, "prometheus": prometheus}
+    expected = {
+        "port": port,
+        "watch_dir": str(watch_dir) if watch_dir else None,
+        "prometheus": prometheus,
+    }
     pid = state.get("pid")
     if isinstance(pid, int) and pid != os.getpid():
         command_text = _process_command(pid)
@@ -3365,7 +3706,9 @@ def daemon_stop_cmd(
 
 @daemon_app.command("status")
 def daemon_status_cmd(
-    port: Annotated[int, typer.Option("--port", help="Daemon port to report.")] = DEFAULT_DAEMON_PORT,
+    port: Annotated[
+        int, typer.Option("--port", help="Daemon port to report.")
+    ] = DEFAULT_DAEMON_PORT,
     watch_dir: Annotated[
         Optional[Path],
         typer.Option("--watch-dir", help="Optionally load trace files before reporting status."),
@@ -3505,9 +3848,9 @@ def telemetry_verify_payload_cmd(
         "payload_path": str(payload_path),
         "upload_permitted_by_current_policy": client.can_upload(),
         "blocked_by_do_not_track": os.environ.get("DO_NOT_TRACK") == "1",
-        "blocked_by_inferguard_telemetry_disabled": os.environ.get(
-            "INFERGUARD_TELEMETRY", ""
-        ).strip().lower()
+        "blocked_by_inferguard_telemetry_disabled": os.environ.get("INFERGUARD_TELEMETRY", "")
+        .strip()
+        .lower()
         in {"disabled", "0", "false", "off"},
         "dropped_fields": [],
         "payload": payload,
@@ -3758,7 +4101,9 @@ def _pending_payloads(directory: Path) -> list[dict[str, object]]:
         except (OSError, json.JSONDecodeError):
             raw = {}
         if isinstance(raw, dict):
-            payload_kind = raw.get("payload_kind") if isinstance(raw.get("payload_kind"), str) else None
+            payload_kind = (
+                raw.get("payload_kind") if isinstance(raw.get("payload_kind"), str) else None
+            )
             schema_version = (
                 raw.get("schema_version") if isinstance(raw.get("schema_version"), str) else None
             )
@@ -3819,9 +4164,19 @@ def _is_never_collected_key(key: str) -> bool:
 
 
 def _validated_kvcast_mode(raw: str) -> str:
-    if raw in {"cold-pressure", "prefix-reuse", "mixed-agent", "eviction-probe", "fragmentation-probe", "multi-tenant-storm", "retry-storm"}:
+    if raw in {
+        "cold-pressure",
+        "prefix-reuse",
+        "mixed-agent",
+        "eviction-probe",
+        "fragmentation-probe",
+        "multi-tenant-storm",
+        "retry-storm",
+    }:
         return raw
-    raise typer.BadParameter("--mode must be one of cold-pressure|prefix-reuse|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm")
+    raise typer.BadParameter(
+        "--mode must be one of cold-pressure|prefix-reuse|mixed-agent|eviction-probe|fragmentation-probe|multi-tenant-storm|retry-storm"
+    )
 
 
 def _parse_sla_tiers(raw: Optional[str]) -> dict[str, str] | None:
@@ -3853,15 +4208,17 @@ def _validated_metrics_engine(raw: str) -> Optional[EngineName]:
         f"--metrics-engine must be one of auto|vllm|sglang|dynamo|lmcache|llm-d (got {raw!r})"
     )
 
+
 def _parse_int_csv(raw: str, option_name: str) -> list[int]:
     try:
         values = [int(part.strip()) for part in raw.split(",") if part.strip()]
     except ValueError as exc:
-        raise typer.BadParameter(f"{option_name} must be a comma-separated list of integers") from exc
+        raise typer.BadParameter(
+            f"{option_name} must be a comma-separated list of integers"
+        ) from exc
     if not values or any(value <= 0 for value in values):
         raise typer.BadParameter(f"{option_name} values must be positive integers")
     return values
-
 
 
 def _parse_string_csv(raw: Optional[str]) -> list[str]:
@@ -3883,11 +4240,15 @@ def _parse_float_kv_csv(raw: Optional[str], option_name: str) -> dict[str, float
         try:
             parsed[key.strip()] = float(value.strip())
         except ValueError as exc:
-            raise typer.BadParameter(f"{option_name} value for {key.strip()} must be numeric") from exc
+            raise typer.BadParameter(
+                f"{option_name} value for {key.strip()} must be numeric"
+            ) from exc
     return parsed
 
 
-def _run_compare(run_a_dir: Path, run_b_dir: Path, options: CompareOptions, *, json_out: bool) -> None:
+def _run_compare(
+    run_a_dir: Path, run_b_dir: Path, options: CompareOptions, *, json_out: bool
+) -> None:
     try:
         report = compare_runs(run_a_dir, run_b_dir, options)
     except CompareError as exc:

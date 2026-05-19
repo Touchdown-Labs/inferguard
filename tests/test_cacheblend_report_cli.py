@@ -46,6 +46,40 @@ def test_cacheblend_report_cli_outputs_metrics_serde_and_lifecycle(tmp_path):
     assert payload["lifecycle"]["boundary_evidence"]["claim_status"] == "measured"
 
 
+def test_cacheblend_report_cli_writes_output_file_for_packet_artifact(tmp_path):
+    metrics = tmp_path / "metrics.prom"
+    output = tmp_path / "cacheblend_report.json"
+    missing_evidence = tmp_path / "missing-boundary.jsonl"
+    metrics.write_text(
+        "\n".join(
+            [
+                "lmcache_blend_lookup_requested_tokens_total 10",
+                "lmcache_blend_lookup_hit_tokens_total 4",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "cacheblend-report",
+            "--metrics-file",
+            str(metrics),
+            "--boundary-evidence-file",
+            str(missing_evidence),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["cacheblend_metrics"]["blend_hit_rate"] == 0.4
+    assert payload["lifecycle"]["boundary_evidence"]["claim_status"] == "not_proven"
+    assert json.loads(result.stdout)["cacheblend_metrics"]["blend_hit_rate"] == 0.4
+
+
 def test_cacheblend_report_cli_covers_current_lmcache_cb_metric_surface(tmp_path):
     metrics = tmp_path / "metrics.prom"
     metrics.write_text(
@@ -121,12 +155,14 @@ def test_cacheblend_report_cli_covers_current_lmcache_cb_metric_surface(tmp_path
     assert payload["lifecycle"]["avg_duration_seconds_by_operation"][
         "retrieve_pre_computed:l1_to_gpu"
     ] == pytest.approx(0.2)
-    assert payload["lifecycle"]["transfer_chunks_by_operation"][
-        "retrieve_pre_computed:l1_to_gpu"
-    ] == 12
-    assert payload["lifecycle"]["transfer_tokens_by_operation"][
-        "retrieve_pre_computed:l1_to_gpu"
-    ] == 3072
+    assert (
+        payload["lifecycle"]["transfer_chunks_by_operation"]["retrieve_pre_computed:l1_to_gpu"]
+        == 12
+    )
+    assert (
+        payload["lifecycle"]["transfer_tokens_by_operation"]["retrieve_pre_computed:l1_to_gpu"]
+        == 3072
+    )
     assert payload["serde"]["compression_ratio_by_serde"]["fp8"] == 0.25
     assert payload["serde"]["total_failures"] == 1
     assert payload["serde"]["failures_by_serde_direction"]["fp8:encode"] == 1

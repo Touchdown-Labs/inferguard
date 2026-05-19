@@ -543,8 +543,11 @@ def _coverage_gaps(
                     "required_when": family["required_when"],
                 }
             )
+    cacheblend_observed = bool(
+        (lmcache_report.get("observed") or {}).get("lmcache_cacheblend")
+    )
     for family in lmcache_report.get("families", []):
-        if _is_missing_required_gap(family):
+        if _is_missing_required_gap(family, cacheblend_observed=cacheblend_observed):
             gaps.append(
                 {
                     "surface": family.get("surface"),
@@ -556,10 +559,25 @@ def _coverage_gaps(
     return gaps
 
 
-def _is_missing_required_gap(family: dict[str, Any]) -> bool:
+def _is_missing_required_gap(
+    family: dict[str, Any], *, cacheblend_observed: bool = False
+) -> bool:
     if not family.get("applicable"):
         return False
-    if family.get("required_when") == "optional":
+    if family.get("required_when") in {"optional", "sampled"}:
+        return False
+    if (
+        cacheblend_observed
+        and family.get("surface") == "lmcache_mp"
+        and family.get("family") == "lookup_tokens"
+        and family.get("status") == "missing"
+    ):
+        return False
+    if (
+        family.get("surface") == "lmcache_cacheblend"
+        and family.get("family") in {"stale", "failure", "no_gpu_context"}
+        and family.get("status") == "zero"
+    ):
         return False
     return family.get("status") in {"missing", "zero"}
 

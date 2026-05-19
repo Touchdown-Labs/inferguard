@@ -254,7 +254,7 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp.l0_block_*_seconds*",
             "lmcache_mp.l0_block_*_total",
         ),
-        required_when="sampled",
+        required_when="always",
     ),
     MetricFamilySpec(
         "lmcache_mp",

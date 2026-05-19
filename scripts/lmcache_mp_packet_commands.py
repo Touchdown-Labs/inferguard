@@ -10,6 +10,7 @@ PACKET_COMMANDS = {
     "D": "modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_d",
     "E": "modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_e",
     "F": "modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_f",
+    "G": "modal run scripts/lmcache_mp_modal_packet_lab.py::run_packet_g",
 }
 
 

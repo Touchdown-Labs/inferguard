@@ -77,6 +77,12 @@ INFERGUARD_LOCAL_INSTALL_COMMAND = f"python -m pip install -e {MODAL_INFERGUARD_
 
 MODAL_LMCACHE_SOURCE = "/opt/lmcache"
 MODAL_VLLM_SOURCE = "/opt/vllm"
+MODAL_LOCAL_SOURCE_IGNORE = [
+    ".DS_Store",
+    "**/.DS_Store",
+    "**/__pycache__/**",
+    "**/*.pyc",
+]
 LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_LMCACHE_LOCAL_SOURCE"
 LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
 LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
@@ -84,6 +90,48 @@ LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
 VLLM_LOCAL_SOURCE_ENV = "INFERGUARD_VLLM_LOCAL_SOURCE"
 VLLM_CONNECTOR_RELATIVE_PATH = Path(
     "distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py"
+)
+VLLM_CACHEBLEND_WORKER_RELATIVE_PATH = Path("v1/worker/gpu_worker.py")
+VLLM_OVERLAY_RELATIVE_PATHS = (VLLM_CONNECTOR_RELATIVE_PATH,)
+VLLM_CACHEBLEND_WORKER_PATCH_B64 = (
+    "ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCBzaHV0aWwKaW1wb3J0IHZsbG0KCnNyY19yb290ID0gUGF0"
+    "aCgnL29wdC92bGxtL3ZsbG0nKQpkc3Rfcm9vdCA9IFBhdGgodmxsbS5fX2ZpbGVfXykucGFyZW50CmNvbm5lY3Rv"
+    "cl9yZWwgPSBQYXRoKCdkaXN0cmlidXRlZC9rdl90cmFuc2Zlci9rdl9jb25uZWN0b3IvdjEvbG1jYWNoZV9tcF9j"
+    "b25uZWN0b3IucHknKQpzcmMgPSBzcmNfcm9vdCAvIGNvbm5lY3Rvcl9yZWwKZHN0ID0gZHN0X3Jvb3QgLyBjb25u"
+    "ZWN0b3JfcmVsCmRzdC5wYXJlbnQubWtkaXIocGFyZW50cz1UcnVlLCBleGlzdF9vaz1UcnVlKQpzaHV0aWwuY29w"
+    "eTIoc3JjLCBkc3QpCnByaW50KGYnT3ZlcmxheWVkIHZMTE0gZmlsZSB7c3JjfSAtPiB7ZHN0fScpCgphdHRlbnRp"
+    "b25fcGF0aCA9IGRzdF9yb290IC8gJ2F0dGVudGlvbi5weScKaWYgbm90IGF0dGVudGlvbl9wYXRoLmV4aXN0cygp"
+    "OgogICAgYXR0ZW50aW9uX3BhdGgud3JpdGVfdGV4dCgnIyBTUERYLUxpY2Vuc2UtSWRlbnRpZmllcjogQXBhY2hl"
+    "LTIuMFxuIyBTUERYLUZpbGVDb3B5cmlnaHRUZXh0OiBDb3B5cmlnaHQgY29udHJpYnV0b3JzIHRvIHRoZSB2TExN"
+    "IHByb2plY3RcblxuIiIiQ29tcGF0aWJpbGl0eSBzaGltIGZvciBpbnRlZ3JhdGlvbnMgaW1wb3J0aW5nIGBgdmxs"
+    "bS5hdHRlbnRpb25gYC4iIiJcblxuZnJvbSB2bGxtLm1vZGVsX2V4ZWN1dG9yLmxheWVycy5hdHRlbnRpb24gaW1w"
+    "b3J0IEF0dGVudGlvblxuXG5fX2FsbF9fID0gWyJBdHRlbnRpb24iXVxuJywgZW5jb2Rpbmc9J3V0Zi04JykKICAg"
+    "IHByaW50KGYnSW5zdGFsbGVkIHZMTE0gYXR0ZW50aW9uIGNvbXBhdGliaWxpdHkgc2hpbSBhdCB7YXR0ZW50aW9u"
+    "X3BhdGh9JykKCndvcmtlcl9wYXRoID0gZHN0X3Jvb3QgLyAndjEvd29ya2VyL2dwdV93b3JrZXIucHknCnRleHQg"
+    "PSB3b3JrZXJfcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9J3V0Zi04JykKaGVscGVyID0gJ1xuXG5kZWYgX21heWJl"
+    "X3JlZ2lzdGVyX2xtY2FjaGVfYmxlbmRfbW9kZWwod29ya2VyOiBvYmplY3QpIC0+IE5vbmU6XG4gICAgIiIiUmVn"
+    "aXN0ZXIgdGhlIGxvYWRlZCB2TExNIG1vZGVsIHdpdGggTE1DYWNoZSBDYWNoZUJsZW5kIHdoZW4gYXZhaWxhYmxl"
+    "LiIiIlxuICAgIHRyeTpcbiAgICAgICAgaW1wb3J0IGltcG9ydGxpYlxuICAgICAgICBsbWNhY2hlX3V0aWxzID0g"
+    "aW1wb3J0bGliLmltcG9ydF9tb2R1bGUoImxtY2FjaGUuaW50ZWdyYXRpb24udmxsbS51dGlscyIpXG4gICAgICAg"
+    "IG1vZGVsX3V0aWxzID0gaW1wb3J0bGliLmltcG9ydF9tb2R1bGUoImxtY2FjaGUudjEuY29tcHV0ZS5tb2RlbHMu"
+    "dXRpbHMiKVxuICAgIGV4Y2VwdCBJbXBvcnRFcnJvcjpcbiAgICAgICAgcmV0dXJuXG5cbiAgICBtb2RlbF9ydW5u"
+    "ZXIgPSBnZXRhdHRyKHdvcmtlciwgIm1vZGVsX3J1bm5lciIsIE5vbmUpXG4gICAgbW9kZWwgPSBnZXRhdHRyKG1v"
+    "ZGVsX3J1bm5lciwgIm1vZGVsIiwgTm9uZSlcbiAgICB1bndyYXAgPSBnZXRhdHRyKG1vZGVsLCAidW53cmFwIiwg"
+    "Tm9uZSlcbiAgICB3aGlsZSBjYWxsYWJsZSh1bndyYXApOlxuICAgICAgICBtb2RlbCA9IHVud3JhcCgpXG4gICAg"
+    "ICAgIHVud3JhcCA9IGdldGF0dHIobW9kZWwsICJ1bndyYXAiLCBOb25lKVxuICAgIGlmIG1vZGVsIGlzIE5vbmU6"
+    "XG4gICAgICAgIHJldHVyblxuICAgIG1vZGVsX3V0aWxzLlZMTE1Nb2RlbFRyYWNrZXIucmVnaXN0ZXJfbW9kZWwo"
+    "bG1jYWNoZV91dGlscy5FTkdJTkVfTkFNRSwgbW9kZWwpXG4nCmlmICdfbWF5YmVfcmVnaXN0ZXJfbG1jYWNoZV9i"
+    "bGVuZF9tb2RlbCcgbm90IGluIHRleHQ6CiAgICB0ZXh0ID0gdGV4dC5yZXBsYWNlKCdcbmNsYXNzIFdvcmtlcign"
+    "LCBoZWxwZXIgKyAnXG5jbGFzcyBXb3JrZXIoJywgMSkKaWYgJ19tYXliZV9yZWdpc3Rlcl9sbWNhY2hlX2JsZW5k"
+    "X21vZGVsKHNlbGYpJyBub3QgaW4gdGV4dDoKICAgIGxpbmVzID0gdGV4dC5zcGxpdGxpbmVzKCkKICAgIGZvciBp"
+    "bmRleCwgbGluZSBpbiBlbnVtZXJhdGUobGluZXMpOgogICAgICAgIGlmICdzZWxmLm1vZGVsX3J1bm5lci5sb2Fk"
+    "X21vZGVsKCcgaW4gbGluZToKICAgICAgICAgICAgaW5kZW50ID0gbGluZVs6IGxlbihsaW5lKSAtIGxlbihsaW5l"
+    "LmxzdHJpcCgpKV0KICAgICAgICAgICAgbGluZXMuaW5zZXJ0KGluZGV4ICsgMSwgaW5kZW50ICsgJ19tYXliZV9y"
+    "ZWdpc3Rlcl9sbWNhY2hlX2JsZW5kX21vZGVsKHNlbGYpJykKICAgICAgICAgICAgdGV4dCA9ICdcbicuam9pbihs"
+    "aW5lcykgKyAnXG4nCiAgICAgICAgICAgIGJyZWFrCiAgICBlbHNlOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJv"
+    "cignQ291bGQgbm90IGZpbmQgbW9kZWxfcnVubmVyLmxvYWRfbW9kZWwgY2FsbCBpbiB2TExNIGdwdV93b3JrZXIu"
+    "cHknKQp3b3JrZXJfcGF0aC53cml0ZV90ZXh0KHRleHQsIGVuY29kaW5nPSd1dGYtOCcpCnByaW50KGYnUGF0Y2hl"
+    "ZCB2TExNIENhY2hlQmxlbmQgbW9kZWwgcmVnaXN0cmF0aW9uIGluIHt3b3JrZXJfcGF0aH0nKQ=="
 )
 LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
 LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
@@ -103,6 +151,7 @@ UPSTREAM_LMCACHE_MP_PROMETHEUS_FAMILIES = (
 )
 PACKET_B_LIFECYCLE_EVIDENCE_FILE = "packet-b-lifecycle-evidence.json"
 CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE = "cacheblend_l0_boundary_evidence.jsonl"
+CACHEBLEND_REPORT_FILE = "cacheblend_report.json"
 AGENT_KV_OFFLOAD_REPORT_FILE = "agent_kv_offload_report.json"
 WORKLOAD_MANIFEST_FILE = "workload_manifest.json"
 PACKET_B_TRACE_SOURCE = "traces/isb1-dsv4-agent"
@@ -314,21 +363,18 @@ def _select_vllm_overlay_plan(env: Mapping[str, str] | None = None) -> VllmOverl
         return VllmOverlayPlan(source_kind="pypi")
 
     local_source = Path(local_source_raw).expanduser()
-    connector_source = local_source / "vllm" / VLLM_CONNECTOR_RELATIVE_PATH
-    if not connector_source.exists():
+    missing_overlays = [
+        local_source / "vllm" / rel_path for rel_path in VLLM_OVERLAY_RELATIVE_PATHS
+    ]
+    missing_overlays = [path for path in missing_overlays if not path.exists()]
+    if missing_overlays:
+        missing_list = ", ".join(str(path) for path in missing_overlays)
         raise FileNotFoundError(
-            f"{VLLM_LOCAL_SOURCE_ENV} must point to a vLLM checkout containing {connector_source}"
+            f"{VLLM_LOCAL_SOURCE_ENV} must point to a vLLM checkout containing {missing_list}"
         )
 
     overlay_command = "python -c " + shlex.quote(
-        "from pathlib import Path; "
-        "import shutil, vllm; "
-        f"rel = Path({str(VLLM_CONNECTOR_RELATIVE_PATH)!r}); "
-        f"src = Path({(MODAL_VLLM_SOURCE + '/vllm')!r}) / rel; "
-        "dst = Path(vllm.__file__).parent / rel; "
-        "dst.parent.mkdir(parents=True, exist_ok=True); "
-        "shutil.copy2(src, dst); "
-        "print(f'Overlayed vLLM connector {src} -> {dst}')"
+        "import base64; exec(base64.b64decode('" + VLLM_CACHEBLEND_WORKER_PATCH_B64 + "'))"
     )
     return VllmOverlayPlan(
         source_kind="local_connector_overlay",
@@ -358,12 +404,14 @@ def _build_modal_image() -> modal.Image:
             local_path=str(LMCACHE_INSTALL_PLAN.local_source),
             remote_path=MODAL_LMCACHE_SOURCE,
             copy=True,
+            ignore=MODAL_LOCAL_SOURCE_IGNORE,
         )
     if VLLM_OVERLAY_PLAN.local_source is not None:
         built_image = built_image.add_local_dir(
             local_path=str(VLLM_OVERLAY_PLAN.local_source / "vllm"),
             remote_path=f"{MODAL_VLLM_SOURCE}/vllm",
             copy=True,
+            ignore=MODAL_LOCAL_SOURCE_IGNORE,
         )
     built_image = (
         built_image.add_local_file(
@@ -443,6 +491,7 @@ class PacketSpec:
     l2_adapter: str | None = None
     enable_otel: bool = False
     enable_cache_salt: bool = False
+    enable_cacheblend: bool = False
     eviction_policy: str = "LRU"
     vllm_gpu_memory_utilization: str = "0.80"
     vllm_max_model_len: int = MODEL_MAX_LEN
@@ -535,6 +584,27 @@ PACKETS: dict[str, PacketSpec] = {
         notes=(
             "Uses tenant cache_salt request fields when vLLM/LMCache accept them; "
             "IsolatedLRU launch support is upstream-version dependent.",
+        ),
+    ),
+    "g": PacketSpec(
+        packet_id="g",
+        name="Packet G live CacheBlend server/MP proof",
+        workload="cacheblend_live",
+        output_slug="packet-g-cacheblend-live",
+        request_count=24,
+        enable_cacheblend=True,
+        vllm_gpu_memory_utilization="0.70",
+        vllm_max_model_len=8192,
+        strict_inferguard_gate=False,
+        extra_required_artifacts=(
+            CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE,
+            CACHEBLEND_REPORT_FILE,
+            "traffic.log",
+        ),
+        notes=(
+            "Exercises live LMCache CacheBlend through standalone lmcache server plus vLLM LMCacheMPConnector.",
+            "Packet G disables ordinary prefix caching and sends a shared CacheBlend chunk through LMCache's CB lookup/retrieve/store protocols.",
+            "CacheBlend CLI report, compat report, and observability coverage all receive the same live metrics/evidence files.",
         ),
     ),
 }
@@ -761,6 +831,8 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--lookup-hash-log-max-files",
         "10",
     ]
+    if spec.enable_cacheblend:
+        cmd.extend(["--engine-type", "blend"])
     if spec.l2_configured:
         l2_spec = {
             "type": spec.l2_adapter or "fs",
@@ -825,6 +897,20 @@ def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[st
         env["INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"] = str(
             run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE
         )
+    if spec.enable_cacheblend:
+        env.update(
+            {
+                "INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH": str(
+                    run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE
+                ),
+                "LMCACHE_ENABLE_CACHEBLEND": "True",
+                "LMCACHE_ENABLE_BLENDING": "True",
+                "LMCACHE_BLEND_SPECIAL_STR": " # # ",
+                "LMCACHE_USE_LAYERWISE": "True",
+                "LMCACHE_BLEND_CHECK_LAYERS": "1",
+                "LMCACHE_BLEND_RECOMPUTE_RATIOS": "0.15",
+            }
+        )
     return env
 
 
@@ -852,17 +938,26 @@ def _launch_lmcache(
 
 def _build_vllm_command(spec: PacketSpec | None = None) -> list[str]:
     spec = spec or PACKETS["a"]
-    kv_transfer_config = {
+    kv_connector_extra_config: dict[str, object] = {
+        "lmcache.mp.host": f"tcp://{LMCACHE_HOST}",
+        "lmcache.mp.port": LMCACHE_ZMQ_PORT,
+        "lmcache.mp.mq_timeout": 10,
+    }
+    kv_transfer_config: dict[str, object] = {
         "kv_connector": "LMCacheMPConnector",
         "kv_role": "kv_both",
         "kv_load_failure_policy": "recompute",
-        "kv_connector_extra_config": {
-            "lmcache.mp.host": f"tcp://{LMCACHE_HOST}",
-            "lmcache.mp.port": LMCACHE_ZMQ_PORT,
-            "lmcache.mp.mq_timeout": 10,
-        },
+        "kv_connector_extra_config": kv_connector_extra_config,
     }
-    return [
+    if spec.enable_cacheblend:
+        # vLLM >= 0.20 resolves MP connectors through the module path when
+        # supplied. Keep the explicit path so Packet G proves the LMCache-owned
+        # MP connector, not a vendored or stale built-in connector path.
+        kv_transfer_config["kv_connector_module_path"] = (
+            "lmcache.integration.vllm.lmcache_mp_connector"
+        )
+        kv_connector_extra_config["lmcache.mp.cacheblend"] = True
+    cmd = [
         "vllm",
         "serve",
         MODEL,
@@ -876,6 +971,12 @@ def _build_vllm_command(spec: PacketSpec | None = None) -> list[str]:
         "--port",
         str(VLLM_PORT),
     ]
+    if spec.enable_cacheblend:
+        # Keep Packet G on the explicit LMCacheMPConnector path. Passing
+        # --kv-offloading-backend also asks vLLM to instantiate its ordinary
+        # LMCacheConnectorV1, which conflicts with kv_connector_module_path.
+        cmd.extend(["--no-enable-prefix-caching"])
+    return cmd
 
 
 def _launch_vllm(
@@ -884,8 +985,16 @@ def _launch_vllm(
     spec = spec or PACKETS["a"]
     log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
     cmd = _build_vllm_command(spec)
+    env_update = _build_lmcache_env(run_dir, spec) if spec.enable_cacheblend else {}
     (run_dir / "vllm_command.json").write_text(json.dumps(cmd, indent=2) + "\n", encoding="utf-8")
-    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
+    if env_update:
+        (run_dir / "vllm_env.json").write_text(
+            json.dumps(env_update, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    env = os.environ.copy()
+    env.update(env_update)
+    proc = subprocess.Popen(cmd, stdout=log_handle, stderr=subprocess.STDOUT, text=True, env=env)
     return proc, log_handle
 
 
@@ -1140,6 +1249,7 @@ def _drive_traffic(run_dir: Path, spec: PacketSpec | None = None) -> None:
         "otel_reuse": 16,
         "trace_replay": 20,
         "cache_salt_isolated_lru": 24,
+        "cacheblend_live": 24,
     }.get(spec.workload, 10)
     _write_workload_manifest(run_dir, spec, requests)
     script = r"""
@@ -1159,8 +1269,12 @@ benchmark_id = sys.argv[8]
 workload_profile = sys.argv[9]
 trace_source = sys.argv[10]
 trace_classes = [item for item in sys.argv[11].split(",") if item]
+blend_special_str = sys.argv[12]
 shared_prefix = "InferGuard LMCache MP shared repeated-prefix validation. " * 220
 eviction_prefix = "InferGuard LMCache MP eviction pressure unique block. " * 260
+cacheblend_shared_chunk = "InferGuard CacheBlend shared middle chunk for non-prefix semantic reuse. " * 180
+cacheblend_left_context = "CacheBlend left-side request-specific context. " * 120
+cacheblend_right_context = "CacheBlend right-side request-specific context. " * 120
 for idx in range(requests):
     if workload == "reuse_eviction":
         phase = ("warm" if idx < 12 else "pressure" if idx < 40 else "retest")
@@ -1174,7 +1288,16 @@ for idx in range(requests):
     else:
         prefix = shared_prefix
         prefix_group = "shared-anchor"
-    prompt = prefix + f"\nRequest variant {idx % 4}: summarize the observability evidence."
+    if workload == "cacheblend_live":
+        prompt = (
+            f"{cacheblend_shared_chunk}{blend_special_str}"
+            f"{cacheblend_left_context} request-left-{idx % 6} "
+            f"{cacheblend_right_context} request-right-{idx % 4}. "
+            "Summarize the CacheBlend observability evidence."
+        )
+        prefix_group = "cacheblend-prefix-shared-chunk"
+    else:
+        prompt = prefix + f"\nRequest variant {idx % 4}: summarize the observability evidence."
     if phase == "warm":
         trace_class = "coding-long"
     elif phase == "pressure":
@@ -1244,6 +1367,7 @@ for idx in range(requests):
                 spec.workload_profile or spec.workload,
                 spec.trace_source or "",
                 ",".join(spec.trace_workload_classes),
+                _build_lmcache_env(run_dir, spec).get("LMCACHE_BLEND_SPECIAL_STR", " # # "),
             ],
             run_dir / "traffic.log",
             timeout=30 * 60,
@@ -1528,7 +1652,7 @@ def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) ->
         cmd.append("--l2-configured")
     if spec.enable_otel:
         cmd.append("--mp-tracing-enabled")
-    if spec.packet_id == "b":
+    if spec.packet_id == "b" or spec.enable_cacheblend:
         cmd.extend(
             [
                 "--lmcache-cacheblend-boundary-evidence-file",
@@ -1579,7 +1703,7 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
         cmd.append("--l2-configured")
     if spec.enable_otel:
         cmd.append("--mp-tracing-enabled")
-    if spec.packet_id == "b":
+    if spec.packet_id == "b" or spec.enable_cacheblend:
         cmd.extend(
             [
                 "--lmcache-cacheblend-boundary-evidence-file",
@@ -1627,7 +1751,7 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
     ]
     if spec.l2_configured:
         cmd.append("--l2-configured")
-    if spec.packet_id == "b":
+    if spec.packet_id == "b" or spec.enable_cacheblend:
         cmd.extend(
             [
                 "--lmcache-cacheblend-boundary-evidence-file",
@@ -1648,6 +1772,25 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
     return cmd
 
 
+def _build_cacheblend_report_cmd(run_dir: Path, spec: PacketSpec | None = None) -> list[str]:
+    spec = spec or PACKETS["a"]
+    cmd = [
+        "inferguard",
+        "cacheblend-report",
+        "--metrics-file",
+        str(run_dir / "lmcache_metrics_loaded.prom"),
+    ]
+    if spec.enable_cacheblend or spec.packet_id == "b":
+        cmd.extend(
+            [
+                "--boundary-evidence-file",
+                str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
+            ]
+        )
+    cmd.extend(["--output", str(run_dir / CACHEBLEND_REPORT_FILE)])
+    return cmd
+
+
 def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> None:
     spec = spec or PACKETS["a"]
     commands_log = run_dir / "inferguard_commands.log"
@@ -1660,6 +1803,8 @@ def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> Non
         _run_best_effort(
             _build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180
         )
+    if spec.enable_cacheblend:
+        _run_required(_build_cacheblend_report_cmd(run_dir, spec), commands_log, timeout=180)
 
     job_dir = run_dir / "inferguard-job"
     collect_metrics_cmd = [
@@ -1976,6 +2121,11 @@ def run_packet_f() -> str:
     return _run_packet(PACKETS["f"])
 
 
+@app.function(gpu="H100", timeout=4 * 60 * 60, startup_timeout=30 * 60, volumes={"/out": volume})
+def run_packet_g() -> str:
+    return _run_packet(PACKETS["g"])
+
+
 @app.local_entrypoint()
 def main(packet: str = "a") -> None:
     key = _get_packet(packet).packet_id
@@ -1991,6 +2141,7 @@ def _remote_packet_runner(packet: str) -> modal.Function:
         "d": run_packet_d,
         "e": run_packet_e,
         "f": run_packet_f,
+        "g": run_packet_g,
     }
     return runners[key]
 
