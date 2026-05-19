@@ -40,10 +40,6 @@ _COUNTER_ALIASES = {
         "lmcache_blend_retrieve_requests_total",
         "lmcache_blend.retrieve_requests",
     ),
-    "retrieve_successes": (
-        "lmcache_blend_retrieve_successes_total",
-        "lmcache_blend.retrieve_successes",
-    ),
     "retrieve_failures": (
         "lmcache_blend_retrieve_failures_total",
         "lmcache_blend.retrieve_failures",

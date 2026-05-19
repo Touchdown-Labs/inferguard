@@ -141,6 +141,33 @@ LMCACHE_LOCKED_METRICS: tuple[str, ...] = (
     "lmcache_mp_event_bus_drain_lag_seconds",
     "lmcache_mp_event_bus_dropped_events_total",
     "lmcache_mp_event_bus_subscriber_exceptions_total",
+    # ── CacheBlend (CB) backend metrics ──
+    "lmcache_blend_lookup_requests_total",
+    "lmcache_blend_lookup_requested_tokens_total",
+    "lmcache_blend_lookup_hit_tokens_total",
+    "lmcache_blend_lookup_fingerprint_hits_total",
+    "lmcache_blend_lookup_storage_hits_total",
+    "lmcache_blend_lookup_stale_chunks_total",
+    "lmcache_blend_lookup_no_gpu_context_errors_total",
+    "lmcache_blend_retrieve_requests_total",
+    "lmcache_blend_retrieve_chunks_total",
+    "lmcache_blend_retrieve_failures_total",
+    "lmcache_blend_store_pre_computed_requests_total",
+    "lmcache_blend_store_pre_computed_chunks_total",
+    "lmcache_blend_store_pre_computed_failures_total",
+    "lmcache_blend_store_final_requests_total",
+    "lmcache_blend_store_final_chunks_total",
+    "lmcache_blend_store_final_failures_total",
+    "lmcache_blend_fingerprints_registered_total",
+    "lmcache_blend_chunks_evicted_total",
+    "lmcache_blend_l0_gpu_operation_duration_seconds",
+    "lmcache_blend_l0_gpu_transfer_chunks_total",
+    "lmcache_blend_l0_gpu_transfer_tokens_total",
+    "lmcache_blend_serde_encode_duration_seconds",
+    "lmcache_blend_serde_decode_duration_seconds",
+    "lmcache_blend_serde_bytes_in_total",
+    "lmcache_blend_serde_bytes_out_total",
+    "lmcache_blend_serde_failures_total",
 )
 
 ENGINE_SOURCE_METRICS: dict[str, tuple[str, ...]] = {
@@ -401,7 +428,9 @@ def build_metrics_summary(
 ) -> dict[str, Any]:
     """Build the ``inferguard-metrics-summary/v1`` group dictionary."""
 
-    groups: dict[str, dict[str, Any]] = {group: {"claim_status": "not_proven"} for group in NORMALIZED_GROUPS}
+    groups: dict[str, dict[str, Any]] = {
+        group: {"claim_status": "not_proven"} for group in NORMALIZED_GROUPS
+    }
     engine_by_group: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for row in engine_rows:
         engine_by_group[str(row.get("group"))].append(row)
@@ -443,7 +472,9 @@ def _prefill_group(
     return _group(
         request_prefill_time_seconds=_hist_value(samples, "vllm:request_prefill_time_seconds"),
         prompt_tokens_total=prompt_tokens,
-        prompt_tokens_source=_source_for(observed, "vllm:prompt_tokens_total", "sglang:prompt_tokens_total"),
+        prompt_tokens_source=_source_for(
+            observed, "vllm:prompt_tokens_total", "sglang:prompt_tokens_total"
+        ),
     )
 
 
@@ -483,7 +514,9 @@ def _queue_group(
         requests_running=running,
         requests_waiting=waiting,
         request_queue_time_seconds=_hist_value(samples, "vllm:request_queue_time_seconds"),
-        running_source=_source_for(observed, "vllm:num_requests_running", "sglang:num_running_reqs"),
+        running_source=_source_for(
+            observed, "vllm:num_requests_running", "sglang:num_running_reqs"
+        ),
         waiting_source=_source_for(observed, "vllm:num_requests_waiting", "sglang:num_queue_reqs"),
     )
 
@@ -529,12 +562,8 @@ def _kv_cache_group(
         simple_cpu_offload_total_blocks=_max_metric(
             samples, "vllm:simple_cpu_offload_total_blocks"
         ),
-        simple_cpu_offload_free_blocks=_max_metric(
-            samples, "vllm:simple_cpu_offload_free_blocks"
-        ),
-        simple_cpu_offload_used_blocks=_max_metric(
-            samples, "vllm:simple_cpu_offload_used_blocks"
-        ),
+        simple_cpu_offload_free_blocks=_max_metric(samples, "vllm:simple_cpu_offload_free_blocks"),
+        simple_cpu_offload_used_blocks=_max_metric(samples, "vllm:simple_cpu_offload_used_blocks"),
         simple_cpu_offload_usage_perc=_max_metric(samples, "vllm:simple_cpu_offload_usage_perc"),
         simple_cpu_offload_pending_loads=_max_metric(
             samples, "vllm:simple_cpu_offload_pending_loads"
@@ -556,9 +585,7 @@ def _kv_cache_group(
         ),
         dynamo_kvbm_l1_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l1_gpu"}),
         dynamo_kvbm_l2_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l2_cpu"}),
-        dynamo_kvbm_l3_count=_labeled_sum(
-            samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}
-        ),
+        dynamo_kvbm_l3_count=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}),
         dynamo_l1_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l1_gpu"}),
         dynamo_l2_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l2_cpu"}),
         dynamo_l3_blocks=_labeled_sum(samples, "dynamo:kvbm_blocks", {"tier": "l3_storage"}),
@@ -638,7 +665,9 @@ def _lmcache_group(
     mp_present = any(sample.name.startswith("lmcache_mp_") for sample in samples)
     mp_requested = _sum_metric(samples, "lmcache_mp_lookup_requested_tokens_total")
     mp_hit = _sum_metric(samples, "lmcache_mp_lookup_hit_tokens_total")
-    mp_hit_rate = mp_hit / mp_requested if mp_hit is not None and mp_requested and mp_requested > 0 else None
+    mp_hit_rate = (
+        mp_hit / mp_requested if mp_hit is not None and mp_requested and mp_requested > 0 else None
+    )
     hit_count = _sum_metric(
         samples,
         "lmcache:num_hit_tokens",
@@ -651,7 +680,11 @@ def _lmcache_group(
     if miss_count is None and mp_hit is not None and mp_requested is not None:
         miss_count = max(mp_requested - mp_hit, 0.0)
     retrieve_hit_rate = _max_metric(
-        samples, "lmcache:retrieve_hit_rate", "lmcache_retrieve_hit_rate", "lmcache:hit_rate", "lmcache_hit_rate"
+        samples,
+        "lmcache:retrieve_hit_rate",
+        "lmcache_retrieve_hit_rate",
+        "lmcache:hit_rate",
+        "lmcache_hit_rate",
     )
     if retrieve_hit_rate is None and mp_hit_rate is not None:
         retrieve_hit_rate = mp_hit_rate
@@ -665,17 +698,38 @@ def _lmcache_group(
         backend = backend or "mp"
     return _group(
         mp_mode_enabled=mp_present or None,
-        num_hit_tokens=_sum_metric(samples, "lmcache:num_hit_tokens", "lmcache_hit_count", "lmcache_mp_lookup_hit_tokens_total"),
-        num_lookup_hits=_sum_metric(samples, "lmcache:num_lookup_hits", "lmcache_hit_count", "lmcache_mp_lookup_hit_tokens_total"),
-        num_retrieve_requests=_sum_metric(samples, "lmcache:num_retrieve_requests", "lmcache_num_retrieve_requests"),
-        num_store_requests=_sum_metric(samples, "lmcache:num_store_requests", "lmcache_num_store_requests"),
-        num_lookup_requests=_sum_metric(samples, "lmcache:num_lookup_requests", "lmcache_num_lookup_requests"),
-        num_requested_tokens=_sum_metric(samples, "lmcache:num_requested_tokens", "lmcache_num_requested_tokens"),
-        num_lookup_tokens=_sum_metric(samples, "lmcache:num_lookup_tokens", "lmcache_num_lookup_tokens"),
+        num_hit_tokens=_sum_metric(
+            samples,
+            "lmcache:num_hit_tokens",
+            "lmcache_hit_count",
+            "lmcache_mp_lookup_hit_tokens_total",
+        ),
+        num_lookup_hits=_sum_metric(
+            samples,
+            "lmcache:num_lookup_hits",
+            "lmcache_hit_count",
+            "lmcache_mp_lookup_hit_tokens_total",
+        ),
+        num_retrieve_requests=_sum_metric(
+            samples, "lmcache:num_retrieve_requests", "lmcache_num_retrieve_requests"
+        ),
+        num_store_requests=_sum_metric(
+            samples, "lmcache:num_store_requests", "lmcache_num_store_requests"
+        ),
+        num_lookup_requests=_sum_metric(
+            samples, "lmcache:num_lookup_requests", "lmcache_num_lookup_requests"
+        ),
+        num_requested_tokens=_sum_metric(
+            samples, "lmcache:num_requested_tokens", "lmcache_num_requested_tokens"
+        ),
+        num_lookup_tokens=_sum_metric(
+            samples, "lmcache:num_lookup_tokens", "lmcache_num_lookup_tokens"
+        ),
         lookup_requested_tokens=mp_requested,
         lookup_hit_tokens=mp_hit,
         retrieve_hit_rate=retrieve_hit_rate,
-        lookup_hit_rate=_max_metric(samples, "lmcache:lookup_hit_rate", "lmcache_lookup_hit_rate") or mp_hit_rate,
+        lookup_hit_rate=_max_metric(samples, "lmcache:lookup_hit_rate", "lmcache_lookup_hit_rate")
+        or mp_hit_rate,
         lookup_0_hit_requests=_sum_metric(samples, "lmcache:lookup_0_hit_requests"),
         sm_read_requests=_sum_metric(samples, "lmcache_mp_sm_read_requests_total"),
         sm_read_succeed_keys=_sum_metric(samples, "lmcache_mp_sm_read_succeed_keys_total"),
@@ -709,9 +763,13 @@ def _lmcache_group(
         l1_evicted_keys=_sum_metric(samples, "lmcache_mp_l1_evicted_keys_total"),
         l1_memory_usage_bytes=_max_metric(samples, "lmcache_mp_l1_memory_usage_bytes"),
         l1_chunk_lifetime_seconds=_hist_value(samples, "lmcache_mp_l1_chunk_lifetime_seconds"),
-        l1_chunk_idle_before_evict_seconds=_hist_value(samples, "lmcache_mp_l1_chunk_idle_before_evict_seconds"),
+        l1_chunk_idle_before_evict_seconds=_hist_value(
+            samples, "lmcache_mp_l1_chunk_idle_before_evict_seconds"
+        ),
         l1_chunk_reuse_gap_seconds=_hist_value(samples, "lmcache_mp_l1_chunk_reuse_gap_seconds"),
-        l1_chunk_evict_reuse_gap_seconds=_hist_value(samples, "lmcache_mp_l1_chunk_evict_reuse_gap_seconds"),
+        l1_chunk_evict_reuse_gap_seconds=_hist_value(
+            samples, "lmcache_mp_l1_chunk_evict_reuse_gap_seconds"
+        ),
         l0_block_lifetime_seconds=_hist_value(samples, "lmcache_mp_l0_block_lifetime_seconds"),
         l0_block_idle_before_evict_seconds=_hist_value(
             samples, "lmcache_mp_l0_block_idle_before_evict_seconds"
@@ -740,18 +798,34 @@ def _lmcache_group(
         active_prefetch_jobs=_max_metric(samples, "lmcache_mp_active_prefetch_jobs"),
         num_inflight_l2_stores=_sum_metric(samples, "lmcache_mp_num_inflight_l2_stores"),
         num_inflight_l2_loads=_sum_metric(samples, "lmcache_mp_num_inflight_l2_loads"),
-        inflight_load_memory_usage_bytes=_sum_metric(samples, "lmcache_mp_inflight_load_memory_usage_bytes"),
+        inflight_load_memory_usage_bytes=_sum_metric(
+            samples, "lmcache_mp_inflight_load_memory_usage_bytes"
+        ),
         event_bus_queue_depth=_max_metric(samples, "lmcache_mp_event_bus_queue_depth"),
         event_bus_drain_lag_seconds=_hist_value(samples, "lmcache_mp_event_bus_drain_lag_seconds")
         or _max_metric(samples, "lmcache_mp_event_bus_drain_lag_seconds"),
-        event_bus_dropped_events_total=_sum_metric(samples, "lmcache_mp_event_bus_dropped_events_total"),
-        event_bus_subscriber_exceptions_total=_sum_metric(samples, "lmcache_mp_event_bus_subscriber_exceptions_total"),
+        event_bus_dropped_events_total=_sum_metric(
+            samples, "lmcache_mp_event_bus_dropped_events_total"
+        ),
+        event_bus_subscriber_exceptions_total=_sum_metric(
+            samples, "lmcache_mp_event_bus_subscriber_exceptions_total"
+        ),
         is_healthy=_max_metric(samples, "lmcache:is_healthy", "lmcache_is_healthy"),
-        storage_event_count=_sum_metric(samples, "lmcache:storage_event_count", "lmcache_storage_event_count"),
-        remote_read_bytes=_sum_metric(samples, "lmcache:remote_read_bytes", "lmcache_remote_read_bytes"),
-        remote_write_bytes=_sum_metric(samples, "lmcache:remote_write_bytes", "lmcache_remote_write_bytes"),
-        remote_ping_latency_ms=_max_metric(samples, "lmcache:remote_ping_latency_ms", "lmcache_remote_ping_latency_ms"),
-        remote_ping_errors=_sum_metric(samples, "lmcache:remote_ping_errors", "lmcache_remote_ping_errors"),
+        storage_event_count=_sum_metric(
+            samples, "lmcache:storage_event_count", "lmcache_storage_event_count"
+        ),
+        remote_read_bytes=_sum_metric(
+            samples, "lmcache:remote_read_bytes", "lmcache_remote_read_bytes"
+        ),
+        remote_write_bytes=_sum_metric(
+            samples, "lmcache:remote_write_bytes", "lmcache_remote_write_bytes"
+        ),
+        remote_ping_latency_ms=_max_metric(
+            samples, "lmcache:remote_ping_latency_ms", "lmcache_remote_ping_latency_ms"
+        ),
+        remote_ping_errors=_sum_metric(
+            samples, "lmcache:remote_ping_errors", "lmcache_remote_ping_errors"
+        ),
         p2p_requests=_sum_metric(samples, "lmcache:num_p2p_requests", "lmcache_num_p2p_requests"),
         p2p_transferred_tokens=_sum_metric(
             samples, "lmcache:num_p2p_transferred_tokens", "lmcache_num_p2p_transferred_tokens"
@@ -759,9 +833,15 @@ def _lmcache_group(
         p2p_time_to_transfer=_max_metric(
             samples, "lmcache:p2p_time_to_transfer", "lmcache_p2p_time_to_transfer"
         ),
-        p2p_transfer_speed=_max_metric(samples, "lmcache:p2p_transfer_speed", "lmcache_p2p_transfer_speed"),
-        chunk_stats_enabled=_max_metric(samples, "lmcache:chunk_stats_enabled", "lmcache_chunk_stats_enabled"),
-        total_chunk_requests=_sum_metric(samples, "lmcache:total_chunk_requests", "lmcache_total_chunk_requests"),
+        p2p_transfer_speed=_max_metric(
+            samples, "lmcache:p2p_transfer_speed", "lmcache_p2p_transfer_speed"
+        ),
+        chunk_stats_enabled=_max_metric(
+            samples, "lmcache:chunk_stats_enabled", "lmcache_chunk_stats_enabled"
+        ),
+        total_chunk_requests=_sum_metric(
+            samples, "lmcache:total_chunk_requests", "lmcache_total_chunk_requests"
+        ),
         total_chunks=_max_metric(samples, "lmcache:total_chunks", "lmcache_total_chunks"),
         unique_chunks=_max_metric(samples, "lmcache:unique_chunks", "lmcache_unique_chunks"),
         connector=connector,
@@ -838,16 +918,22 @@ def _last_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
 
 
 def _max_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
-    values = [sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)]
+    values = [
+        sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)
+    ]
     return max(values) if values else None
 
 
 def _sum_metric(samples: Iterable[LabeledSample], *names: str) -> float | None:
-    values = [sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)]
+    values = [
+        sample.value for sample in samples if sample.name in names and math.isfinite(sample.value)
+    ]
     return sum(values) if values else None
 
 
-def _labeled_sum(samples: Iterable[LabeledSample], name: str, labels: Mapping[str, str]) -> float | None:
+def _labeled_sum(
+    samples: Iterable[LabeledSample], name: str, labels: Mapping[str, str]
+) -> float | None:
     values = [
         sample.value
         for sample in samples
@@ -871,7 +957,9 @@ def _hist_value(samples: Iterable[LabeledSample], base_name: str) -> float | Non
 
 def _quantile_value(samples: Iterable[LabeledSample], base_name: str) -> float | None:
     preferred = ("0.95", "0.99", "0.5", "0.50", "p95", "p99", "p50")
-    matches = [sample for sample in samples if sample.name == base_name and "quantile" in sample.labels]
+    matches = [
+        sample for sample in samples if sample.name == base_name and "quantile" in sample.labels
+    ]
     for quantile in preferred:
         for sample in matches:
             if sample.labels.get("quantile") == quantile and math.isfinite(sample.value):
@@ -955,7 +1043,9 @@ def _labels_mention_lmcache(sample: LabeledSample) -> bool:
     return any(str(value).startswith("LMCache") for value in sample.labels.values())
 
 
-def _dcgm_original_rows(samples: Iterable[Any]) -> dict[tuple[str | None, int | None], dict[str, float]]:
+def _dcgm_original_rows(
+    samples: Iterable[Any],
+) -> dict[tuple[str | None, int | None], dict[str, float]]:
     rows: dict[tuple[str | None, int | None], dict[str, float]] = defaultdict(dict)
     for sample in samples:
         if sample.name not in DCGM_FIELD_SPECS:

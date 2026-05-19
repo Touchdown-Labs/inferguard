@@ -49,6 +49,10 @@ VLLM_HEALTH_URL = f"{VLLM_BASE_URL}/health"
 VLLM_METRICS_URL = f"{VLLM_BASE_URL}/metrics"
 LMCACHE_HTTP_BASE_URL = f"http://127.0.0.1:{LMCACHE_HTTP_PORT}"
 LMCACHE_HEALTH_URL = f"{LMCACHE_HTTP_BASE_URL}/api/healthcheck"
+LMCACHE_HEALTH_URLS = (
+    LMCACHE_HEALTH_URL,
+    f"{LMCACHE_HTTP_BASE_URL}/healthcheck",
+)
 LMCACHE_HTTP_METRICS_URL = f"{LMCACHE_HTTP_BASE_URL}/metrics"
 LMCACHE_STANDALONE_METRICS_URL = f"http://127.0.0.1:{LMCACHE_PROMETHEUS_PORT}/metrics"
 LMCACHE_METRICS_URLS = (LMCACHE_HTTP_METRICS_URL, LMCACHE_STANDALONE_METRICS_URL)
@@ -78,7 +82,9 @@ LMCACHE_GIT_REF_ENV = "INFERGUARD_LMCACHE_GIT_REF"
 LMCACHE_GIT_REPO_ENV = "INFERGUARD_LMCACHE_GIT_REPO"
 LMCACHE_PIP_SPEC_ENV = "INFERGUARD_LMCACHE_PIP_SPEC"
 VLLM_LOCAL_SOURCE_ENV = "INFERGUARD_VLLM_LOCAL_SOURCE"
-VLLM_CONNECTOR_RELATIVE_PATH = Path("distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py")
+VLLM_CONNECTOR_RELATIVE_PATH = Path(
+    "distributed/kv_transfer/kv_connector/v1/lmcache_mp_connector.py"
+)
 LEGACY_LMCACHE_LOCAL_SOURCE_ENV = "INFERGUARD_PACKET_A_LMCACHE_LOCAL_SOURCE"
 LEGACY_LMCACHE_GIT_REF_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REF"
 LEGACY_LMCACHE_GIT_REPO_ENV = "INFERGUARD_PACKET_A_LMCACHE_GIT_REPO"
@@ -249,8 +255,7 @@ CUDA_SOURCE_BUILD_ENV = {
     "TORCH_CUDA_ARCH_LIST": "9.0",
     "ENABLE_CXX11_ABI": "1",
     "LD_LIBRARY_PATH": (
-        "/usr/local/cuda/lib64:"
-        "/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
+        "/usr/local/cuda/lib64:/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib"
     ),
 }
 
@@ -276,9 +281,7 @@ def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> Lmcach
         return LmcacheInstallPlan(
             source_kind="local",
             pip_packages=(*BASE_MODAL_PIP_PACKAGES, *LMCACHE_SOURCE_BUILD_DEPS),
-            run_commands=(
-                f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation",
-            ),
+            run_commands=(f"python -m pip install -e {MODAL_LMCACHE_SOURCE} --no-build-isolation",),
             local_source=Path(local_source).expanduser(),
             source_ref=local_source,
         )
@@ -288,9 +291,7 @@ def _select_lmcache_install_plan(env: Mapping[str, str] | None = None) -> Lmcach
         return LmcacheInstallPlan(
             source_kind="git",
             pip_packages=(*BASE_MODAL_PIP_PACKAGES, *LMCACHE_SOURCE_BUILD_DEPS),
-            run_commands=(
-                f"python -m pip install {shlex.quote(git_spec)} --no-build-isolation",
-            ),
+            run_commands=(f"python -m pip install {shlex.quote(git_spec)} --no-build-isolation",),
             remote_source=git_repo,
             source_ref=git_ref,
         )
@@ -503,7 +504,9 @@ PACKETS: dict[str, PacketSpec] = {
         l2_configured=True,
         l2_adapter="fs",
         extra_required_artifacts=(L2_CONFIG_FILE,),
-        notes=("Local fs L2 config is written into the run directory and reported with --l2-configured.",),
+        notes=(
+            "Local fs L2 config is written into the run directory and reported with --l2-configured.",
+        ),
     ),
     "d": PacketSpec(
         packet_id="d",
@@ -511,13 +514,17 @@ PACKETS: dict[str, PacketSpec] = {
         workload="otel_reuse",
         enable_otel=True,
         extra_required_artifacts=(LMCACHE_OTEL_FILE, "lmcache-packet/lmcache_otel_evidence.json"),
-        notes=("A local OTLP/HTTP collector captures spans to lmcache_otel.jsonl and reports --mp-tracing-enabled.",),
+        notes=(
+            "A local OTLP/HTTP collector captures spans to lmcache_otel.jsonl and reports --mp-tracing-enabled.",
+        ),
     ),
     "e": PacketSpec(
         packet_id="e",
         name="Packet E trace replay",
         workload="trace_replay",
-        notes=("Trace replay artifacts are required for this gate and are wired into compat and coverage reports.",),
+        notes=(
+            "Trace replay artifacts are required for this gate and are wired into compat and coverage reports.",
+        ),
     ),
     "f": PacketSpec(
         packet_id="f",
@@ -599,13 +606,24 @@ def _run_best_effort(cmd: list[str], log_path: Path, *, timeout: int) -> int:
 def _run_required(cmd: list[str], log_path: Path, *, timeout: int) -> None:
     result = _run(cmd, log_path, timeout=timeout)
     if result.returncode != 0:
-        raise RuntimeError(f"required command failed with exit code {result.returncode}: {_quote_cmd(cmd)}")
+        raise RuntimeError(
+            f"required command failed with exit code {result.returncode}: {_quote_cmd(cmd)}"
+        )
 
 
 def _curl_to_file(url: str, path: Path, log_path: Path, *, timeout: int = 30) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     result = _run_best_effort(["curl", "-fsS", url, "-o", str(path)], log_path, timeout=timeout)
     return result == 0
+
+
+def _curl_first_to_file(
+    urls: tuple[str, ...], path: Path, log_path: Path, *, timeout: int = 30
+) -> str | None:
+    for url in urls:
+        if _curl_to_file(url, path, log_path, timeout=timeout):
+            return url
+    return None
 
 
 def _write_lmcache_metrics_url(run_dir: Path, url: str) -> None:
@@ -674,7 +692,9 @@ def _wait_for_any_http(
 
 
 def _quote_cmd(cmd: list[str]) -> str:
-    return " ".join(json.dumps(part) if any(char.isspace() for char in part) else part for part in cmd)
+    return " ".join(
+        json.dumps(part) if any(char.isspace() for char in part) else part for part in cmd
+    )
 
 
 def _write_env_snapshot(run_dir: Path) -> None:
@@ -741,6 +761,13 @@ def _build_lmcache_command(run_dir: Path, spec: PacketSpec | None = None) -> lis
         "--lookup-hash-log-max-files",
         "10",
     ]
+    if spec.l2_configured:
+        l2_spec = {
+            "type": spec.l2_adapter or "fs",
+            "base_path": str(run_dir / "l2-fs"),
+            "persist_enabled": True,
+        }
+        cmd.extend(["--l2-adapter", json.dumps(l2_spec, sort_keys=True)])
     if spec.enable_otel:
         cmd.extend(["--enable-tracing"])
     return cmd
@@ -753,12 +780,16 @@ def _write_l2_config(run_dir: Path, spec: PacketSpec) -> Path | None:
     l2_dir.mkdir(parents=True, exist_ok=True)
     config = {
         "adapter": spec.l2_adapter or "fs",
-        "path": str(l2_dir),
-        "claim_status": "runner_configured_unvalidated_until_modal_packet_runs",
+        "base_path": str(l2_dir),
+        "cli_argument": {
+            "type": spec.l2_adapter or "fs",
+            "base_path": str(l2_dir),
+            "persist_enabled": True,
+        },
+        "claim_status": "runner_configured_via_lmcache_server_l2_adapter_cli",
         "notes": [
             "This file is the runner-owned L2 evidence contract.",
-            "If the installed LMCache version expects different L2 config keys, "
-            "update this file before running Packet C.",
+            "The actual LMCache MP server wiring is the --l2-adapter JSON argument in lmcache_command.json.",
         ],
     }
     config_path = run_dir / L2_CONFIG_FILE
@@ -797,7 +828,9 @@ def _build_lmcache_env(run_dir: Path, spec: PacketSpec | None = None) -> dict[st
     return env
 
 
-def _launch_lmcache(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subprocess.Popen[str], object]:
+def _launch_lmcache(
+    run_dir: Path, spec: PacketSpec | None = None
+) -> tuple[subprocess.Popen[str], object]:
     spec = spec or PACKETS["a"]
     log_handle = (run_dir / "lmcache.log").open("w", encoding="utf-8")
     _write_l2_config(run_dir, spec)
@@ -845,7 +878,9 @@ def _build_vllm_command(spec: PacketSpec | None = None) -> list[str]:
     ]
 
 
-def _launch_vllm(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subprocess.Popen[str], object]:
+def _launch_vllm(
+    run_dir: Path, spec: PacketSpec | None = None
+) -> tuple[subprocess.Popen[str], object]:
     spec = spec or PACKETS["a"]
     log_handle = (run_dir / "vllm.log").open("w", encoding="utf-8")
     cmd = _build_vllm_command(spec)
@@ -857,23 +892,29 @@ def _launch_vllm(run_dir: Path, spec: PacketSpec | None = None) -> tuple[subproc
 def _capture_safe_http(run_dir: Path) -> dict[str, dict[str, object]]:
     log_path = run_dir / "capture.log"
     endpoints = {
-        "root.txt": "/",
-        "healthcheck.json": "/api/healthcheck",
-        "status.json": "/api/status",
-        "conf.json": "/conf",
-        "version.txt": "/version",
-        "lmc_version.txt": "/lmc_version",
-        "commit_id.txt": "/commit_id",
-        "quota.json": "/api/quota",
-        "threads.json": "/threads",
-        "periodic_threads.json": "/periodic-threads",
-        "periodic_threads_health.json": "/periodic-threads-health",
+        "root.txt": ("/",),
+        "healthcheck.json": ("/api/healthcheck", "/healthcheck"),
+        "status.json": ("/api/status", "/status"),
+        "conf.json": ("/conf",),
+        "version.txt": ("/version",),
+        "lmc_version.txt": ("/lmc_version",),
+        "commit_id.txt": ("/commit_id",),
+        "quota.json": ("/api/quota", "/quota"),
+        "threads.json": ("/threads",),
+        "periodic_threads.json": ("/periodic-threads",),
+        "periodic_threads_health.json": ("/periodic-threads-health",),
     }
     results: dict[str, dict[str, object]] = {}
-    for filename, path in endpoints.items():
+    for filename, paths in endpoints.items():
         target = run_dir / "http" / filename
-        ok = _curl_to_file(f"{LMCACHE_HTTP_BASE_URL}{path}", target, log_path)
-        results[filename] = {"path": path, "ok": ok, "bytes": target.stat().st_size if target.exists() else 0}
+        urls = tuple(f"{LMCACHE_HTTP_BASE_URL}{path}" for path in paths)
+        selected_url = _curl_first_to_file(urls, target, log_path)
+        results[filename] = {
+            "ok": selected_url is not None,
+            "paths": list(paths),
+            "url": selected_url,
+            "bytes": target.stat().st_size if target.exists() else 0,
+        }
 
     thread_name = _discover_periodic_thread_name(run_dir / "http" / "periodic_threads.json")
     if thread_name:
@@ -881,7 +922,11 @@ def _capture_safe_http(run_dir: Path) -> dict[str, dict[str, object]]:
         path = f"/periodic-threads/{thread_name}"
         target = run_dir / "http" / filename
         ok = _curl_to_file(f"{LMCACHE_HTTP_BASE_URL}{path}", target, log_path)
-        results[filename] = {"path": path, "ok": ok, "bytes": target.stat().st_size if target.exists() else 0}
+        results[filename] = {
+            "path": path,
+            "ok": ok,
+            "bytes": target.stat().st_size if target.exists() else 0,
+        }
 
     (run_dir / "http" / "capture_manifest.json").write_text(
         json.dumps(results, indent=2, sort_keys=True) + "\n",
@@ -1235,7 +1280,9 @@ def _metric_values_by_name(prom_text: str) -> dict[str, list[float]]:
     return values
 
 
-def _metric_family_row(metric_values: dict[str, list[float]], prefixes: tuple[str, ...]) -> dict[str, object]:
+def _metric_family_row(
+    metric_values: dict[str, list[float]], prefixes: tuple[str, ...]
+) -> dict[str, object]:
     matched = sorted(name for name in metric_values if name.startswith(prefixes))
     populated = sorted(
         name for name in matched if any(value > 0 for value in metric_values.get(name, []))
@@ -1322,9 +1369,17 @@ def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
     coverage = coverage if isinstance(coverage, dict) else {}
     compat = compat if isinstance(compat, dict) else {}
     diagnosis = diagnosis if isinstance(diagnosis, dict) else {}
-    families = evidence.get("required_families") if isinstance(evidence.get("required_families"), dict) else {}
+    families = (
+        evidence.get("required_families")
+        if isinstance(evidence.get("required_families"), dict)
+        else {}
+    )
     l0_row = families.get("l0_lifecycle") if isinstance(families.get("l0_lifecycle"), dict) else {}
-    offload = coverage.get("kv_cache_offload") if isinstance(coverage.get("kv_cache_offload"), dict) else {}
+    offload = (
+        coverage.get("kv_cache_offload")
+        if isinstance(coverage.get("kv_cache_offload"), dict)
+        else {}
+    )
     payload = {
         "schema_version": "inferguard-agent-kv-offload-report/v1",
         "packet_id": spec.packet_id,
@@ -1337,7 +1392,8 @@ def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
             "trace_workload_classes": list(spec.trace_workload_classes),
             "raw_prompts_recorded": workload.get("raw_prompts_recorded", False),
             "request_count": workload.get("request_count", spec.request_count),
-            "phases": workload.get("phases") or _packet_b_phase_plan(spec.request_count or 48, spec),
+            "phases": workload.get("phases")
+            or _packet_b_phase_plan(spec.request_count or 48, spec),
         },
         "vllm": {
             "native_cpu_offload": offload.get("vllm_native_cpu_offload"),
@@ -1384,7 +1440,12 @@ def _write_agent_kv_offload_report(run_dir: Path, spec: PacketSpec) -> None:
 
 def _packet_b_debug_log_markers(run_dir: Path) -> dict[str, dict[str, object]]:
     markers = {
-        "vllm_gpu_block_allocation": ("gpu block", "gpu blocks", "block allocation", "allocate blocks"),
+        "vllm_gpu_block_allocation": (
+            "gpu block",
+            "gpu blocks",
+            "block allocation",
+            "allocate blocks",
+        ),
         "lmcache_l0_block": ("l0 block", "lmcache_mp_l0_block"),
     }
     logs = {
@@ -1474,7 +1535,9 @@ def _build_collect_lmcache_cmd(run_dir: Path, spec: PacketSpec | None = None) ->
                 str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
             ]
         )
-    _maybe_add_existing(cmd, "--lmcache-periodic-thread-file", run_dir / "http" / "periodic_thread.json")
+    _maybe_add_existing(
+        cmd, "--lmcache-periodic-thread-file", run_dir / "http" / "periodic_thread.json"
+    )
     _maybe_add_existing(cmd, "--lmcache-otel-file", run_dir / LMCACHE_OTEL_FILE)
     _maybe_add_existing(cmd, "--lmcache-trace-replay-output", run_dir / TRACE_REPLAY_DIR)
     _maybe_add_existing(cmd, "--lmcache-lookup-hash-path", run_dir / LOOKUP_HASH_DIR)
@@ -1523,9 +1586,17 @@ def _build_lmcache_compat_cmd(run_dir: Path, spec: PacketSpec | None = None) -> 
                 str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
             ]
         )
-    _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
-    _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
-    _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    _maybe_add_existing(
+        cmd,
+        "--lmcache-trace-replay-evidence-file",
+        packet_dir / "lmcache_trace_replay_evidence.json",
+    )
+    _maybe_add_existing(
+        cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json"
+    )
+    _maybe_add_existing(
+        cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json"
+    )
     return cmd
 
 
@@ -1563,9 +1634,17 @@ def _build_observability_coverage_cmd(run_dir: Path, spec: PacketSpec | None = N
                 str(run_dir / CACHEBLEND_L0_BOUNDARY_EVIDENCE_FILE),
             ]
         )
-    _maybe_add_existing(cmd, "--lmcache-trace-replay-evidence-file", packet_dir / "lmcache_trace_replay_evidence.json")
-    _maybe_add_existing(cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json")
-    _maybe_add_existing(cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json")
+    _maybe_add_existing(
+        cmd,
+        "--lmcache-trace-replay-evidence-file",
+        packet_dir / "lmcache_trace_replay_evidence.json",
+    )
+    _maybe_add_existing(
+        cmd, "--lmcache-lookup-hash-evidence-file", packet_dir / "lmcache_lookup_hash_evidence.json"
+    )
+    _maybe_add_existing(
+        cmd, "--lmcache-otel-evidence-file", packet_dir / "lmcache_otel_evidence.json"
+    )
     return cmd
 
 
@@ -1578,7 +1657,9 @@ def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> Non
         _run_required(_build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180)
     else:
         _run_best_effort(_build_lmcache_compat_cmd(run_dir, spec), commands_log, timeout=180)
-        _run_best_effort(_build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180)
+        _run_best_effort(
+            _build_observability_coverage_cmd(run_dir, spec), commands_log, timeout=180
+        )
 
     job_dir = run_dir / "inferguard-job"
     collect_metrics_cmd = [
@@ -1601,7 +1682,10 @@ def _run_inferguard_packet(run_dir: Path, spec: PacketSpec | None = None) -> Non
     _run_best_effort(collect_metrics_cmd, commands_log, timeout=120)
     if (run_dir / "lmcache_compat_report.json").exists():
         (job_dir / "metrics").mkdir(parents=True, exist_ok=True)
-        shutil.copy2(run_dir / "lmcache_compat_report.json", job_dir / "metrics" / "lmcache_compat_report.json")
+        shutil.copy2(
+            run_dir / "lmcache_compat_report.json",
+            job_dir / "metrics" / "lmcache_compat_report.json",
+        )
     diagnose_cmd = [
         "inferguard",
         "diagnose-bottleneck",
@@ -1677,10 +1761,14 @@ def _validate_required_artifacts(run_dir: Path, spec: PacketSpec | None = None) 
     _write_summary_and_index(run_dir, spec)
     missing = _missing_artifacts(run_dir, _required_artifacts(spec), require_nonempty=True)
     if missing:
-        raise RuntimeError(f"Packet {spec.packet_id.upper()} missing required artifacts: " + ", ".join(missing))
+        raise RuntimeError(
+            f"Packet {spec.packet_id.upper()} missing required artifacts: " + ", ".join(missing)
+        )
     if spec.packet_id == "b":
         evidence = _read_json(run_dir / PACKET_B_LIFECYCLE_EVIDENCE_FILE)
-        missing_families = evidence.get("missing_required_families") if isinstance(evidence, dict) else None
+        missing_families = (
+            evidence.get("missing_required_families") if isinstance(evidence, dict) else None
+        )
         if not isinstance(evidence, dict) or evidence.get("claim_status") != "measured":
             warning = (
                 "Packet B lifecycle evidence is not measured; missing required families: "
@@ -1810,8 +1898,8 @@ def _run_packet(spec: PacketSpec) -> str:
             handles.append(otel_handle)
         lmcache_proc, lmcache_handle = _launch_lmcache(run_dir, spec)
         handles.append(lmcache_handle)
-        _wait_for_http(
-            LMCACHE_HEALTH_URL,
+        _wait_for_any_http(
+            LMCACHE_HEALTH_URLS,
             run_dir / "health.log",
             label="LMCache HTTP",
             max_wait_seconds=180,
@@ -1915,7 +2003,9 @@ def _run_from_python_api(packet: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run LMCache MP packet lab through the Modal Python API.")
+    parser = argparse.ArgumentParser(
+        description="Run LMCache MP packet lab through the Modal Python API."
+    )
     parser.add_argument("--packet", default="a", choices=sorted(PACKETS), help="Packet id to run.")
     args = parser.parse_args()
     _run_from_python_api(args.packet)

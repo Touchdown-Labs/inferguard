@@ -1774,6 +1774,83 @@ def _lmcache_compat_exit_code(report: dict[str, Any], fail_on: str) -> int:
     return 0
 
 
+@app.command("lmcache-merge-ready")
+def lmcache_merge_ready_cmd(
+    packet_b_dir: Annotated[
+        Optional[Path],
+        typer.Option("--packet-b-dir", help="Packet B lifecycle/reuse/eviction artifact directory."),
+    ] = None,
+    packet_c_dir: Annotated[
+        Optional[Path],
+        typer.Option("--packet-c-dir", help="Packet C L2 artifact directory."),
+    ] = None,
+    repo: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--repo",
+            help="Repository to include in git readiness as name=/path/to/repo. Repeatable.",
+        ),
+    ] = None,
+    require_cacheblend: Annotated[
+        bool,
+        typer.Option(
+            "--require-cacheblend/--no-require-cacheblend",
+            help="Block merge readiness when CacheBlend evidence is absent.",
+        ),
+    ] = True,
+    output: Annotated[
+        Optional[Path],
+        typer.Option("--output", help="Optional JSON merge-readiness report path."),
+    ] = None,
+    json_out: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the full merge-readiness report as JSON."),
+    ] = False,
+) -> None:
+    """Summarize LMCache packet evidence, repo state, blockers, and merge readiness."""
+    from inferguard.lmcache_merge_ready import (
+        build_lmcache_merge_ready_report,
+        parse_repo_specs,
+        write_lmcache_merge_ready_report,
+    )
+
+    try:
+        repo_specs = parse_repo_specs(repo or [])
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    report = build_lmcache_merge_ready_report(
+        packet_b_dir=packet_b_dir,
+        packet_c_dir=packet_c_dir,
+        repos=repo_specs,
+        require_cacheblend=require_cacheblend,
+    )
+    if output is not None:
+        write_lmcache_merge_ready_report(report, output)
+    exit_code = 0 if report["merge_ready"] else 1
+    if json_out:
+        typer.echo(json.dumps(report, indent=2, sort_keys=True))
+        raise typer.Exit(code=exit_code)
+
+    table = Table(title="InferGuard LMCache Merge Readiness")
+    table.add_column("Area")
+    table.add_column("Status")
+    table.add_column("Detail")
+    for packet_name, packet in report["packets"].items():
+        table.add_row(packet_name, str(packet.get("status")), str(packet.get("path")))
+    for repo_name, repo_report in report["repos"].items():
+        state = "dirty" if repo_report.get("dirty") else "clean"
+        if repo_report.get("behind"):
+            state = f"behind:{repo_report['behind']}"
+        table.add_row(f"repo:{repo_name}", state, str(repo_report.get("path")))
+    Console().print(table)
+    typer.echo(f"merge_ready={report['merge_ready']} blockers={len(report['blockers'])}")
+    for blocker in report["blockers"]:
+        typer.echo(f"blocker {blocker.get('code')}: {blocker.get('detail')}")
+    if output is not None:
+        typer.echo(f"wrote {output}")
+    raise typer.Exit(code=exit_code)
+
+
 @app.command("collect-lmcache")
 def collect_lmcache_cmd(
     output_dir: Annotated[

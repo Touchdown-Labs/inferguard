@@ -138,7 +138,9 @@ def test_modal_image_installs_current_local_inferguard_source() -> None:
     pip_install_args = next(args for name, args, _kwargs in calls if name == "pip_install")
     assert "inferguard" not in pip_install_args
     assert "lmcache" in pip_install_args
-    assert not any("git+https://github.com/Touchdown-Labs/inferguard" in arg for arg in pip_install_args)
+    assert not any(
+        "git+https://github.com/Touchdown-Labs/inferguard" in arg for arg in pip_install_args
+    )
 
     add_local_files = [kwargs for name, _args, kwargs in calls if name == "add_local_file"]
     assert add_local_files == [
@@ -280,9 +282,14 @@ def test_trace_replay_command_mirrors_required_lmcache_launch_config(tmp_path: P
     assert replay[:3] == ["lmcache", "trace", "replay"]
     assert replay[3] == str(tmp_path / "lmcache_trace.lct")
     assert replay[replay.index("--output-dir") + 1] == str(tmp_path / "trace-replay")
-    assert replay[replay.index("--jsonl-out") + 1] == str(tmp_path / "trace-replay" / "trace_replay.jsonl")
+    assert replay[replay.index("--jsonl-out") + 1] == str(
+        tmp_path / "trace-replay" / "trace_replay.jsonl"
+    )
     assert replay[replay.index("--l1-size-gb") + 1] == lmcache[lmcache.index("--l1-size-gb") + 1]
-    assert replay[replay.index("--eviction-policy") + 1] == lmcache[lmcache.index("--eviction-policy") + 1]
+    assert (
+        replay[replay.index("--eviction-policy") + 1]
+        == lmcache[lmcache.index("--eviction-policy") + 1]
+    )
     assert "--disable-metrics" in replay
 
 
@@ -343,7 +350,9 @@ def test_packet_b_wires_cacheblend_l0_boundary_evidence(tmp_path: Path) -> None:
     assert env["INFERGUARD_L0_BLOCK_BOUNDARY_EVIDENCE_PATH"] == str(evidence_path)
     for cmd in (collect, compat, coverage):
         assert "--lmcache-cacheblend-boundary-evidence-file" in cmd
-        assert cmd[cmd.index("--lmcache-cacheblend-boundary-evidence-file") + 1] == str(evidence_path)
+        assert cmd[cmd.index("--lmcache-cacheblend-boundary-evidence-file") + 1] == str(
+            evidence_path
+        )
 
 
 def test_capture_metrics_uses_lmcache_prometheus_fallback(tmp_path: Path) -> None:
@@ -501,7 +510,9 @@ def test_packet_b_lifecycle_evidence_requires_sampled_l0_l1_reuse_and_eviction(
 
     lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
 
-    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    evidence = json.loads(
+        (tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8")
+    )
     assert evidence["sdlc_row_id"] == "C1"
     assert evidence["benchmark_id"] == "LC1"
     assert evidence["workload_profile"] == "long_context_agent_kv_offload"
@@ -538,7 +549,9 @@ def test_packet_b_lifecycle_evidence_blocks_missing_or_zero_l0_lifecycle(tmp_pat
 
     lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
 
-    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    evidence = json.loads(
+        (tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8")
+    )
     assert evidence["claim_status"] == "not_proven"
     assert evidence["acceptance_status"] == "blocked"
     assert evidence["blocked_reason"] == "lmcache_mp_l0_block_metrics_absent"
@@ -601,12 +614,16 @@ def test_packet_b_lifecycle_evidence_records_debug_log_markers(tmp_path: Path) -
 
     lab._write_packet_b_lifecycle_evidence(tmp_path, spec)
 
-    evidence = json.loads((tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8"))
+    evidence = json.loads(
+        (tmp_path / "packet-b-lifecycle-evidence.json").read_text(encoding="utf-8")
+    )
     assert evidence["debug_log_markers"]["vllm_gpu_block_allocation"]["status"] == "found"
     assert evidence["debug_log_markers"]["lmcache_l0_block"]["status"] == "found"
 
 
-def test_packet_b_validation_records_warning_when_lifecycle_evidence_not_measured(tmp_path: Path) -> None:
+def test_packet_b_validation_records_warning_when_lifecycle_evidence_not_measured(
+    tmp_path: Path,
+) -> None:
     lab = _load_lab_module()
     spec = lab.PACKETS["b"]
     for rel in lab._required_artifacts(spec):
@@ -662,7 +679,9 @@ def test_packet_c_wires_l2_config_and_strict_report_flags(tmp_path: Path) -> Non
     lab = _load_lab_module()
     spec = lab.PACKETS["c"]
     (tmp_path / "lmcache-packet").mkdir()
-    (tmp_path / "lmcache-packet" / "lmcache_trace_replay_evidence.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "lmcache-packet" / "lmcache_trace_replay_evidence.json").write_text(
+        "{}", encoding="utf-8"
+    )
 
     config_path = lab._write_l2_config(tmp_path, spec)
     env = lab._build_lmcache_env(tmp_path, spec)
@@ -687,7 +706,9 @@ def test_packet_d_wires_otel_collector_evidence_into_reports(tmp_path: Path) -> 
     packet_dir = tmp_path / "lmcache-packet"
     packet_dir.mkdir()
     (tmp_path / "lmcache_otel.jsonl").write_text('{"name":"mp.store"}\n', encoding="utf-8")
-    (packet_dir / "lmcache_otel_evidence.json").write_text('{"claim_status":"measured"}', encoding="utf-8")
+    (packet_dir / "lmcache_otel_evidence.json").write_text(
+        '{"claim_status":"measured"}', encoding="utf-8"
+    )
 
     cmd = lab._build_lmcache_command(tmp_path, spec)
     env = lab._build_lmcache_env(tmp_path, spec)
@@ -730,7 +751,9 @@ def test_packet_a_collect_command_uses_saved_safe_http_and_optional_outputs(tmp_
     cmd = lab._build_collect_lmcache_cmd(tmp_path)
 
     assert "--lmcache-http-base-url" in cmd
-    assert cmd[cmd.index("--lmcache-health-file") + 1] == str(tmp_path / "http" / "healthcheck.json")
+    assert cmd[cmd.index("--lmcache-health-file") + 1] == str(
+        tmp_path / "http" / "healthcheck.json"
+    )
     assert cmd[cmd.index("--lmcache-status-file") + 1] == str(tmp_path / "http" / "status.json")
     assert cmd[cmd.index("--lmcache-conf-file") + 1] == str(tmp_path / "http" / "conf.json")
     assert cmd[cmd.index("--lmcache-threads-file") + 1] == str(tmp_path / "http" / "threads.json")

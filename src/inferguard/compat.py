@@ -39,9 +39,17 @@ class MetricFamilySpec:
 
 LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_embedded", "legacy_lookup", ("lmcache:lookup_*", "lmcache_lookup_*")),
-    MetricFamilySpec("lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")),
-    MetricFamilySpec("lmcache_embedded", "production_requests", ("lmcache:num_*_requests*", "lmcache_num_*_requests*")),
-    MetricFamilySpec("lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_requests",
+        ("lmcache:num_*_requests*", "lmcache_num_*_requests*"),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")
+    ),
     MetricFamilySpec(
         "lmcache_embedded",
         "production_hit_rate",
@@ -130,13 +138,27 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ),
         required_when="optional",
     ),
-    MetricFamilySpec("lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")),
-    MetricFamilySpec("lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")),
-    MetricFamilySpec("lmcache_embedded", "production_p2p", ("lmcache:*p2p*", "lmcache_*p2p*"), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_p2p",
+        ("lmcache:*p2p*", "lmcache_*p2p*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_embedded",
         "production_health",
-        ("lmcache:is_healthy", "lmcache:lmcache_is_healthy", "lmcache_is_healthy", "lmcache_lmcache_is_healthy"),
+        (
+            "lmcache:is_healthy",
+            "lmcache:lmcache_is_healthy",
+            "lmcache_is_healthy",
+            "lmcache_lmcache_is_healthy",
+        ),
         required_when="optional",
     ),
     MetricFamilySpec(
@@ -178,7 +200,12 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec(
         "lmcache_embedded",
         "chunk_stats",
-        ("lmcache:*chunk*", "lmcache_*chunk*", "lmcache:chunk_statistics_*", "lmcache_chunk_statistics_*"),
+        (
+            "lmcache:*chunk*",
+            "lmcache_*chunk*",
+            "lmcache:chunk_statistics_*",
+            "lmcache_chunk_statistics_*",
+        ),
         required_when="optional",
     ),
     MetricFamilySpec(
@@ -198,8 +225,14 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lookup_tokens",
         ("lmcache_mp_lookup_*_tokens*", "lmcache_mp.lookup_*_tokens*"),
     ),
-    MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys*", "lmcache_mp.l1_*_keys*")),
-    MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes", "lmcache_mp.l1_memory_usage_bytes")),
+    MetricFamilySpec(
+        "lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys*", "lmcache_mp.l1_*_keys*")
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l1_memory",
+        ("lmcache_mp_l1_memory_usage_bytes", "lmcache_mp.l1_memory_usage_bytes"),
+    ),
     MetricFamilySpec(
         "lmcache_mp",
         "l1_failures",
@@ -215,7 +248,12 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec(
         "lmcache_mp",
         "l0_lifecycle",
-        ("lmcache_mp_l0_block_*_seconds*", "lmcache_mp.l0_block_*_seconds*"),
+        (
+            "lmcache_mp_l0_block_*_seconds*",
+            "lmcache_mp_l0_block_*_total",
+            "lmcache_mp.l0_block_*_seconds*",
+            "lmcache_mp.l0_block_*_total",
+        ),
         required_when="sampled",
     ),
     MetricFamilySpec(
@@ -292,7 +330,12 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ),
         required_when="l2_configured",
     ),
-    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*", "lmcache_mp.event_bus.*"), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "event_bus",
+        ("lmcache_mp_event_bus_*", "lmcache_mp.event_bus.*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "lookup",
@@ -367,12 +410,26 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ("lmcache_blend_lookup_stale_chunks*",),
         required_when="cacheblend_observed",
     ),
+    MetricFamilySpec(
+        "lmcache_cacheblend",
+        "serde",
+        (
+            "lmcache_blend_serde_encode_duration_seconds*",
+            "lmcache_blend_serde_decode_duration_seconds*",
+            "lmcache_blend_serde_bytes_in*",
+            "lmcache_blend_serde_bytes_out*",
+            "lmcache_blend_serde_failures*",
+        ),
+        required_when="cacheblend_observed",
+    ),
 )
 
 VLLM_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("vllm_prefix_cache", "local_prefix", ("vllm:prefix_cache_*",)),
     MetricFamilySpec("vllm_prefix_cache", "external_prefix", ("vllm:external_prefix_cache_*",)),
-    MetricFamilySpec("vllm_prefix_cache", "prompt_tokens_by_source", ("vllm:prompt_tokens_by_source*",)),
+    MetricFamilySpec(
+        "vllm_prefix_cache", "prompt_tokens_by_source", ("vllm:prompt_tokens_by_source*",)
+    ),
     MetricFamilySpec("vllm_prefix_cache", "prompt_tokens_cached", ("vllm:prompt_tokens_cached*",)),
     MetricFamilySpec("vllm_simple_cpu_offload", "kv_offload_transfer", ("vllm:kv_offload_*",)),
     MetricFamilySpec("vllm_simple_cpu_offload", "simple_cpu_pool", ("vllm:simple_cpu_offload_*",)),
@@ -402,7 +459,9 @@ def build_compat_report(
 
     samples = _tag_samples(engine_text, "engine") + _tag_samples(lmcache_text, "lmcache")
     observed_names = {sample.name for sample in samples}
-    observed_lmcache_mp = any(name.startswith(("lmcache_mp_", "lmcache_mp.")) for name in observed_names)
+    observed_lmcache_mp = any(
+        name.startswith(("lmcache_mp_", "lmcache_mp.")) for name in observed_names
+    )
     observed_lmcache_cacheblend = any(name.startswith("lmcache_blend_") for name in observed_names)
     observed_lmcache_embedded = any(
         (name.startswith("lmcache:") or name.startswith("lmcache_"))
@@ -702,8 +761,12 @@ def _evidence_family_rows(
         _evidence_family_row("lmcache_logs", "lifecycle_logs", lmcache_log_evidence),
         _evidence_family_row("lmcache_trace_recording", "storage_lct", lmcache_trace_evidence),
         _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
-        _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
-        _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
+        _evidence_family_row(
+            "lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence
+        ),
+        _evidence_family_row(
+            "lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence
+        ),
         _evidence_family_row(
             "lmcache_cacheblend_boundary",
             "boundary_jsonl",
@@ -712,13 +775,17 @@ def _evidence_family_rows(
     ]
 
 
-def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
+def _evidence_family_row(
+    surface: str, family: str, evidence: dict[str, Any] | None
+) -> dict[str, Any]:
     status = "missing"
     count = 0
     populated = 0
     if evidence:
         count = 1
-        event_counts = evidence.get("event_counts") if isinstance(evidence.get("event_counts"), dict) else {}
+        event_counts = (
+            evidence.get("event_counts") if isinstance(evidence.get("event_counts"), dict) else {}
+        )
         if (
             evidence.get("claim_status") == "measured"
             or evidence.get("booleans", {}).get("is_healthy")
@@ -819,8 +886,7 @@ def _architecture_detection(
             str(value)
             for sample in samples
             for key, value in sample.labels.items()
-            if key in {"enable_lmcache", "lmcache_enabled", "sglang_enable_lmcache"}
-            and value
+            if key in {"enable_lmcache", "lmcache_enabled", "sglang_enable_lmcache"} and value
         }
     )
     has_mp_connector = "LMCacheMPConnector" in connector_labels
@@ -837,14 +903,13 @@ def _architecture_detection(
         for connector in connector_labels
     )
     has_sglang_lmcradix_cache = "LMCRadixCache" in cache_labels
-    has_sglang_enable_lmcache = any(
-        value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels
-    ) or "sglang:lmcache_enabled" in names
+    has_sglang_enable_lmcache = (
+        any(value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels)
+        or "sglang:lmcache_enabled" in names
+    )
     has_sglang_hicache_metrics = any(name.startswith("sglang:hicache_") for name in names)
     has_sglang_lmcache_signal = (
-        has_sglang_lmcache_connector
-        or has_sglang_lmcradix_cache
-        or has_sglang_enable_lmcache
+        has_sglang_lmcache_connector or has_sglang_lmcradix_cache or has_sglang_enable_lmcache
     )
     label = "unknown"
     confidence = "not_proven"
@@ -853,9 +918,7 @@ def _architecture_detection(
         label = "vllm_mp_lmcache"
         confidence = "measured" if observed_mp_like and has_mp_connector else "inferred"
     elif has_vllm and (
-        observed_lmcache_embedded
-        or has_vllm_embedded_connector
-        or has_vllm_lmcache_offload_backend
+        observed_lmcache_embedded or has_vllm_embedded_connector or has_vllm_lmcache_offload_backend
     ):
         label = "vllm_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
@@ -1011,10 +1074,12 @@ def _upstream_questions(
                 "owner_question": "This MP scrape has counters but sparse sampled lifecycle/throughput histograms; should this lab raise --metrics-sample-rate for validation runs?",
             }
         )
-    if (
-        by_key.get(("lmcache_mp", "storage_manager"), {}).get("status") == "populated"
-        and by_key.get(("lmcache_mp", "l0_lifecycle"), {}).get("status") in {"missing", "zero"}
-    ):
+    if by_key.get(("lmcache_mp", "storage_manager"), {}).get(
+        "status"
+    ) == "populated" and by_key.get(("lmcache_mp", "l0_lifecycle"), {}).get("status") in {
+        "missing",
+        "zero",
+    }:
         questions.append(
             {
                 "code": "lmcache_mp_l0_lifecycle_missing",
@@ -1038,11 +1103,7 @@ def _upstream_questions(
     external_queries = _sum_matching(samples, "vllm:external_prefix_cache_queries_total")
     external_hits = _sum_matching(samples, "vllm:external_prefix_cache_hits_total")
     external_transfer_tokens = _sum_matching(
-        [
-            sample
-            for sample in samples
-            if sample.labels.get("source") == "external_kv_transfer"
-        ],
+        [sample for sample in samples if sample.labels.get("source") == "external_kv_transfer"],
         "vllm:prompt_tokens_by_source_total",
     )
     if external_queries > 0 and external_hits == 0 and external_transfer_tokens == 0:
@@ -1103,7 +1164,9 @@ def _diagnostic_findings(
                 "severity": "warning",
                 "message": "LMCache MP metrics are present but EventBus self-metrics are absent, so tail-drop risk is not directly observable.",
                 "metrics": {
-                    "event_bus_queue_size": mp_observability.get("config", {}).get("event_bus_queue_size"),
+                    "event_bus_queue_size": mp_observability.get("config", {}).get(
+                        "event_bus_queue_size"
+                    ),
                     "event_bus_metric_names": mp_observability.get("event_bus_metric_names", []),
                 },
                 "recommendation": "Ask LMCache to expose stable EventBus queue depth, dropped event, drain lag, and subscriber exception counters.",
@@ -1157,7 +1220,9 @@ def _diagnostic_findings(
         )
     l0_l1_store_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
     l0_l1_load_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
-    lmcache_mp_present = any(sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples)
+    lmcache_mp_present = any(
+        sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples
+    )
     l0_lifecycle_present = any(
         sample.name.startswith(("lmcache_mp_l0_block_", "lmcache_mp.l0_block_"))
         for sample in samples
@@ -1176,7 +1241,9 @@ def _diagnostic_findings(
                 "recommendation": "C1 cannot be accepted until lmcache_mp_l0_block_* metrics are emitted by the tested LMCache/vLLM ref.",
             }
         )
-    l0_l1_present = any(sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples)
+    l0_l1_present = any(
+        sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples
+    )
     if lmcache_mp_present and not l0_l1_present:
         findings.append(
             {
@@ -1190,9 +1257,8 @@ def _diagnostic_findings(
                 "recommendation": "For KV cache offload profiling, run a workload/ref that emits lmcache_mp_l0_l1_store_throughput_gbs and lmcache_mp_l0_l1_load_throughput_gbs.",
             }
         )
-    elif (
-        (l0_l1_store_throughput is not None and l0_l1_store_throughput < 0.1)
-        or (l0_l1_load_throughput is not None and l0_l1_load_throughput < 0.1)
+    elif (l0_l1_store_throughput is not None and l0_l1_store_throughput < 0.1) or (
+        l0_l1_load_throughput is not None and l0_l1_load_throughput < 0.1
     ):
         findings.append(
             {
@@ -1244,7 +1310,8 @@ def _diagnostic_findings(
     inflight_l2_loads = _mp_sum(samples, "lmcache_mp.num_inflight_l2_loads")
     active_prefetch_jobs = _mp_sum(samples, "lmcache_mp.active_prefetch_jobs")
     if (inflight_l2_loads > 0 or active_prefetch_jobs > 0) and (
-        l2_load_completed <= 0 or l2_loaded_keys < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
+        l2_load_completed <= 0
+        or l2_loaded_keys < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
     ):
         findings.append(
             {
@@ -1264,7 +1331,11 @@ def _diagnostic_findings(
     store_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_store_throughput_gbs")
     load_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_load_throughput_gbs")
     low_store = store_throughput is not None and store_throughput < 0.1 and inflight_l2_stores > 0
-    low_load = load_throughput is not None and load_throughput < 0.1 and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
+    low_load = (
+        load_throughput is not None
+        and load_throughput < 0.1
+        and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
+    )
     if low_store or low_load:
         findings.append(
             {
@@ -1292,7 +1363,9 @@ def _diagnostic_findings(
         findings.append(
             {
                 "code": "lmcache_cacheblend_failures",
-                "severity": "critical" if cacheblend_failures > 0 or cacheblend_no_gpu > 0 else "warning",
+                "severity": "critical"
+                if cacheblend_failures > 0 or cacheblend_no_gpu > 0
+                else "warning",
                 "message": "LMCache CacheBlend reports failures, stale chunks, or missing GPU context.",
                 "metrics": {
                     "lmcache_blend_failures_total": cacheblend_failures,
@@ -1331,7 +1404,9 @@ def _architecture_diagnostic_findings(architecture: dict[str, Any]) -> list[dict
                 "code": "vllm_lmcache_offload_flag_without_metrics",
                 "severity": "info",
                 "message": "vLLM reports kv_offloading_backend=lmcache, but no embedded lmcache:* metrics were observed.",
-                "metrics": {"offload_backend_labels": architecture.get("offload_backend_labels", [])},
+                "metrics": {
+                    "offload_backend_labels": architecture.get("offload_backend_labels", [])
+                },
                 "recommendation": "Capture engine /metrics and inline LMCache logs before claiming embedded LMCache runtime behavior.",
             }
         )
@@ -1354,9 +1429,8 @@ def _architecture_diagnostic_findings(architecture: dict[str, Any]) -> list[dict
                 "recommendation": "Keep HiCache/local tier findings separate from embedded LMCache compatibility until LMCache-specific launch or metric evidence is captured.",
             }
         )
-    if (
-        architecture.get("label") == "sglang_embedded_lmcache"
-        and signals.get("sglang_hicache_metrics")
+    if architecture.get("label") == "sglang_embedded_lmcache" and signals.get(
+        "sglang_hicache_metrics"
     ):
         findings.append(
             {
@@ -1402,7 +1476,9 @@ def _mp_observability_report(
         }
     )
     if explicit.get("service_instance_id"):
-        service_instance_ids = sorted(set(service_instance_ids) | {str(explicit["service_instance_id"])})
+        service_instance_ids = sorted(
+            set(service_instance_ids) | {str(explicit["service_instance_id"])}
+        )
     cache_salts = sorted(
         {
             sample.labels.get("cache_salt", "")
@@ -1425,7 +1501,11 @@ def _mp_observability_report(
         }
     )
     event_bus_metric_names = sorted(
-        {sample.name for sample in samples if sample.name.startswith(("lmcache_mp_event_bus_", "lmcache_mp.event_bus."))}
+        {
+            sample.name
+            for sample in samples
+            if sample.name.startswith(("lmcache_mp_event_bus_", "lmcache_mp.event_bus."))
+        }
     )
     counter_names = {
         sample.name
@@ -1540,15 +1620,23 @@ def _l2_summary(samples: list[LabeledSample]) -> dict[str, Any]:
         "store_failed_keys": _mp_sum(samples, "lmcache_mp.l2_store_failed_keys", counter=True),
         "prefetch_load_tasks": load_tasks,
         "load_completed": load_completed,
-        "prefetch_loaded_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True),
-        "prefetch_failed_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True),
+        "prefetch_loaded_keys": _mp_sum(
+            samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True
+        ),
+        "prefetch_failed_keys": _mp_sum(
+            samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True
+        ),
         "prefetch_failures": _mp_sum(samples, "lmcache_mp.l2_prefetch_failure", counter=True),
         "num_inflight_l2_stores": inflight_stores,
         "num_inflight_l2_loads": inflight_loads,
         "active_prefetch_jobs": active_prefetch,
-        "inflight_load_memory_usage_bytes": _mp_sum(samples, "lmcache_mp.inflight_load_memory_usage_bytes"),
-        "store_backlog": inflight_stores > 0 and (store_completed <= 0 or store_completed < store_tasks),
-        "load_backlog": (inflight_loads > 0 or active_prefetch > 0) and (
+        "inflight_load_memory_usage_bytes": _mp_sum(
+            samples, "lmcache_mp.inflight_load_memory_usage_bytes"
+        ),
+        "store_backlog": inflight_stores > 0
+        and (store_completed <= 0 or store_completed < store_tasks),
+        "load_backlog": (inflight_loads > 0 or active_prefetch > 0)
+        and (
             load_completed <= 0
             or _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True)
             < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
@@ -1572,13 +1660,19 @@ def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
         "lookup_requests": lookup_requests,
         "lookup_fingerprint_hits": fingerprint_hits,
         "lookup_storage_hits": storage_hits,
-        "lookup_fingerprint_hit_rate": fingerprint_hits / lookup_requests if lookup_requests > 0 else None,
+        "lookup_fingerprint_hit_rate": fingerprint_hits / lookup_requests
+        if lookup_requests > 0
+        else None,
         "lookup_storage_hit_rate": storage_hits / lookup_requests if lookup_requests > 0 else None,
         "lookup_stale_chunks": _sum_matching(samples, "lmcache_blend_lookup_stale_chunks*"),
-        "lookup_no_gpu_context_errors": _sum_matching(samples, "lmcache_blend_lookup_no_gpu_context_errors*"),
+        "lookup_no_gpu_context_errors": _sum_matching(
+            samples, "lmcache_blend_lookup_no_gpu_context_errors*"
+        ),
         "retrieve_requests": _sum_matching(samples, "lmcache_blend_retrieve_requests*"),
         "retrieve_chunks": _sum_matching(samples, "lmcache_blend_retrieve_chunks*"),
-        "store_pre_computed_requests": _sum_matching(samples, "lmcache_blend_store_pre_computed_requests*"),
+        "store_pre_computed_requests": _sum_matching(
+            samples, "lmcache_blend_store_pre_computed_requests*"
+        ),
         "store_final_requests": _sum_matching(samples, "lmcache_blend_store_final_requests*"),
         "failures": failures,
         "fingerprints_registered": _sum_matching(samples, "lmcache_blend_fingerprints_registered*"),
@@ -1744,7 +1838,9 @@ def _http_status_l1_manager(evidence: dict[str, Any] | None) -> dict[str, Any]:
     status = ((evidence or {}).get("endpoints") or {}).get("status") or {}
     fields = status.get("fields") if isinstance(status, dict) else None
     storage_manager = (fields or {}).get("storage_manager") if isinstance(fields, dict) else None
-    l1_manager = (storage_manager or {}).get("l1_manager") if isinstance(storage_manager, dict) else None
+    l1_manager = (
+        (storage_manager or {}).get("l1_manager") if isinstance(storage_manager, dict) else None
+    )
     return l1_manager if isinstance(l1_manager, dict) else {}
 
 
