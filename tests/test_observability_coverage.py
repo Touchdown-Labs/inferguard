@@ -54,6 +54,103 @@ vllm:kv_transfer_sent_bytes_total 123
     assert report["surfaces"]["sglang"]["status"] == "not_applicable"
 
 
+def test_observability_coverage_external_prefix_cache_does_not_require_vllm_kv_transfer() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+vllm:time_to_first_token_seconds_count 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 10
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5
+vllm:prefix_cache_queries_total 10
+vllm:prefix_cache_hits_total 8
+vllm:external_prefix_cache_queries_total 4
+vllm:external_prefix_cache_hits_total 2
+vllm:prompt_tokens_by_source_total{source="external_kv_transfer"} 20
+""",
+        expected_engine="vllm",
+        external_cache_configured=True,
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("vllm", "kv_transfer")]["status"] == "not_applicable"
+    assert not any(
+        gap["surface"] == "vllm" and gap["family"] == "kv_transfer"
+        for gap in report["coverage_gaps"]
+    )
+
+
+def test_observability_coverage_optional_absent_families_are_not_gaps() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_lookup_requested_tokens_total 100
+lmcache_mp_lookup_hit_tokens_total 80
+lmcache_mp_l1_chunk_lifetime_seconds_count 1
+lmcache_mp_l0_block_allocated_blocks_total 48
+lmcache_mp_l0_l1_store_throughput_gbs_count 1
+lmcache_mp_real_reuse_gap_seconds_count 1
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    gap_keys = {(gap["surface"], gap["family"]) for gap in report["coverage_gaps"]}
+    assert ("lmcache_mp", "l2_failures") not in gap_keys
+    assert ("lmcache_mp", "engine_counters") not in gap_keys
+    assert ("lmcache_mp", "gauges") not in gap_keys
+    assert ("lmcache_mp", "event_bus") not in gap_keys
+    assert ("vllm_simple_cpu_offload", "kv_offload_transfer") not in gap_keys
+    assert ("vllm_simple_cpu_offload", "simple_cpu_pool") not in gap_keys
+
+
+def test_observability_coverage_optional_zero_families_do_not_prevent_surface_completion() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_memory_usage_bytes 1024
+lmcache_mp_lookup_requested_tokens_total 100
+lmcache_mp_lookup_hit_tokens_total 80
+lmcache_mp_l1_chunk_lifetime_seconds_count 1
+lmcache_mp_l0_block_allocated_blocks_total 48
+lmcache_mp_l0_l1_store_throughput_gbs_count 1
+lmcache_mp_real_reuse_gap_seconds_count 1
+lmcache_mp_active_prefetch_jobs 0
+lmcache_mp_event_bus_queue_depth 0
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    assert report["surfaces"]["lmcache_mp"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_otel"]["status"] == "not_applicable"
+
+
+def test_observability_coverage_sampled_vllm_block_lifecycle_is_not_required_without_vllm_samples() -> (
+    None
+):
+    report = build_observability_coverage_report(
+        engine_text="""
+vllm:time_to_first_token_seconds_count 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 10
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5
+vllm:prefix_cache_queries_total 10
+vllm:prefix_cache_hits_total 8
+""",
+        expected_engine="vllm",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("vllm", "kv_block_lifecycle")]["status"] == "not_applicable"
+    assert not any(
+        gap["surface"] == "vllm" and gap["family"] == "kv_block_lifecycle"
+        for gap in report["coverage_gaps"]
+    )
+
+
 def test_observability_coverage_marks_sglang_and_lmcache_mp() -> None:
     report = build_observability_coverage_report(
         engine_text="""

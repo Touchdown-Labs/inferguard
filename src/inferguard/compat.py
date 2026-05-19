@@ -431,8 +431,18 @@ VLLM_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "vllm_prefix_cache", "prompt_tokens_by_source", ("vllm:prompt_tokens_by_source*",)
     ),
     MetricFamilySpec("vllm_prefix_cache", "prompt_tokens_cached", ("vllm:prompt_tokens_cached*",)),
-    MetricFamilySpec("vllm_simple_cpu_offload", "kv_offload_transfer", ("vllm:kv_offload_*",)),
-    MetricFamilySpec("vllm_simple_cpu_offload", "simple_cpu_pool", ("vllm:simple_cpu_offload_*",)),
+    MetricFamilySpec(
+        "vllm_simple_cpu_offload",
+        "kv_offload_transfer",
+        ("vllm:kv_offload_*",),
+        required_when="optional",
+    ),
+    MetricFamilySpec(
+        "vllm_simple_cpu_offload",
+        "simple_cpu_pool",
+        ("vllm:simple_cpu_offload_*",),
+        required_when="optional",
+    ),
 )
 
 COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = LMCACHE_COMPAT_REGISTRY + VLLM_COMPAT_REGISTRY
@@ -697,6 +707,8 @@ def _family_row(
         mp_metrics_disabled=mp_metrics_disabled,
         cacheblend_observed=cacheblend_observed,
     )
+    if spec.required_when == "optional" and not matched_names:
+        applicable = False
     status = "missing"
     if not applicable:
         status = "not_applicable"
@@ -730,18 +742,36 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 "zero": 0,
                 "missing": 0,
                 "not_applicable": 0,
+                "required_family_count": 0,
+                "required_populated": 0,
+                "required_zero": 0,
+                "required_missing": 0,
                 "status": "missing",
             },
         )
         row["family_count"] += 1
         row[str(family["status"])] += 1
+        if (
+            family.get("applicable")
+            and family.get("required_when") != "optional"
+            and family.get("status") != "not_applicable"
+        ):
+            row["required_family_count"] += 1
+            row[f"required_{family['status']}"] += 1
     for row in rows.values():
-        applicable_count = row["family_count"] - row["not_applicable"]
-        if applicable_count == 0:
-            row["status"] = "not_applicable"
-        elif row["populated"]:
-            row["status"] = "partial" if row["missing"] or row["zero"] else "complete"
-        elif row["zero"]:
+        applicable_required = row["required_family_count"]
+        if applicable_required == 0:
+            if row["populated"]:
+                row["status"] = "complete"
+            elif row["zero"]:
+                row["status"] = "zero"
+            else:
+                row["status"] = "not_applicable"
+        elif row["required_populated"]:
+            row["status"] = (
+                "partial" if row["required_missing"] or row["required_zero"] else "complete"
+            )
+        elif row["required_zero"]:
             row["status"] = "zero"
     return rows
 
@@ -803,7 +833,7 @@ def _evidence_family_row(
         "family": family,
         "patterns": (),
         "required_when": "optional",
-        "applicable": True,
+        "applicable": evidence is not None,
         "status": status,
         "support_level": _support_level(status),
         "series_count": count,

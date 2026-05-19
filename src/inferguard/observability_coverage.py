@@ -235,7 +235,9 @@ def build_observability_coverage_report(
         },
         "observed": {
             "total_series": len(observed_names),
-            "populated_nonzero_series": len({sample.name for sample in samples if sample.value != 0.0}),
+            "populated_nonzero_series": len(
+                {sample.name for sample in samples if sample.value != 0.0}
+            ),
         },
         "kv_cache_offload": kv_cache_offload,
         "surfaces": surfaces,
@@ -340,6 +342,8 @@ def _family_row(
         cpu_offload_configured=cpu_offload_configured,
         disaggregated_or_external_cache=disaggregated_or_external_cache,
     )
+    if family.required_when in {"optional", "sampled"} and not names:
+        applicable = False
     status = "missing"
     if not applicable:
         status = "not_applicable"
@@ -372,7 +376,7 @@ def _is_applicable(
     if family.required_when == "cpu_offload_configured":
         return cpu_offload_configured
     if family.required_when == "disaggregated_or_external_cache":
-        return disaggregated_or_external_cache or external_cache_configured
+        return disaggregated_or_external_cache
     return True
 
 
@@ -387,19 +391,37 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 "zero": 0,
                 "missing": 0,
                 "not_applicable": 0,
+                "required_family_count": 0,
+                "required_populated": 0,
+                "required_zero": 0,
+                "required_missing": 0,
                 "status": "missing",
             },
         )
         row["family_count"] += 1
         row[str(family["status"])] += 1
+        if (
+            family.get("applicable")
+            and family.get("required_when") != "optional"
+            and family.get("status") != "not_applicable"
+        ):
+            row["required_family_count"] += 1
+            row[f"required_{family['status']}"] += 1
     for row in rows.values():
-        applicable = row["family_count"] - row["not_applicable"]
-        if applicable == 0:
-            row["status"] = "not_applicable"
-        elif row["missing"]:
-            row["status"] = "partial" if row["populated"] or row["zero"] else "missing"
-        elif row["zero"]:
-            row["status"] = "zero" if not row["populated"] else "partial"
+        applicable_required = row["required_family_count"]
+        if applicable_required == 0:
+            if row["populated"]:
+                row["status"] = "complete"
+            elif row["zero"]:
+                row["status"] = "zero"
+            else:
+                row["status"] = "not_applicable"
+        elif row["required_missing"]:
+            row["status"] = (
+                "partial" if row["required_populated"] or row["required_zero"] else "missing"
+            )
+        elif row["required_zero"]:
+            row["status"] = "zero" if not row["required_populated"] else "partial"
         else:
             row["status"] = "complete"
     return rows
@@ -408,10 +430,18 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 def _kv_cache_offload_report(samples: list[Any]) -> dict[str, Any]:
     """Summarize CPU<->GPU KV movement separately from generic cache coverage."""
 
-    vllm_gpu_to_cpu_bytes = _sum_labeled(samples, "vllm:kv_offload_total_bytes", "transfer_type", "GPU_to_CPU")
-    vllm_cpu_to_gpu_bytes = _sum_labeled(samples, "vllm:kv_offload_total_bytes", "transfer_type", "CPU_to_GPU")
-    vllm_gpu_to_cpu_time = _sum_labeled(samples, "vllm:kv_offload_total_time", "transfer_type", "GPU_to_CPU")
-    vllm_cpu_to_gpu_time = _sum_labeled(samples, "vllm:kv_offload_total_time", "transfer_type", "CPU_to_GPU")
+    vllm_gpu_to_cpu_bytes = _sum_labeled(
+        samples, "vllm:kv_offload_total_bytes", "transfer_type", "GPU_to_CPU"
+    )
+    vllm_cpu_to_gpu_bytes = _sum_labeled(
+        samples, "vllm:kv_offload_total_bytes", "transfer_type", "CPU_to_GPU"
+    )
+    vllm_gpu_to_cpu_time = _sum_labeled(
+        samples, "vllm:kv_offload_total_time", "transfer_type", "GPU_to_CPU"
+    )
+    vllm_cpu_to_gpu_time = _sum_labeled(
+        samples, "vllm:kv_offload_total_time", "transfer_type", "CPU_to_GPU"
+    )
     vllm_gpu_to_cpu_bytes += _sum_names(samples, "vllm:kv_offload_bytes_gpu_to_cpu")
     vllm_cpu_to_gpu_bytes += _sum_names(samples, "vllm:kv_offload_bytes_cpu_to_gpu")
     vllm_gpu_to_cpu_time += _sum_names(samples, "vllm:kv_offload_time_gpu_to_cpu")
@@ -419,11 +449,16 @@ def _kv_cache_offload_report(samples: list[Any]) -> dict[str, Any]:
 
     lmcache_store_gbs = _hist_avg(samples, "lmcache_mp_l0_l1_store_throughput_gbs")
     lmcache_load_gbs = _hist_avg(samples, "lmcache_mp_l0_l1_load_throughput_gbs")
-    lmcache_store_gbs = lmcache_store_gbs or _hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
-    lmcache_load_gbs = lmcache_load_gbs or _hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
+    lmcache_store_gbs = lmcache_store_gbs or _hist_avg(
+        samples, "lmcache_mp.l0_l1_store_throughput_gbs"
+    )
+    lmcache_load_gbs = lmcache_load_gbs or _hist_avg(
+        samples, "lmcache_mp.l0_l1_load_throughput_gbs"
+    )
 
     native_present = any(
-        sample.name.startswith(("vllm:kv_offload_", "vllm:simple_cpu_offload_")) for sample in samples
+        sample.name.startswith(("vllm:kv_offload_", "vllm:simple_cpu_offload_"))
+        for sample in samples
     )
     lmcache_present = any(
         sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples
@@ -441,14 +476,24 @@ def _kv_cache_offload_report(samples: list[Any]) -> dict[str, Any]:
             "cpu_to_gpu_bytes": vllm_cpu_to_gpu_bytes,
             "gpu_to_cpu_seconds": vllm_gpu_to_cpu_time,
             "cpu_to_gpu_seconds": vllm_cpu_to_gpu_time,
-            "simple_cpu_offload_used_blocks": _max_names(samples, "vllm:simple_cpu_offload_used_blocks"),
-            "simple_cpu_offload_usage_perc": _max_names(samples, "vllm:simple_cpu_offload_usage_perc"),
-            "simple_cpu_offload_pending_loads": _max_names(samples, "vllm:simple_cpu_offload_pending_loads"),
-            "simple_cpu_offload_pending_stores": _max_names(samples, "vllm:simple_cpu_offload_pending_stores"),
+            "simple_cpu_offload_used_blocks": _max_names(
+                samples, "vllm:simple_cpu_offload_used_blocks"
+            ),
+            "simple_cpu_offload_usage_perc": _max_names(
+                samples, "vllm:simple_cpu_offload_usage_perc"
+            ),
+            "simple_cpu_offload_pending_loads": _max_names(
+                samples, "vllm:simple_cpu_offload_pending_loads"
+            ),
+            "simple_cpu_offload_pending_stores": _max_names(
+                samples, "vllm:simple_cpu_offload_pending_stores"
+            ),
         },
         "lmcache_mp_l0_l1_kv_transfer": {
             "status": "populated"
-            if any(value is not None and value > 0 for value in (lmcache_store_gbs, lmcache_load_gbs))
+            if any(
+                value is not None and value > 0 for value in (lmcache_store_gbs, lmcache_load_gbs)
+            )
             else ("zero" if lmcache_present else "missing"),
             "metric_source": "standalone LMCache MP /metrics",
             "interpretation": "LMCache MP GPU<->CPU KV transfer throughput; this is the offload lane that proves LMCache moved KV between L0 GPU blocks and L1 CPU memory.",
@@ -459,7 +504,11 @@ def _kv_cache_offload_report(samples: list[Any]) -> dict[str, Any]:
 
 
 def _sum_labeled(samples: list[Any], name: str, label: str, value: str) -> float:
-    return sum(sample.value for sample in samples if sample.name == name and sample.labels.get(label) == value)
+    return sum(
+        sample.value
+        for sample in samples
+        if sample.name == name and sample.labels.get(label) == value
+    )
 
 
 def _sum_names(samples: list[Any], *names: str) -> float:
@@ -485,7 +534,7 @@ def _coverage_gaps(
 ) -> list[dict[str, Any]]:
     gaps: list[dict[str, Any]] = []
     for family in engine_families:
-        if family["applicable"] and family["status"] in {"missing", "zero"}:
+        if _is_missing_required_gap(family):
             gaps.append(
                 {
                     "surface": family["surface"],
@@ -495,7 +544,7 @@ def _coverage_gaps(
                 }
             )
     for family in lmcache_report.get("families", []):
-        if family.get("applicable") and family.get("status") in {"missing", "zero"}:
+        if _is_missing_required_gap(family):
             gaps.append(
                 {
                     "surface": family.get("surface"),
@@ -505,6 +554,14 @@ def _coverage_gaps(
                 }
             )
     return gaps
+
+
+def _is_missing_required_gap(family: dict[str, Any]) -> bool:
+    if not family.get("applicable"):
+        return False
+    if family.get("required_when") == "optional":
+        return False
+    return family.get("status") in {"missing", "zero"}
 
 
 def _detected_engines(observed_names: set[str]) -> list[str]:
