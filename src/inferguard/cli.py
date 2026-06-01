@@ -295,7 +295,8 @@ def serve(
         raise typer.Exit(1) from exc
 
     mcp = create_mcp_server()
-    console.print(f"[green]Starting InferGuard MCP server ({transport})...[/green]")
+    err_console = Console(stderr=True)
+    err_console.print(f"[green]Starting InferGuard MCP server ({transport})...[/green]")
     if transport == "stdio":
         mcp.run(transport="stdio")
         return
