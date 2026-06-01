@@ -41,6 +41,27 @@ def create_mcp_server() -> FastMCP:
             await agent.shutdown()
 
     @mcp.tool()
+    async def tool_inferguard_investigate_rlm(endpoint: str = "", model: str = "") -> dict[str, Any]:
+        """Perform a proactive RLM-decomposed investigation on the target endpoint and return advisories."""
+        if endpoint:
+            os.environ["TARGET_ENDPOINT"] = endpoint
+        config = InferGuardConfig.from_env()
+        agent = InferGuardAgent(config, model_name=model or os.environ.get("INFERGUARD_MODEL_NAME", ""))
+        try:
+            # We first run a scan/gather to capture metric snapshots
+            await agent.run_once()
+            # Defer to RLM brain proactive cycle
+            advisories = await agent.proactive_cycle()
+            return {
+                "status": "success",
+                "advisories": [a.as_dict() for a in advisories],
+                "endpoint": config.target_endpoint,
+                "model": agent.model_name
+            }
+        finally:
+            await agent.shutdown()
+
+    @mcp.tool()
     async def tool_inferguard_recall(query: str) -> list[dict[str, Any]]:
         """Search similar incidents from vector memory."""
         config = InferGuardConfig.from_env()

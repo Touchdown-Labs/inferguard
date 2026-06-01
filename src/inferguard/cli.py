@@ -221,6 +221,59 @@ def recall(
 
 
 @app.command()
+def rlm(
+    endpoint: str = typer.Argument(help="Inference endpoint URL to investigate."),
+    model: str = typer.Option("", help="Optional model name hint."),
+) -> None:
+    """Run one proactive RLM investigation cycle and display advisories."""
+    config = _load_runtime_config(endpoint)
+    from inferguard.agent import InferGuardAgent
+
+    async def _rlm() -> dict[str, Any]:
+        agent = InferGuardAgent(config, model_name=model)
+        try:
+            # We first scrape to capture metrics
+            await agent.run_once()
+            # Then perform the proactive RLM cycle
+            advisories = await agent.proactive_cycle()
+            return {
+                "status": "success",
+                "advisories": [a.as_dict() for a in advisories],
+                "model_name": agent.model_name
+            }
+        except Exception as exc:
+            return {"status": "error", "error": str(exc)}
+        finally:
+            await agent.shutdown()
+
+    report = asyncio.run(_rlm())
+    status = report.get("status", "unknown")
+    if status == "success":
+        console.print("[green]RLM Active Investigation completed successfully.[/green]")
+        advisories = report.get("advisories", [])
+        if not advisories:
+            console.print("[yellow]No proactive advisories generated.[/yellow]")
+            return
+
+        for adv in advisories:
+            console.print(Panel(
+                f"[bold cyan]Advisory Type:</bold cyan] {adv['advisory_type']}\n"
+                f"[bold cyan]Confidence:</bold cyan] {adv['confidence']:.0%}\n"
+                f"[bold cyan]Horizon:</bold cyan] {adv['horizon_seconds']}s\n"
+                f"[bold cyan]Reason:</bold cyan] {adv['reason']}\n"
+                f"[bold cyan]Evidence:</bold cyan]\n" + "\n".join(f"  - {e}" for e in adv['evidence']) + "\n\n"
+                f"[bold magenta]Recommended Actions:</bold magenta]\n" + 
+                "\n".join(f"  - {act['action_type']}: {act.get('parameters', {})}" for act in adv['recommended_safe_actions']),
+                title="InferGuard Proactive RLM Advisory",
+                border_style="cyan"
+            ))
+        return
+
+    console.print(f"[red]Error:[/red] {report.get('error', 'unknown')}")
+    raise typer.Exit(1)
+
+
+@app.command()
 def serve(
     endpoint: str = typer.Argument(help="Inference endpoint URL to monitor."),
     model: str = typer.Option("", help="Optional model name hint."),
