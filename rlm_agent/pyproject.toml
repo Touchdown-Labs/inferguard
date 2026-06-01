@@ -1,0 +1,18 @@
+[project]
+name = "inferguard-rlm-agent"
+version = "0.1.0"
+description = "InferGuard v6 L3 production-ready RLM agent brain"
+requires-python = ">=3.11"
+dependencies = [
+  "rlm",
+  "daytona-sdk",
+  "httpx",
+  "structlog",
+  "fastapi",
+  "uvicorn",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+

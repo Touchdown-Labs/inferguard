@@ -1,0 +1,25 @@
+name = "inferguard"
+workspace = "touchdown-labs"
+type = "agent"
+entrypoint = "serve:app"
+
+agents = []
+functions = []
+models = []
+
+[env]
+TARGET_ENDPOINT = "@target_endpoint"
+UPSTASH_REDIS_URL = "@upstash_redis_url"
+UPSTASH_REDIS_TOKEN = "@upstash_redis_token"
+UPSTASH_VECTOR_URL = "@upstash_vector_url"
+UPSTASH_VECTOR_TOKEN = "@upstash_vector_token"
+GMI_API_KEY = "@gmi_api_key"
+GMI_BASE_URL = "@gmi_base_url"
+GMI_MODEL = "@gmi_model"
+KV_ALERT_THRESHOLD = "0.85"
+TTFT_ALERT_MULTIPLIER = "2.0"
+POLL_INTERVAL_SECONDS = "30"
+
+[runtime]
+generation = "mk3"
+memory = 4096
