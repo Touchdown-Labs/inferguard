@@ -257,12 +257,12 @@ def rlm(
 
         for adv in advisories:
             console.print(Panel(
-                f"[bold cyan]Advisory Type:</bold cyan] {adv['advisory_type']}\n"
-                f"[bold cyan]Confidence:</bold cyan] {adv['confidence']:.0%}\n"
-                f"[bold cyan]Horizon:</bold cyan] {adv['horizon_seconds']}s\n"
-                f"[bold cyan]Reason:</bold cyan] {adv['reason']}\n"
-                f"[bold cyan]Evidence:</bold cyan]\n" + "\n".join(f"  - {e}" for e in adv['evidence']) + "\n\n"
-                f"[bold magenta]Recommended Actions:</bold magenta]\n" + 
+                f"[bold cyan]Advisory Type:[/bold cyan] {adv['advisory_type']}\n"
+                f"[bold cyan]Confidence:[/bold cyan] {adv['confidence']:.0%}\n"
+                f"[bold cyan]Horizon:[/bold cyan] {adv['horizon_seconds']}s\n"
+                f"[bold cyan]Reason:[/bold cyan] {adv['reason']}\n"
+                f"[bold cyan]Evidence:[/bold cyan]\n" + "\n".join(f"  - {e}" for e in adv['evidence']) + "\n\n"
+                f"[bold magenta]Recommended Actions:[/bold magenta]\n" + 
                 "\n".join(f"  - {act['action_type']}: {act.get('parameters', {})}" for act in adv['recommended_safe_actions']),
                 title="InferGuard Proactive RLM Advisory",
                 border_style="cyan"
