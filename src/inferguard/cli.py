@@ -288,7 +288,8 @@ def serve(
     try:
         from inferguard.mcp_server import create_mcp_server
     except ImportError as exc:
-        console.print(
+        err_console = Console(stderr=True)
+        err_console.print(
             "[red]MCP support is not installed.[/red] Install with "
             "[bold]pip install '.[mcp]'[/bold] and try again."
         )
