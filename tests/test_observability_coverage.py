@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from inferguard.cli import app
-from inferguard.observability_coverage import build_observability_coverage_report
+from inferguard.observability_coverage import (
+    build_observability_coverage_report,
+    read_cacheblend_boundary_evidence_jsonl,
+)
+from typer.testing import CliRunner
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LMCACHE_FIXTURES = FIXTURES / "lmcache_metrics"
@@ -53,6 +55,103 @@ vllm:kv_transfer_sent_bytes_total 123
     assert report["surfaces"]["sglang"]["status"] == "not_applicable"
 
 
+def test_observability_coverage_external_prefix_cache_does_not_require_vllm_kv_transfer() -> None:
+    report = build_observability_coverage_report(
+        engine_text="""
+vllm:time_to_first_token_seconds_count 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 10
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5
+vllm:prefix_cache_queries_total 10
+vllm:prefix_cache_hits_total 8
+vllm:external_prefix_cache_queries_total 4
+vllm:external_prefix_cache_hits_total 2
+vllm:prompt_tokens_by_source_total{source="external_kv_transfer"} 20
+""",
+        expected_engine="vllm",
+        external_cache_configured=True,
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("vllm", "kv_transfer")]["status"] == "not_applicable"
+    assert not any(
+        gap["surface"] == "vllm" and gap["family"] == "kv_transfer"
+        for gap in report["coverage_gaps"]
+    )
+
+
+def test_observability_coverage_optional_absent_families_are_not_gaps() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_lookup_requested_tokens_total 100
+lmcache_mp_lookup_hit_tokens_total 80
+lmcache_mp_l1_chunk_lifetime_seconds_count 1
+lmcache_mp_l0_block_allocated_blocks_total 48
+lmcache_mp_l0_l1_store_throughput_gbs_count 1
+lmcache_mp_real_reuse_gap_seconds_count 1
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    gap_keys = {(gap["surface"], gap["family"]) for gap in report["coverage_gaps"]}
+    assert ("lmcache_mp", "l2_failures") not in gap_keys
+    assert ("lmcache_mp", "engine_counters") not in gap_keys
+    assert ("lmcache_mp", "gauges") not in gap_keys
+    assert ("lmcache_mp", "event_bus") not in gap_keys
+    assert ("vllm_simple_cpu_offload", "kv_offload_transfer") not in gap_keys
+    assert ("vllm_simple_cpu_offload", "simple_cpu_pool") not in gap_keys
+
+
+def test_observability_coverage_optional_zero_families_do_not_prevent_surface_completion() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_memory_usage_bytes 1024
+lmcache_mp_lookup_requested_tokens_total 100
+lmcache_mp_lookup_hit_tokens_total 80
+lmcache_mp_l1_chunk_lifetime_seconds_count 1
+lmcache_mp_l0_block_allocated_blocks_total 48
+lmcache_mp_l0_l1_store_throughput_gbs_count 1
+lmcache_mp_real_reuse_gap_seconds_count 1
+lmcache_mp_active_prefetch_jobs 0
+lmcache_mp_event_bus_queue_depth 0
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    assert report["surfaces"]["lmcache_mp"]["status"] == "complete"
+    assert report["surfaces"]["lmcache_otel"]["status"] == "not_applicable"
+
+
+def test_observability_coverage_sampled_vllm_block_lifecycle_is_not_required_without_vllm_samples() -> (
+    None
+):
+    report = build_observability_coverage_report(
+        engine_text="""
+vllm:time_to_first_token_seconds_count 1
+vllm:prompt_tokens_total 100
+vllm:generation_tokens_total 10
+vllm:num_requests_running 1
+vllm:kv_cache_usage_perc 0.5
+vllm:prefix_cache_queries_total 10
+vllm:prefix_cache_hits_total 8
+""",
+        expected_engine="vllm",
+    )
+
+    families = {(row["surface"], row["family"]): row for row in report["families"]}
+    assert families[("vllm", "kv_block_lifecycle")]["status"] == "not_applicable"
+    assert not any(
+        gap["surface"] == "vllm" and gap["family"] == "kv_block_lifecycle"
+        for gap in report["coverage_gaps"]
+    )
+
+
 def test_observability_coverage_marks_sglang_and_lmcache_mp() -> None:
     report = build_observability_coverage_report(
         engine_text="""
@@ -77,7 +176,9 @@ lmcache_mp_lookup_hit_tokens_total 50
 
     assert report["detected_engines"] == ["sglang"]
     assert report["detected_lmcache_mode"] == "mp"
-    assert report["lmcache_compat"]["detected_architecture"]["label"] == "sglang_mp_lmcache_candidate"
+    assert (
+        report["lmcache_compat"]["detected_architecture"]["label"] == "sglang_mp_lmcache_candidate"
+    )
     assert report["surfaces"]["sglang"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["lmcache_mp"]["status"] in {"complete", "partial"}
     assert report["surfaces"]["vllm"]["status"] == "not_applicable"
@@ -339,7 +440,11 @@ def test_observability_coverage_includes_lmcache_non_prometheus_evidence() -> No
         lmcache_http_evidence={"booleans": {"is_healthy": True}, "endpoints": {"health": {}}},
         lmcache_log_evidence={"line_count": 2, "event_counts": {"store": 1}},
         lmcache_trace_evidence={"present": True, "claim_status": "measured", "record_count": 2},
-        lmcache_otel_evidence={"present": True, "claim_status": "measured", "lmcache_span_count": 3},
+        lmcache_otel_evidence={
+            "present": True,
+            "claim_status": "measured",
+            "lmcache_span_count": 3,
+        },
         lmcache_trace_replay_evidence={"present": True, "claim_status": "measured", "row_count": 1},
         lmcache_lookup_hash_evidence={"present": True, "claim_status": "measured", "row_count": 1},
     )
@@ -359,7 +464,9 @@ def test_lmcache_compat_cli_accepts_evidence_files(tmp_path: Path) -> None:
     otel = tmp_path / "otel.json"
     trace_replay = tmp_path / "trace_replay.json"
     lookup_hash = tmp_path / "lookup_hash.json"
-    http.write_text('{"booleans": {"is_healthy": true}, "endpoints": {"health": {}}}', encoding="utf-8")
+    http.write_text(
+        '{"booleans": {"is_healthy": true}, "endpoints": {"health": {}}}', encoding="utf-8"
+    )
     log.write_text('{"line_count": 1, "event_counts": {"store": 1}}', encoding="utf-8")
     trace.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
     otel.write_text('{"present": true, "claim_status": "measured"}', encoding="utf-8")
@@ -447,8 +554,12 @@ def test_observability_coverage_cli_accepts_new_lmcache_evidence_files(tmp_path:
     trace_replay = tmp_path / "trace_replay.json"
     lookup_hash = tmp_path / "lookup_hash.json"
     log.write_text('{"line_count": 1, "event_counts": {"retrieve": 1}}', encoding="utf-8")
-    trace_replay.write_text('{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8")
-    lookup_hash.write_text('{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8")
+    trace_replay.write_text(
+        '{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8"
+    )
+    lookup_hash.write_text(
+        '{"present": true, "claim_status": "measured", "row_count": 1}', encoding="utf-8"
+    )
 
     result = CliRunner().invoke(
         app,
@@ -537,8 +648,66 @@ lmcache_blend_chunks_evicted_total 2
     assert families[("lmcache_cacheblend", "failure")]["status"] == "populated"
     assert families[("lmcache_cacheblend", "no_gpu_context")]["status"] == "populated"
     assert families[("lmcache_cacheblend", "stale")]["status"] == "populated"
-    assert any(item["code"] == "lmcache_cacheblend_failures" for item in compat["diagnostic_findings"])
+    assert any(
+        item["code"] == "lmcache_cacheblend_failures" for item in compat["diagnostic_findings"]
+    )
     assert not any(gap["surface"] == "lmcache_cacheblend" for gap in report["coverage_gaps"])
+
+
+def test_lmcache_cacheblend_l0_gpu_lifecycle_is_fixture_backed_not_live_validated() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_blend_l0_gpu_operation_duration_seconds_sum{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 1.2
+lmcache_blend_l0_gpu_operation_duration_seconds_count{operation="store_pre_computed",direction="gpu_to_gpu",instance_id="worker-0"} 3
+lmcache_blend_l0_gpu_transfer_chunks_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 7
+lmcache_blend_l0_gpu_transfer_tokens_total{operation="retrieve_pre_computed",direction="gpu_to_cpu",instance_id="worker-0"} 700
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    families = {
+        (row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]
+    }
+    row = families[("lmcache_cacheblend", "l0_gpu_lifecycle")]
+    assert row["status"] == "populated"
+    assert row["support_level"] == "fixture_backed"
+    assert row["support_level"] != "live_validated"
+    assert report["surfaces"]["lmcache_cacheblend"]["status"] == "complete"
+
+
+def test_lmcache_cacheblend_boundary_jsonl_is_sanitized_and_reported() -> None:
+    evidence = read_cacheblend_boundary_evidence_jsonl(
+        Path(__file__).parent / "fixtures" / "lmcache_cacheblend_boundary_evidence.jsonl"
+    )
+
+    assert evidence["present"] is True
+    assert evidence["claim_status"] == "measured"
+    assert evidence["row_count"] == 6
+    assert evidence["event_counts"] == {
+        "store_pre_computed.submitted": 1,
+        "store_pre_computed.start": 1,
+        "retrieve_pre_computed.start": 1,
+        "retrieve_pre_computed.end": 1,
+        "store_final.submitted": 1,
+        "store_final.end": 1,
+    }
+    assert evidence["stages"] == ["retrieve_pre_computed", "store_final", "store_pre_computed"]
+    encoded = json.dumps(evidence)
+    for forbidden in [
+        "token_ids",
+        "block_ids",
+        "hashes",
+        "object_keys",
+        "tok-raw",
+        "block-raw",
+        "hash-raw",
+        "s3://raw-key",
+    ]:
+        assert forbidden not in encoded
+
+    report = build_observability_coverage_report(lmcache_cacheblend_boundary_evidence=evidence)
+    assert report["surfaces"]["lmcache_cacheblend_boundary"]["status"] == "complete"
+    assert report["lmcache_compat"]["lmcache_cacheblend_boundary_evidence"] == evidence
 
 
 def test_lmcache_cacheblend_surface_is_optional_when_absent() -> None:
@@ -568,7 +737,9 @@ lmcache:chunk_statistics_chunks 6
         expect_lmcache_mode="embedded",
     )
 
-    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    families = {
+        (row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]
+    }
     assert report["detected_lmcache_mode"] == "embedded"
     assert families[("lmcache_embedded", "production_health")]["status"] == "populated"
     assert families[("lmcache_embedded", "production_failures")]["status"] == "populated"
@@ -582,7 +753,9 @@ def test_lmcache_production_metrics_reference_families_are_reported() -> None:
         expect_lmcache_mode="embedded",
     )
 
-    families = {(row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]}
+    families = {
+        (row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]
+    }
     expected_populated = {
         "production_requests",
         "production_tokens",
@@ -779,6 +952,33 @@ lmcache_mp_l0_l1_load_throughput_gbs_count 2
     )
 
 
+def test_lmcache_mp_l0_lifecycle_populated_when_block_counter_metrics_present() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 1
+lmcache_mp_l1_write_keys_total 1
+lmcache_mp_l1_chunk_lifetime_seconds_count 2
+lmcache_mp_l0_block_allocated_blocks_total 48
+lmcache_mp_l0_block_allocation_records_total 12
+lmcache_mp_l0_l1_store_throughput_gbs_count 2
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    compat = report["lmcache_compat"]
+    families = {(row["surface"], row["family"]): row for row in compat["families"]}
+    assert families[("lmcache_mp", "l0_lifecycle")]["status"] == "populated"
+    assert (
+        "lmcache_mp_l0_block_allocated_blocks_total"
+        in families[("lmcache_mp", "l0_lifecycle")]["matched_metrics"]
+    )
+    assert not any(
+        gap["surface"] == "lmcache_mp" and gap["family"] == "l0_lifecycle"
+        for gap in report["coverage_gaps"]
+    )
+
+
 def test_lmcache_mp_l0_lifecycle_missing_emits_gap_and_diagnostic() -> None:
     report = build_observability_coverage_report(
         lmcache_text="""
@@ -863,3 +1063,81 @@ def test_lmcache_compat_promotes_parser_only_p2p_pd_log_findings() -> None:
     assert by_code["lmcache_log_p2p_transfer_failure"]["evidence_status"] == "parser_only"
     assert by_code["lmcache_log_pd_role_mismatch"]["evidence_status"] == "parser_only"
     assert report["surfaces"]["lmcache_logs"]["status"] == "complete"
+
+
+def test_lmcache_embedded_backend_families_zero_when_series_are_all_zero() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 0
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 0
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {
+        (row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]
+    }
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert (
+        families[("lmcache_embedded", "production_remote_backend_network")]["support_level"]
+        == "parser_only"
+    )
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "zero"
+
+
+def test_lmcache_embedded_backend_surface_partial_with_populated_and_zero_backends() -> None:
+    report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache:num_retrieve_requests_total 1
+lmcache:remote_ping_latency_seconds_count 0
+lmcache:local_cpu_memory_usage_bytes 1024
+lmcache:p2p_transfer_bytes_total 0
+""",
+        expect_lmcache_mode="embedded",
+    )
+
+    families = {
+        (row["surface"], row["family"]): row for row in report["lmcache_compat"]["families"]
+    }
+    assert families[("lmcache_embedded", "production_requests")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_remote_backend_network")]["status"] == "zero"
+    assert families[("lmcache_embedded", "production_local_cpu_backend")]["status"] == "populated"
+    assert families[("lmcache_embedded", "production_p2p")]["status"] == "zero"
+    assert report["surfaces"]["lmcache_embedded"]["status"] == "partial"
+
+
+def test_lmcache_mp_backend_coverage_zero_and_partial_surfaces() -> None:
+    zero_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 0
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 0
+""",
+        expect_lmcache_mode="mp",
+    )
+    partial_report = build_observability_coverage_report(
+        lmcache_text="""
+lmcache_mp_sm_read_requests_total 1
+lmcache_mp_l1_read_keys_total 0
+lmcache_mp_l1_memory_usage_bytes 2048
+""",
+        expect_lmcache_mode="mp",
+    )
+
+    zero_families = {
+        (row["surface"], row["family"]): row for row in zero_report["lmcache_compat"]["families"]
+    }
+    partial_families = {
+        (row["surface"], row["family"]): row for row in partial_report["lmcache_compat"]["families"]
+    }
+    assert zero_families[("lmcache_mp", "storage_manager")]["status"] == "zero"
+    assert zero_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert zero_report["surfaces"]["lmcache_mp"]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "storage_manager")]["status"] == "populated"
+    assert partial_families[("lmcache_mp", "l1_counters")]["status"] == "zero"
+    assert partial_families[("lmcache_mp", "l1_memory")]["status"] == "populated"
+    assert partial_report["surfaces"]["lmcache_mp"]["status"] == "partial"

@@ -178,8 +178,13 @@ class LmcacheMetrics:
     lmcache_blend_lookup_requests: int | None = None
     lmcache_blend_lookup_fingerprint_hits: int | None = None
     lmcache_blend_lookup_storage_hits: int | None = None
+    lmcache_blend_lookup_requested_tokens: int | None = None
+    lmcache_blend_lookup_hit_tokens: int | None = None
     lmcache_blend_lookup_stale_chunks: int | None = None
     lmcache_blend_lookup_no_gpu_context_errors: int | None = None
+    lmcache_blend_l0_gpu_operation_duration_seconds: float | None = None
+    lmcache_blend_l0_gpu_transfer_chunks: int | None = None
+    lmcache_blend_l0_gpu_transfer_tokens: int | None = None
     lmcache_blend_retrieve_requests: int | None = None
     lmcache_blend_retrieve_chunks: int | None = None
     lmcache_blend_retrieve_failures: int | None = None
@@ -984,6 +989,14 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
         {"name": "lmcache_blend_lookup_storage_hits_total", "type": "int", "aggregate": "sum"},
         {"name": "lmcache_blend_lookup_storage_hits", "type": "int", "aggregate": "sum"},
     ),
+    "lmcache_blend_lookup_requested_tokens": (
+        {"name": "lmcache_blend_lookup_requested_tokens_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_requested_tokens", "type": "int", "aggregate": "sum"},
+    ),
+    "lmcache_blend_lookup_hit_tokens": (
+        {"name": "lmcache_blend_lookup_hit_tokens_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_lookup_hit_tokens", "type": "int", "aggregate": "sum"},
+    ),
     "lmcache_blend_lookup_stale_chunks": (
         {"name": "lmcache_blend_lookup_stale_chunks_total", "type": "int", "aggregate": "sum"},
         {"name": "lmcache_blend_lookup_stale_chunks", "type": "int", "aggregate": "sum"},
@@ -991,6 +1004,17 @@ _ALIAS_TABLE: dict[str, tuple[dict[str, Any], ...]] = {
     "lmcache_blend_lookup_no_gpu_context_errors": (
         {"name": "lmcache_blend_lookup_no_gpu_context_errors_total", "type": "int", "aggregate": "sum"},
         {"name": "lmcache_blend_lookup_no_gpu_context_errors", "type": "int", "aggregate": "sum"},
+    ),
+    "lmcache_blend_l0_gpu_operation_duration_seconds": (
+        {"name": "lmcache_blend_l0_gpu_operation_duration_seconds", "type": "hist_avg"},
+    ),
+    "lmcache_blend_l0_gpu_transfer_chunks": (
+        {"name": "lmcache_blend_l0_gpu_transfer_chunks_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_l0_gpu_transfer_chunks", "type": "int", "aggregate": "sum"},
+    ),
+    "lmcache_blend_l0_gpu_transfer_tokens": (
+        {"name": "lmcache_blend_l0_gpu_transfer_tokens_total", "type": "int", "aggregate": "sum"},
+        {"name": "lmcache_blend_l0_gpu_transfer_tokens", "type": "int", "aggregate": "sum"},
     ),
     "lmcache_blend_retrieve_requests": (
         {"name": "lmcache_blend_retrieve_requests_total", "type": "int", "aggregate": "sum"},
@@ -1115,7 +1139,7 @@ def _hist_avg(samples: list[LabeledSample], base_name: str) -> float | None:
             count += sample.value
     if count <= 0:
         return None
-    return total / count
+    return round(total / count, 12)
 
 
 def _labels_match(sample: LabeledSample, expected: dict[str, str]) -> bool:

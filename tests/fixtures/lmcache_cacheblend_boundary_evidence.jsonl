@@ -1,0 +1,6 @@
+{"stage":"store_pre_computed","event":"submitted","token_ids":["tok-raw-a","tok-raw-b"],"block_ids":["block-raw-a"],"hashes":["hash-raw-a"],"object_keys":["s3://raw-key/a"],"chunk_count":2}
+{"stage":"store_pre_computed","event":"start","token_ids":["tok-raw-c"],"chunk_count":2}
+{"stage":"retrieve_pre_computed","event":"start","block_ids":["block-raw-b"],"chunk_count":1}
+{"stage":"retrieve_pre_computed","event":"end","hashes":["hash-raw-b"],"token_count":32}
+{"stage":"store_final","event":"submitted","object_keys":["s3://raw-key/final"],"chunk_count":3}
+{"stage":"store_final","event":"end","token_ids":["tok-raw-z"],"token_count":64}

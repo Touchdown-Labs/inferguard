@@ -11,21 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from inferguard.collect_metrics.normalize import LMCACHE_LOCKED_METRICS, VLLM_LOCKED_METRICS
+from inferguard.lmcache_cacheblend_boundary import read_cacheblend_boundary_evidence_jsonl
 from inferguard.metrics_core import LabeledSample, parse_labeled_prometheus_text
 
 SCHEMA_VERSION = "inferguard-observability-compat/v1"
-L0_BOUNDARY_SCHEMA_VERSION = "inferguard-l0-block-boundary-event/v1"
-L0_BOUNDARY_FORBIDDEN_FIELDS = (
-    "token_ids",
-    "tokens",
-    "raw_tokens",
-    "raw_token_ids",
-    "block_ids",
-    "raw_block_ids",
-    "gpu_block_ids",
-)
-SGLANG_KV_EVENTS_SCHEMA_VERSION = "inferguard-sglang-kv-events-evidence/v1"
-SGLANG_KV_EVENTS_FORBIDDEN_FIELDS = ("token id lists", "block hash lists", "parent block hash")
 
 
 class ExpectMode(StrEnum):
@@ -50,9 +39,17 @@ class MetricFamilySpec:
 
 LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("lmcache_embedded", "legacy_lookup", ("lmcache:lookup_*", "lmcache_lookup_*")),
-    MetricFamilySpec("lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")),
-    MetricFamilySpec("lmcache_embedded", "production_requests", ("lmcache:num_*_requests*", "lmcache_num_*_requests*")),
-    MetricFamilySpec("lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_retrieve", ("lmcache:retrieve_*", "lmcache_retrieve_*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_requests",
+        ("lmcache:num_*_requests*", "lmcache_num_*_requests*"),
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded", "production_tokens", ("lmcache:num_*tokens*", "lmcache_num_*tokens*")
+    ),
     MetricFamilySpec(
         "lmcache_embedded",
         "production_hit_rate",
@@ -141,13 +138,27 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ),
         required_when="optional",
     ),
-    MetricFamilySpec("lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")),
-    MetricFamilySpec("lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")),
-    MetricFamilySpec("lmcache_embedded", "production_p2p", ("lmcache:*p2p*", "lmcache_*p2p*"), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_local_cpu", ("lmcache:local_cpu_*", "lmcache_local_cpu_*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded", "legacy_tier_usage", ("lmcache:tier_usage*", "lmcache_tier_usage*")
+    ),
+    MetricFamilySpec(
+        "lmcache_embedded",
+        "production_p2p",
+        ("lmcache:*p2p*", "lmcache_*p2p*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_embedded",
         "production_health",
-        ("lmcache:is_healthy", "lmcache:lmcache_is_healthy", "lmcache_is_healthy", "lmcache_lmcache_is_healthy"),
+        (
+            "lmcache:is_healthy",
+            "lmcache:lmcache_is_healthy",
+            "lmcache_is_healthy",
+            "lmcache_lmcache_is_healthy",
+        ),
         required_when="optional",
     ),
     MetricFamilySpec(
@@ -189,7 +200,12 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec(
         "lmcache_embedded",
         "chunk_stats",
-        ("lmcache:*chunk*", "lmcache_*chunk*", "lmcache:chunk_statistics_*", "lmcache_chunk_statistics_*"),
+        (
+            "lmcache:*chunk*",
+            "lmcache_*chunk*",
+            "lmcache:chunk_statistics_*",
+            "lmcache_chunk_statistics_*",
+        ),
         required_when="optional",
     ),
     MetricFamilySpec(
@@ -209,8 +225,14 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lookup_tokens",
         ("lmcache_mp_lookup_*_tokens*", "lmcache_mp.lookup_*_tokens*"),
     ),
-    MetricFamilySpec("lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys*", "lmcache_mp.l1_*_keys*")),
-    MetricFamilySpec("lmcache_mp", "l1_memory", ("lmcache_mp_l1_memory_usage_bytes", "lmcache_mp.l1_memory_usage_bytes")),
+    MetricFamilySpec(
+        "lmcache_mp", "l1_counters", ("lmcache_mp_l1_*_keys*", "lmcache_mp.l1_*_keys*")
+    ),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "l1_memory",
+        ("lmcache_mp_l1_memory_usage_bytes", "lmcache_mp.l1_memory_usage_bytes"),
+    ),
     MetricFamilySpec(
         "lmcache_mp",
         "l1_failures",
@@ -232,22 +254,7 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_mp.l0_block_*_seconds*",
             "lmcache_mp.l0_block_*_total",
         ),
-        required_when="sampled",
-    ),
-    MetricFamilySpec(
-        "lmcache_mp",
-        "l0_allocation_counters",
-        (
-            "lmcache_mp_l0_block_allocation_records",
-            "lmcache_mp_l0_block_allocation_records_total",
-            "lmcache_mp_l0_block_allocated_blocks",
-            "lmcache_mp_l0_block_allocated_blocks_total",
-            "lmcache_mp.l0_block_allocation_records",
-            "lmcache_mp.l0_block_allocation_records_total",
-            "lmcache_mp.l0_block_allocated_blocks",
-            "lmcache_mp.l0_block_allocated_blocks_total",
-        ),
-        required_when="sampled",
+        required_when="always",
     ),
     MetricFamilySpec(
         "lmcache_mp",
@@ -323,14 +330,31 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         ),
         required_when="l2_configured",
     ),
-    MetricFamilySpec("lmcache_mp", "event_bus", ("lmcache_mp_event_bus_*", "lmcache_mp.event_bus.*"), required_when="optional"),
+    MetricFamilySpec(
+        "lmcache_mp",
+        "event_bus",
+        ("lmcache_mp_event_bus_*", "lmcache_mp.event_bus.*"),
+        required_when="optional",
+    ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "lookup",
         (
             "lmcache_blend_lookup_requests*",
+            "lmcache_blend_lookup_requested_tokens*",
+            "lmcache_blend_lookup_hit_tokens*",
             "lmcache_blend_lookup_fingerprint_hits*",
             "lmcache_blend_lookup_storage_hits*",
+        ),
+        required_when="cacheblend_observed",
+    ),
+    MetricFamilySpec(
+        "lmcache_cacheblend",
+        "l0_gpu_lifecycle",
+        (
+            "lmcache_blend_l0_gpu_operation_duration_seconds*",
+            "lmcache_blend_l0_gpu_transfer_chunks*",
+            "lmcache_blend_l0_gpu_transfer_tokens*",
         ),
         required_when="cacheblend_observed",
     ),
@@ -344,25 +368,25 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
         "lmcache_cacheblend",
         "store_pre_computed",
         ("lmcache_blend_store_pre_computed_requests*", "lmcache_blend_store_pre_computed_chunks*"),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "store_final",
         ("lmcache_blend_store_final_requests*", "lmcache_blend_store_final_chunks*"),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "fingerprint",
         ("lmcache_blend_fingerprints_registered*",),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "evict",
         ("lmcache_blend_chunks_evicted*",),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
@@ -372,29 +396,53 @@ LMCACHE_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
             "lmcache_blend_store_pre_computed_failures*",
             "lmcache_blend_store_final_failures*",
         ),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "no_gpu_context",
         ("lmcache_blend_lookup_no_gpu_context_errors*",),
-        required_when="optional",
+        required_when="cacheblend_observed",
     ),
     MetricFamilySpec(
         "lmcache_cacheblend",
         "stale",
         ("lmcache_blend_lookup_stale_chunks*",),
-        required_when="optional",
+        required_when="cacheblend_observed",
+    ),
+    MetricFamilySpec(
+        "lmcache_cacheblend",
+        "serde",
+        (
+            "lmcache_blend_serde_encode_duration_seconds*",
+            "lmcache_blend_serde_decode_duration_seconds*",
+            "lmcache_blend_serde_bytes_in*",
+            "lmcache_blend_serde_bytes_out*",
+            "lmcache_blend_serde_failures*",
+        ),
+        required_when="cacheblend_observed",
     ),
 )
 
 VLLM_COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = (
     MetricFamilySpec("vllm_prefix_cache", "local_prefix", ("vllm:prefix_cache_*",)),
     MetricFamilySpec("vllm_prefix_cache", "external_prefix", ("vllm:external_prefix_cache_*",)),
-    MetricFamilySpec("vllm_prefix_cache", "prompt_tokens_by_source", ("vllm:prompt_tokens_by_source*",)),
+    MetricFamilySpec(
+        "vllm_prefix_cache", "prompt_tokens_by_source", ("vllm:prompt_tokens_by_source*",)
+    ),
     MetricFamilySpec("vllm_prefix_cache", "prompt_tokens_cached", ("vllm:prompt_tokens_cached*",)),
-    MetricFamilySpec("vllm_simple_cpu_offload", "kv_offload_transfer", ("vllm:kv_offload_*",)),
-    MetricFamilySpec("vllm_simple_cpu_offload", "simple_cpu_pool", ("vllm:simple_cpu_offload_*",)),
+    MetricFamilySpec(
+        "vllm_simple_cpu_offload",
+        "kv_offload_transfer",
+        ("vllm:kv_offload_*",),
+        required_when="optional",
+    ),
+    MetricFamilySpec(
+        "vllm_simple_cpu_offload",
+        "simple_cpu_pool",
+        ("vllm:simple_cpu_offload_*",),
+        required_when="optional",
+    ),
 )
 
 COMPAT_REGISTRY: tuple[MetricFamilySpec, ...] = LMCACHE_COMPAT_REGISTRY + VLLM_COMPAT_REGISTRY
@@ -415,13 +463,15 @@ def build_compat_report(
     lmcache_otel_evidence: dict[str, Any] | None = None,
     lmcache_trace_replay_evidence: dict[str, Any] | None = None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None = None,
-    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
+    lmcache_cacheblend_boundary_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a compatibility report for observed vLLM/LMCache metrics."""
 
     samples = _tag_samples(engine_text, "engine") + _tag_samples(lmcache_text, "lmcache")
     observed_names = {sample.name for sample in samples}
-    observed_lmcache_mp = any(name.startswith(("lmcache_mp_", "lmcache_mp.")) for name in observed_names)
+    observed_lmcache_mp = any(
+        name.startswith(("lmcache_mp_", "lmcache_mp.")) for name in observed_names
+    )
     observed_lmcache_cacheblend = any(name.startswith("lmcache_blend_") for name in observed_names)
     observed_lmcache_embedded = any(
         (name.startswith("lmcache:") or name.startswith("lmcache_"))
@@ -429,29 +479,15 @@ def build_compat_report(
         and not name.startswith("lmcache_blend_")
         for name in observed_names
     )
-    observed_lmcache_mp_evidence = _has_measured_mp_evidence(
-        lmcache_http_evidence=lmcache_http_evidence,
-        lmcache_log_evidence=lmcache_log_evidence,
-        lmcache_otel_evidence=lmcache_otel_evidence,
-        lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
-    )
-    observed_lmcache_cacheblend_evidence = _has_measured_cacheblend_evidence(
-        lmcache_otel_evidence=lmcache_otel_evidence,
-    )
-    cacheblend_observed = observed_lmcache_cacheblend or observed_lmcache_cacheblend_evidence
-    mp_metrics_prometheus_unavailable = observed_lmcache_mp_evidence and not observed_lmcache_mp
     detected_mode = _detected_mode(
-        observed_lmcache_mp or observed_lmcache_mp_evidence,
+        observed_lmcache_mp or observed_lmcache_cacheblend,
         observed_lmcache_embedded,
-        cacheblend_observed,
     )
-    mp_launch_evidence = _sglang_lmcache_mp_launch_evidence(samples, mp_observability or {})
     architecture = _architecture_detection(
         samples,
         observed_lmcache_mp=observed_lmcache_mp,
         observed_lmcache_cacheblend=observed_lmcache_cacheblend,
         observed_lmcache_embedded=observed_lmcache_embedded,
-        sglang_lmcache_mp_launch_evidence=mp_launch_evidence,
     )
     mp_observability_report = _mp_observability_report(
         samples,
@@ -464,9 +500,8 @@ def build_compat_report(
             samples,
             detected_mode=detected_mode,
             l2_configured=l2_configured,
-            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled"))
-            or mp_metrics_prometheus_unavailable,
-            cacheblend_observed=cacheblend_observed,
+            mp_metrics_disabled=bool(mp_observability_report["config"].get("metrics_disabled")),
+            cacheblend_observed=observed_lmcache_cacheblend,
         )
         for spec in COMPAT_REGISTRY
     ]
@@ -478,7 +513,7 @@ def build_compat_report(
             lmcache_otel_evidence=lmcache_otel_evidence,
             lmcache_trace_replay_evidence=lmcache_trace_replay_evidence,
             lmcache_lookup_hash_evidence=lmcache_lookup_hash_evidence,
-            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
+            lmcache_cacheblend_boundary_evidence=lmcache_cacheblend_boundary_evidence,
         )
     )
     diagnostic_findings = _diagnostic_findings(
@@ -517,7 +552,6 @@ def build_compat_report(
             lmcache_http_evidence=lmcache_http_evidence,
             lmcache_trace_evidence=lmcache_trace_evidence,
             lmcache_otel_evidence=lmcache_otel_evidence,
-            lmcache_l0_boundary_evidence=lmcache_l0_boundary_evidence,
             mp_observability=mp_observability_report,
         )
     )
@@ -534,11 +568,7 @@ def build_compat_report(
         "upstream_questions": upstream_questions,
         "observed": {
             "lmcache_mp": observed_lmcache_mp,
-            "lmcache_mp_evidence": observed_lmcache_mp_evidence,
-            "lmcache_mp_metrics_prometheus_unavailable": mp_metrics_prometheus_unavailable,
-            "lmcache_cacheblend": cacheblend_observed,
-            "lmcache_cacheblend_metrics": observed_lmcache_cacheblend,
-            "lmcache_cacheblend_evidence": observed_lmcache_cacheblend_evidence,
+            "lmcache_cacheblend": observed_lmcache_cacheblend,
             "lmcache_embedded": observed_lmcache_embedded,
             "vllm": any(name.startswith("vllm:") for name in observed_names),
             "total_series": len(observed_names),
@@ -555,7 +585,7 @@ def build_compat_report(
         "lmcache_otel_evidence": lmcache_otel_evidence,
         "lmcache_trace_replay_evidence": lmcache_trace_replay_evidence,
         "lmcache_lookup_hash_evidence": lmcache_lookup_hash_evidence,
-        "lmcache_l0_boundary_evidence": lmcache_l0_boundary_evidence,
+        "lmcache_cacheblend_boundary_evidence": lmcache_cacheblend_boundary_evidence,
         "surfaces": _surface_rows(families),
         "families": families,
         "locked_metrics": {
@@ -578,7 +608,7 @@ def build_compat_report_from_paths(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
-    lmcache_l0_boundary_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=engine_metrics_file.read_text(encoding="utf-8")
@@ -598,7 +628,9 @@ def build_compat_report_from_paths(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
-        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
     )
 
 
@@ -616,7 +648,7 @@ def build_compat_report_from_urls(
     lmcache_otel_evidence_file: Path | None = None,
     lmcache_trace_replay_evidence_file: Path | None = None,
     lmcache_lookup_hash_evidence_file: Path | None = None,
-    lmcache_l0_boundary_evidence_file: Path | None = None,
+    lmcache_cacheblend_boundary_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     return build_compat_report(
         engine_text=_read_url(engine_metrics_url, timeout_seconds) if engine_metrics_url else "",
@@ -632,7 +664,9 @@ def build_compat_report_from_urls(
         lmcache_otel_evidence=_read_json_object(lmcache_otel_evidence_file),
         lmcache_trace_replay_evidence=_read_json_object(lmcache_trace_replay_evidence_file),
         lmcache_lookup_hash_evidence=_read_json_object(lmcache_lookup_hash_evidence_file),
-        lmcache_l0_boundary_evidence=_read_l0_boundary_evidence(lmcache_l0_boundary_evidence_file),
+        lmcache_cacheblend_boundary_evidence=read_cacheblend_boundary_evidence_jsonl(
+            lmcache_cacheblend_boundary_evidence_file
+        ),
     )
 
 
@@ -673,17 +707,23 @@ def _family_row(
         mp_metrics_disabled=mp_metrics_disabled,
         cacheblend_observed=cacheblend_observed,
     )
+    if spec.required_when == "optional" and not matched_names:
+        applicable = False
     status = "missing"
     if not applicable:
+        status = "not_applicable"
+    elif spec.surface == "lmcache_cacheblend" and not matched_names:
         status = "not_applicable"
     elif matched_names and nonzero_names:
         status = "populated"
     elif matched_names:
         status = "zero"
+    support_level = _support_level(status)
     return {
         **asdict(spec),
         "applicable": applicable,
         "status": status,
+        "support_level": support_level,
         "series_count": len(matched_names),
         "populated_series_count": len(nonzero_names),
         "matched_metrics": matched_names,
@@ -702,18 +742,36 @@ def _surface_rows(families: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 "zero": 0,
                 "missing": 0,
                 "not_applicable": 0,
+                "required_family_count": 0,
+                "required_populated": 0,
+                "required_zero": 0,
+                "required_missing": 0,
                 "status": "missing",
             },
         )
         row["family_count"] += 1
         row[str(family["status"])] += 1
+        if (
+            family.get("applicable")
+            and family.get("required_when") != "optional"
+            and family.get("status") != "not_applicable"
+        ):
+            row["required_family_count"] += 1
+            row[f"required_{family['status']}"] += 1
     for row in rows.values():
-        applicable_count = row["family_count"] - row["not_applicable"]
-        if applicable_count == 0:
-            row["status"] = "not_applicable"
-        elif row["populated"]:
-            row["status"] = "partial" if row["missing"] or row["zero"] else "complete"
-        elif row["zero"]:
+        applicable_required = row["required_family_count"]
+        if applicable_required == 0:
+            if row["populated"]:
+                row["status"] = "complete"
+            elif row["zero"]:
+                row["status"] = "zero"
+            else:
+                row["status"] = "not_applicable"
+        elif row["required_populated"]:
+            row["status"] = (
+                "partial" if row["required_missing"] or row["required_zero"] else "complete"
+            )
+        elif row["required_zero"]:
             row["status"] = "zero"
     return rows
 
@@ -726,33 +784,43 @@ def _evidence_family_rows(
     lmcache_otel_evidence: dict[str, Any] | None,
     lmcache_trace_replay_evidence: dict[str, Any] | None,
     lmcache_lookup_hash_evidence: dict[str, Any] | None,
-    lmcache_l0_boundary_evidence: dict[str, Any] | None,
+    lmcache_cacheblend_boundary_evidence: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     return [
         _evidence_family_row("lmcache_http", "mp_http_api", lmcache_http_evidence),
         _evidence_family_row("lmcache_logs", "lifecycle_logs", lmcache_log_evidence),
         _evidence_family_row("lmcache_trace_recording", "storage_lct", lmcache_trace_evidence),
         _evidence_family_row("lmcache_otel", "mp_spans", lmcache_otel_evidence),
-        _evidence_family_row("lmcache_otel", "cacheblend_spans", lmcache_otel_evidence),
-        _evidence_family_row("lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence),
-        _evidence_family_row("lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence),
-        _evidence_family_row("lmcache_l0_boundary", "redacted_jsonl", lmcache_l0_boundary_evidence),
+        _evidence_family_row(
+            "lmcache_trace_replay", "replay_outputs", lmcache_trace_replay_evidence
+        ),
+        _evidence_family_row(
+            "lmcache_lookup_hash", "lookup_hash_jsonl", lmcache_lookup_hash_evidence
+        ),
+        _evidence_family_row(
+            "lmcache_cacheblend_boundary",
+            "boundary_jsonl",
+            lmcache_cacheblend_boundary_evidence,
+        ),
     ]
 
 
-def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | None) -> dict[str, Any]:
+def _evidence_family_row(
+    surface: str, family: str, evidence: dict[str, Any] | None
+) -> dict[str, Any]:
     status = "missing"
     count = 0
     populated = 0
     if evidence:
         count = 1
-        event_counts = evidence.get("event_counts") if isinstance(evidence.get("event_counts"), dict) else {}
+        event_counts = (
+            evidence.get("event_counts") if isinstance(evidence.get("event_counts"), dict) else {}
+        )
         if (
             evidence.get("claim_status") == "measured"
             or evidence.get("booleans", {}).get("is_healthy")
             or evidence.get("record_count", 0)
-            or evidence.get("accepted_count", 0)
-            or evidence.get("row_count", 0) and evidence.get("claim_status") != "blocked"
+            or evidence.get("row_count", 0)
             or evidence.get("total_records", 0)
             or any(int(value or 0) > 0 for value in event_counts.values())
         ):
@@ -765,80 +833,33 @@ def _evidence_family_row(surface: str, family: str, evidence: dict[str, Any] | N
         "family": family,
         "patterns": (),
         "required_when": "optional",
-        "applicable": True,
+        "applicable": evidence is not None,
         "status": status,
+        "support_level": _support_level(status),
         "series_count": count,
         "populated_series_count": populated,
         "matched_metrics": [],
     }
 
 
-def _has_measured_mp_evidence(
-    *,
-    lmcache_http_evidence: dict[str, Any] | None,
-    lmcache_log_evidence: dict[str, Any] | None,
-    lmcache_otel_evidence: dict[str, Any] | None,
-    lmcache_l0_boundary_evidence: dict[str, Any] | None = None,
-) -> bool:
-    status = (lmcache_http_evidence or {}).get("endpoints", {}).get("status", {})
-    status_fields = status.get("fields") if isinstance(status, dict) else {}
-    engine_type = status_fields.get("engine_type") if isinstance(status_fields, dict) else None
-    log_modes = (lmcache_log_evidence or {}).get("mode_candidates") or []
-    otel_mp_spans = (lmcache_otel_evidence or {}).get("mp_span_count") or 0
-    l0_boundary_measured = (lmcache_l0_boundary_evidence or {}).get("claim_status") == "measured"
-    return engine_type == "MPCacheEngine" or "mp" in log_modes or float(otel_mp_spans) > 0 or l0_boundary_measured
+def _support_level(status: str) -> str:
+    if status == "not_applicable":
+        return "not_applicable"
+    if status == "populated":
+        return "fixture_backed"
+    if status == "zero":
+        return "parser_only"
+    return "not_started"
 
 
-def _has_measured_cacheblend_evidence(*, lmcache_otel_evidence: dict[str, Any] | None) -> bool:
-    otel_cacheblend_spans = (lmcache_otel_evidence or {}).get("cacheblend_span_count") or 0
-    return float(otel_cacheblend_spans) > 0
-
-
-def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool, observed_lmcache_cacheblend: bool) -> str:
+def _detected_mode(observed_lmcache_mp: bool, observed_lmcache_embedded: bool) -> str:
     if observed_lmcache_mp and observed_lmcache_embedded:
         return "mixed"
     if observed_lmcache_mp:
         return "mp"
-    if observed_lmcache_cacheblend and observed_lmcache_embedded:
-        return "embedded_cacheblend"
-    if observed_lmcache_cacheblend:
-        return "cacheblend"
     if observed_lmcache_embedded:
         return "embedded"
     return "unknown"
-
-
-def _sglang_lmcache_mp_launch_evidence(
-    samples: list[LabeledSample], explicit: dict[str, Any]
-) -> dict[str, Any]:
-    host_values = sorted(
-        {
-            str(value)
-            for sample in samples
-            for key, value in sample.labels.items()
-            if key in {"lmcache_mp_host", "sglang_lmcache_mp_host"} and value
-        }
-    )
-    port_values = sorted(
-        {
-            str(value)
-            for sample in samples
-            for key, value in sample.labels.items()
-            if key in {"lmcache_mp_port", "sglang_lmcache_mp_port"} and value
-        }
-    )
-    source_fields = explicit.get("source_fields") if isinstance(explicit.get("source_fields"), dict) else {}
-    if source_fields:
-        if source_fields.get("lmcache_mp_host"):
-            host_values.append(str(source_fields["lmcache_mp_host"]))
-        if source_fields.get("lmcache_mp_port"):
-            port_values.append(str(source_fields["lmcache_mp_port"]))
-    present = bool(host_values and port_values)
-    return {
-        "present": present,
-        "lmcache_mp_host_values": sorted(set(host_values)),
-        "lmcache_mp_port_values": sorted(set(port_values)),
-    }
 
 
 def _architecture_detection(
@@ -847,7 +868,6 @@ def _architecture_detection(
     observed_lmcache_mp: bool,
     observed_lmcache_cacheblend: bool,
     observed_lmcache_embedded: bool,
-    sglang_lmcache_mp_launch_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     names = {sample.name for sample in samples}
     has_vllm = any(name.startswith("vllm:") for name in names)
@@ -896,8 +916,7 @@ def _architecture_detection(
             str(value)
             for sample in samples
             for key, value in sample.labels.items()
-            if key in {"enable_lmcache", "lmcache_enabled", "sglang_enable_lmcache"}
-            and value
+            if key in {"enable_lmcache", "lmcache_enabled", "sglang_enable_lmcache"} and value
         }
     )
     has_mp_connector = "LMCacheMPConnector" in connector_labels
@@ -913,38 +932,26 @@ def _architecture_detection(
         connector in {"LMCacheLayerwiseConnector", "LMCacheConnector"}
         for connector in connector_labels
     )
-    has_sglang_mp_lmcache_connector = "LMCacheMPLayerwiseConnector" in connector_labels
     has_sglang_lmcradix_cache = "LMCRadixCache" in cache_labels
-    has_sglang_enable_lmcache = any(
-        value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels
-    ) or "sglang:lmcache_enabled" in names
+    has_sglang_enable_lmcache = (
+        any(value.lower() in {"1", "true", "yes", "on"} for value in sglang_enable_lmcache_labels)
+        or "sglang:lmcache_enabled" in names
+    )
     has_sglang_hicache_metrics = any(name.startswith("sglang:hicache_") for name in names)
-    has_sglang_lmcache_mp_launch = bool((sglang_lmcache_mp_launch_evidence or {}).get("present"))
     has_sglang_lmcache_signal = (
-        has_sglang_lmcache_connector
-        or has_sglang_mp_lmcache_connector
-        or has_sglang_lmcradix_cache
-        or has_sglang_enable_lmcache
+        has_sglang_lmcache_connector or has_sglang_lmcradix_cache or has_sglang_enable_lmcache
     )
     label = "unknown"
     confidence = "not_proven"
-    observed_mp_like = observed_lmcache_mp
-    if has_vllm and observed_lmcache_cacheblend:
-        label = "vllm_embedded_cacheblend"
-        confidence = "measured"
-    elif has_vllm and (observed_mp_like or has_mp_connector):
+    observed_mp_like = observed_lmcache_mp or observed_lmcache_cacheblend
+    if has_vllm and (observed_mp_like or has_mp_connector):
         label = "vllm_mp_lmcache"
         confidence = "measured" if observed_mp_like and has_mp_connector else "inferred"
     elif has_vllm and (
-        observed_lmcache_embedded
-        or has_vllm_embedded_connector
-        or has_vllm_lmcache_offload_backend
+        observed_lmcache_embedded or has_vllm_embedded_connector or has_vllm_lmcache_offload_backend
     ):
         label = "vllm_embedded_lmcache"
         confidence = "measured" if observed_lmcache_embedded else "inferred"
-    elif has_sglang and observed_mp_like and has_sglang_lmcache_mp_launch:
-        label = "sglang_mp_lmcache_observability"
-        confidence = "fixture_tested"
     elif has_sglang and observed_mp_like:
         label = "sglang_mp_lmcache_candidate"
         confidence = "inferred"
@@ -953,9 +960,6 @@ def _architecture_detection(
         confidence = "measured" if observed_lmcache_embedded else "inferred"
     elif observed_mp_like:
         label = "lmcache_mp_server"
-        confidence = "measured"
-    elif observed_lmcache_cacheblend:
-        label = "lmcache_cacheblend"
         confidence = "measured"
     elif observed_lmcache_embedded:
         label = "lmcache_embedded_unknown_engine"
@@ -970,8 +974,6 @@ def _architecture_detection(
         "vllm_embedded_connector_label": has_vllm_embedded_connector,
         "vllm_lmcache_offload_backend_label": has_vllm_lmcache_offload_backend,
         "sglang_lmcache_connector_label": has_sglang_lmcache_connector,
-        "sglang_mp_lmcache_connector_label": has_sglang_mp_lmcache_connector,
-        "sglang_lmcache_mp_launch_evidence": has_sglang_lmcache_mp_launch,
         "sglang_enable_lmcache_label": has_sglang_enable_lmcache,
         "sglang_lmcradix_cache_label": has_sglang_lmcradix_cache,
         "sglang_hicache_metrics": has_sglang_hicache_metrics,
@@ -1001,7 +1003,7 @@ def _is_applicable(
         return False
     if spec.surface == "lmcache_cacheblend" and (not cacheblend_observed or mp_metrics_disabled):
         return False
-    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed", "embedded_cacheblend"}:
+    if spec.surface == "lmcache_embedded" and detected_mode not in {"embedded", "mixed"}:
         return False
     if spec.required_when == "l2_configured":
         return l2_configured
@@ -1044,14 +1046,6 @@ def _failures(
                     "code": "lmcache_mp_family_missing",
                     "family": family["family"],
                     "message": f"expected LMCache MP family {family['family']!r} was missing",
-                }
-            )
-        if family["surface"] == "lmcache_cacheblend" and family["status"] == "missing":
-            failures.append(
-                {
-                    "code": "lmcache_cacheblend_family_missing",
-                    "family": family["family"],
-                    "message": f"expected LMCache CacheBlend family {family['family']!r} was missing",
                 }
             )
     return failures
@@ -1110,10 +1104,12 @@ def _upstream_questions(
                 "owner_question": "This MP scrape has counters but sparse sampled lifecycle/throughput histograms; should this lab raise --metrics-sample-rate for validation runs?",
             }
         )
-    if (
-        by_key.get(("lmcache_mp", "storage_manager"), {}).get("status") == "populated"
-        and by_key.get(("lmcache_mp", "l0_lifecycle"), {}).get("status") in {"missing", "zero"}
-    ):
+    if by_key.get(("lmcache_mp", "storage_manager"), {}).get(
+        "status"
+    ) == "populated" and by_key.get(("lmcache_mp", "l0_lifecycle"), {}).get("status") in {
+        "missing",
+        "zero",
+    }:
         questions.append(
             {
                 "code": "lmcache_mp_l0_lifecycle_missing",
@@ -1137,11 +1133,7 @@ def _upstream_questions(
     external_queries = _sum_matching(samples, "vllm:external_prefix_cache_queries_total")
     external_hits = _sum_matching(samples, "vllm:external_prefix_cache_hits_total")
     external_transfer_tokens = _sum_matching(
-        [
-            sample
-            for sample in samples
-            if sample.labels.get("source") == "external_kv_transfer"
-        ],
+        [sample for sample in samples if sample.labels.get("source") == "external_kv_transfer"],
         "vllm:prompt_tokens_by_source_total",
     )
     if external_queries > 0 and external_hits == 0 and external_transfer_tokens == 0:
@@ -1202,7 +1194,9 @@ def _diagnostic_findings(
                 "severity": "warning",
                 "message": "LMCache MP metrics are present but EventBus self-metrics are absent, so tail-drop risk is not directly observable.",
                 "metrics": {
-                    "event_bus_queue_size": mp_observability.get("config", {}).get("event_bus_queue_size"),
+                    "event_bus_queue_size": mp_observability.get("config", {}).get(
+                        "event_bus_queue_size"
+                    ),
                     "event_bus_metric_names": mp_observability.get("event_bus_metric_names", []),
                 },
                 "recommendation": "Ask LMCache to expose stable EventBus queue depth, dropped event, drain lag, and subscriber exception counters.",
@@ -1256,7 +1250,9 @@ def _diagnostic_findings(
         )
     l0_l1_store_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_store_throughput_gbs")
     l0_l1_load_throughput = _mp_hist_avg(samples, "lmcache_mp.l0_l1_load_throughput_gbs")
-    lmcache_mp_present = any(sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples)
+    lmcache_mp_present = any(
+        sample.name.startswith(("lmcache_mp_", "lmcache_mp.")) for sample in samples
+    )
     l0_lifecycle_present = any(
         sample.name.startswith(("lmcache_mp_l0_block_", "lmcache_mp.l0_block_"))
         for sample in samples
@@ -1275,7 +1271,9 @@ def _diagnostic_findings(
                 "recommendation": "C1 cannot be accepted until lmcache_mp_l0_block_* metrics are emitted by the tested LMCache/vLLM ref.",
             }
         )
-    l0_l1_present = any(sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples)
+    l0_l1_present = any(
+        sample.name.startswith(("lmcache_mp_l0_l1_", "lmcache_mp.l0_l1_")) for sample in samples
+    )
     if lmcache_mp_present and not l0_l1_present:
         findings.append(
             {
@@ -1289,9 +1287,8 @@ def _diagnostic_findings(
                 "recommendation": "For KV cache offload profiling, run a workload/ref that emits lmcache_mp_l0_l1_store_throughput_gbs and lmcache_mp_l0_l1_load_throughput_gbs.",
             }
         )
-    elif (
-        (l0_l1_store_throughput is not None and l0_l1_store_throughput < 0.1)
-        or (l0_l1_load_throughput is not None and l0_l1_load_throughput < 0.1)
+    elif (l0_l1_store_throughput is not None and l0_l1_store_throughput < 0.1) or (
+        l0_l1_load_throughput is not None and l0_l1_load_throughput < 0.1
     ):
         findings.append(
             {
@@ -1343,7 +1340,8 @@ def _diagnostic_findings(
     inflight_l2_loads = _mp_sum(samples, "lmcache_mp.num_inflight_l2_loads")
     active_prefetch_jobs = _mp_sum(samples, "lmcache_mp.active_prefetch_jobs")
     if (inflight_l2_loads > 0 or active_prefetch_jobs > 0) and (
-        l2_load_completed <= 0 or l2_loaded_keys < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
+        l2_load_completed <= 0
+        or l2_loaded_keys < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
     ):
         findings.append(
             {
@@ -1363,7 +1361,11 @@ def _diagnostic_findings(
     store_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_store_throughput_gbs")
     load_throughput = _mp_hist_avg(samples, "lmcache_mp.l2_load_throughput_gbs")
     low_store = store_throughput is not None and store_throughput < 0.1 and inflight_l2_stores > 0
-    low_load = load_throughput is not None and load_throughput < 0.1 and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
+    low_load = (
+        load_throughput is not None
+        and load_throughput < 0.1
+        and (inflight_l2_loads > 0 or active_prefetch_jobs > 0)
+    )
     if low_store or low_load:
         findings.append(
             {
@@ -1391,7 +1393,9 @@ def _diagnostic_findings(
         findings.append(
             {
                 "code": "lmcache_cacheblend_failures",
-                "severity": "critical" if cacheblend_failures > 0 or cacheblend_no_gpu > 0 else "warning",
+                "severity": "critical"
+                if cacheblend_failures > 0 or cacheblend_no_gpu > 0
+                else "warning",
                 "message": "LMCache CacheBlend reports failures, stale chunks, or missing GPU context.",
                 "metrics": {
                     "lmcache_blend_failures_total": cacheblend_failures,
@@ -1430,7 +1434,9 @@ def _architecture_diagnostic_findings(architecture: dict[str, Any]) -> list[dict
                 "code": "vllm_lmcache_offload_flag_without_metrics",
                 "severity": "info",
                 "message": "vLLM reports kv_offloading_backend=lmcache, but no embedded lmcache:* metrics were observed.",
-                "metrics": {"offload_backend_labels": architecture.get("offload_backend_labels", [])},
+                "metrics": {
+                    "offload_backend_labels": architecture.get("offload_backend_labels", [])
+                },
                 "recommendation": "Capture engine /metrics and inline LMCache logs before claiming embedded LMCache runtime behavior.",
             }
         )
@@ -1453,9 +1459,8 @@ def _architecture_diagnostic_findings(architecture: dict[str, Any]) -> list[dict
                 "recommendation": "Keep HiCache/local tier findings separate from embedded LMCache compatibility until LMCache-specific launch or metric evidence is captured.",
             }
         )
-    if (
-        architecture.get("label") == "sglang_embedded_lmcache"
-        and signals.get("sglang_hicache_metrics")
+    if architecture.get("label") == "sglang_embedded_lmcache" and signals.get(
+        "sglang_hicache_metrics"
     ):
         findings.append(
             {
@@ -1501,7 +1506,9 @@ def _mp_observability_report(
         }
     )
     if explicit.get("service_instance_id"):
-        service_instance_ids = sorted(set(service_instance_ids) | {str(explicit["service_instance_id"])})
+        service_instance_ids = sorted(
+            set(service_instance_ids) | {str(explicit["service_instance_id"])}
+        )
     cache_salts = sorted(
         {
             sample.labels.get("cache_salt", "")
@@ -1524,7 +1531,11 @@ def _mp_observability_report(
         }
     )
     event_bus_metric_names = sorted(
-        {sample.name for sample in samples if sample.name.startswith(("lmcache_mp_event_bus_", "lmcache_mp.event_bus."))}
+        {
+            sample.name
+            for sample in samples
+            if sample.name.startswith(("lmcache_mp_event_bus_", "lmcache_mp.event_bus."))
+        }
     )
     counter_names = {
         sample.name
@@ -1639,15 +1650,23 @@ def _l2_summary(samples: list[LabeledSample]) -> dict[str, Any]:
         "store_failed_keys": _mp_sum(samples, "lmcache_mp.l2_store_failed_keys", counter=True),
         "prefetch_load_tasks": load_tasks,
         "load_completed": load_completed,
-        "prefetch_loaded_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True),
-        "prefetch_failed_keys": _mp_sum(samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True),
+        "prefetch_loaded_keys": _mp_sum(
+            samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True
+        ),
+        "prefetch_failed_keys": _mp_sum(
+            samples, "lmcache_mp.l2_prefetch_failed_keys", counter=True
+        ),
         "prefetch_failures": _mp_sum(samples, "lmcache_mp.l2_prefetch_failure", counter=True),
         "num_inflight_l2_stores": inflight_stores,
         "num_inflight_l2_loads": inflight_loads,
         "active_prefetch_jobs": active_prefetch,
-        "inflight_load_memory_usage_bytes": _mp_sum(samples, "lmcache_mp.inflight_load_memory_usage_bytes"),
-        "store_backlog": inflight_stores > 0 and (store_completed <= 0 or store_completed < store_tasks),
-        "load_backlog": (inflight_loads > 0 or active_prefetch > 0) and (
+        "inflight_load_memory_usage_bytes": _mp_sum(
+            samples, "lmcache_mp.inflight_load_memory_usage_bytes"
+        ),
+        "store_backlog": inflight_stores > 0
+        and (store_completed <= 0 or store_completed < store_tasks),
+        "load_backlog": (inflight_loads > 0 or active_prefetch > 0)
+        and (
             load_completed <= 0
             or _mp_sum(samples, "lmcache_mp.l2_prefetch_loaded_keys", counter=True)
             < _mp_sum(samples, "lmcache_mp.l2_prefetch_load_keys", counter=True)
@@ -1671,118 +1690,23 @@ def _cacheblend_summary(samples: list[LabeledSample]) -> dict[str, Any]:
         "lookup_requests": lookup_requests,
         "lookup_fingerprint_hits": fingerprint_hits,
         "lookup_storage_hits": storage_hits,
-        "lookup_fingerprint_hit_rate": fingerprint_hits / lookup_requests if lookup_requests > 0 else None,
+        "lookup_fingerprint_hit_rate": fingerprint_hits / lookup_requests
+        if lookup_requests > 0
+        else None,
         "lookup_storage_hit_rate": storage_hits / lookup_requests if lookup_requests > 0 else None,
         "lookup_stale_chunks": _sum_matching(samples, "lmcache_blend_lookup_stale_chunks*"),
-        "lookup_no_gpu_context_errors": _sum_matching(samples, "lmcache_blend_lookup_no_gpu_context_errors*"),
+        "lookup_no_gpu_context_errors": _sum_matching(
+            samples, "lmcache_blend_lookup_no_gpu_context_errors*"
+        ),
         "retrieve_requests": _sum_matching(samples, "lmcache_blend_retrieve_requests*"),
         "retrieve_chunks": _sum_matching(samples, "lmcache_blend_retrieve_chunks*"),
-        "store_pre_computed_requests": _sum_matching(samples, "lmcache_blend_store_pre_computed_requests*"),
+        "store_pre_computed_requests": _sum_matching(
+            samples, "lmcache_blend_store_pre_computed_requests*"
+        ),
         "store_final_requests": _sum_matching(samples, "lmcache_blend_store_final_requests*"),
         "failures": failures,
         "fingerprints_registered": _sum_matching(samples, "lmcache_blend_fingerprints_registered*"),
         "chunks_evicted": _sum_matching(samples, "lmcache_blend_chunks_evicted*"),
-    }
-
-
-def read_sglang_kv_events_evidence(path: Path | None) -> dict[str, Any] | None:
-    """Read SGLang KV events and return redacted aggregate evidence only."""
-
-    if path is None:
-        return None
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return {
-            "present": False,
-            "claim_status": "blocked",
-            "failure_reasons": [
-                {"code": "sglang_kv_events_file_unreadable", "message": f"Could not read {path}"}
-            ],
-        }
-    records: list[Any]
-    if path.suffix == ".jsonl":
-        records = []
-        for line in text.splitlines():
-            if line.strip():
-                try:
-                    records.append(json.loads(line))
-                except json.JSONDecodeError:
-                    records.append({"_inferguard_malformed_json": True})
-    else:
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError:
-            records = [{"_inferguard_malformed_json": True}]
-        else:
-            records = payload if isinstance(payload, list) else [payload]
-    return summarize_sglang_kv_events(records)
-
-
-def summarize_sglang_kv_events(records: list[Any]) -> dict[str, Any]:
-    """Summarize SGLang/LMCache KV-event payloads without persisting raw token or hash data."""
-
-    event_batch_count = 0
-    block_stored_count = 0
-    block_removed_count = 0
-    block_count = 0
-    has_parent_relationships = 0
-    raw_token_ids_seen = False
-    raw_block_hashes_seen = False
-    malformed_count = 0
-    publishers: set[str] = set()
-    topics: set[str] = set()
-    for record in records:
-        if not isinstance(record, dict):
-            malformed_count += 1
-            continue
-        if record.get("_inferguard_malformed_json"):
-            malformed_count += 1
-            continue
-        event_batch_count += 1
-        if record.get("publisher"):
-            publishers.add(str(record["publisher"]))
-        if record.get("topic"):
-            topics.add(str(record["topic"]))
-        events = record.get("events") if isinstance(record.get("events"), list) else [record]
-        for event in events:
-            if not isinstance(event, dict):
-                malformed_count += 1
-                continue
-            event_type = str(event.get("type") or event.get("event_type") or event.get("event") or "")
-            raw_token_ids_seen = raw_token_ids_seen or "token_ids" in event
-            raw_block_hashes_seen = raw_block_hashes_seen or "block_hashes" in event or "parent_block_hash" in event
-            event_blocks = event.get("block_hashes")
-            if isinstance(event_blocks, list):
-                block_count += len(event_blocks)
-            elif event.get("block_hash") is not None:
-                block_count += 1
-                raw_block_hashes_seen = True
-            if event.get("parent_block_hash") is not None:
-                has_parent_relationships += 1
-            if event_type.endswith("BlockStored") or event_type == "BlockStored":
-                block_stored_count += 1
-            elif event_type.endswith("BlockRemoved") or event_type == "BlockRemoved":
-                block_removed_count += 1
-    present = bool(event_batch_count or block_stored_count or block_removed_count or block_count)
-    return {
-        "schema_version": SGLANG_KV_EVENTS_SCHEMA_VERSION,
-        "source_engine": "sglang",
-        "publisher": sorted(publishers)[0] if len(publishers) == 1 else None,
-        "topic": sorted(topics)[0] if len(topics) == 1 else None,
-        "event_batch_count": event_batch_count,
-        "block_stored_count": block_stored_count,
-        "block_removed_count": block_removed_count,
-        "block_count": block_count,
-        "has_parent_relationships": has_parent_relationships,
-        "raw_token_id_values_seen": raw_token_ids_seen,
-        "raw_block_hash_values_seen": raw_block_hashes_seen,
-        "raw_token_id_values_recorded": False,
-        "raw_block_hash_values_recorded": False,
-        "redacted_fields": list(SGLANG_KV_EVENTS_FORBIDDEN_FIELDS),
-        "malformed_count": malformed_count,
-        "present": present,
-        "claim_status": "measured" if present and not malformed_count else ("blocked" if malformed_count else "not_proven"),
     }
 
 
@@ -1801,69 +1725,11 @@ def _read_json_object(path: Path | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _read_l0_boundary_evidence(path: Path | None) -> dict[str, Any] | None:
-    if path is None:
-        return None
-    if path.suffix == ".json":
-        payload = _read_json_object(path)
-        return payload if payload else None
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return {"present": False, "claim_status": "blocked", "failure_reasons": [{"code": "lmcache_l0_boundary_file_unreadable", "message": f"Could not read {path}"}]}
-    stage_counts: dict[str, int] = {}
-    accepted = 0
-    rejected = 0
-    failures: list[dict[str, str]] = []
-    raw_tokens = False
-    raw_block_ids = False
-    for line in lines:
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            rejected += 1
-            failures.append({"code": "lmcache_l0_boundary_malformed_json", "message": "Boundary evidence JSONL contained malformed JSON."})
-            continue
-        if not isinstance(event, dict):
-            rejected += 1
-            failures.append({"code": "lmcache_l0_boundary_malformed_event", "message": "Boundary evidence row was not a JSON object."})
-            continue
-        schema = event.get("schema_version") or event.get("schema") or event.get("event_schema")
-        forbidden = sorted(set(event) & set(L0_BOUNDARY_FORBIDDEN_FIELDS))
-        raw_tokens = raw_tokens or any(name in event for name in ("token_ids", "tokens", "raw_tokens", "raw_token_ids"))
-        raw_block_ids = raw_block_ids or any(name in event for name in ("block_ids", "raw_block_ids", "gpu_block_ids"))
-        if schema != L0_BOUNDARY_SCHEMA_VERSION or forbidden:
-            rejected += 1
-            code = "lmcache_l0_boundary_forbidden_raw_fields" if forbidden else "lmcache_l0_boundary_schema_mismatch"
-            failures.append({"code": code, "message": "Boundary evidence row failed schema or redaction validation."})
-            continue
-        stage = str(event.get("stage") or event.get("boundary_stage") or "unknown")
-        stage_counts[stage] = stage_counts.get(stage, 0) + 1
-        accepted += 1
-    row_count = accepted + rejected
-    blocked = bool(rejected and not accepted) or raw_tokens or raw_block_ids
-    return {
-        "present": row_count > 0,
-        "claim_status": "blocked" if blocked else ("measured" if accepted else "not_proven"),
-        "schema_version": L0_BOUNDARY_SCHEMA_VERSION,
-        "row_count": row_count,
-        "accepted_count": accepted,
-        "rejected_count": rejected,
-        "stage_counts": stage_counts,
-        "raw_tokens_recorded": raw_tokens,
-        "raw_block_ids_recorded": raw_block_ids,
-        "failure_reasons": failures,
-    }
-
-
 def _evidence_failures(
     *,
     lmcache_http_evidence: dict[str, Any] | None,
     lmcache_trace_evidence: dict[str, Any] | None,
     lmcache_otel_evidence: dict[str, Any] | None,
-    lmcache_l0_boundary_evidence: dict[str, Any] | None,
     mp_observability: dict[str, Any],
 ) -> list[dict[str, Any]]:
     failures: list[dict[str, Any]] = []
@@ -1873,14 +1739,6 @@ def _evidence_failures(
                 {
                     "code": item.get("code") or "lmcache_http_unhealthy",
                     "message": item.get("message") or "LMCache HTTP endpoint reported unhealthy",
-                }
-            )
-    for item in (lmcache_l0_boundary_evidence or {}).get("failure_reasons", []) or []:
-        if isinstance(item, dict):
-            failures.append(
-                {
-                    "code": item.get("code") or "lmcache_l0_boundary_invalid",
-                    "message": item.get("message") or "LMCache L0 block boundary evidence was invalid.",
                 }
             )
     if (mp_observability.get("config") or {}).get("trace_recording_enabled") and not (
@@ -2010,7 +1868,9 @@ def _http_status_l1_manager(evidence: dict[str, Any] | None) -> dict[str, Any]:
     status = ((evidence or {}).get("endpoints") or {}).get("status") or {}
     fields = status.get("fields") if isinstance(status, dict) else None
     storage_manager = (fields or {}).get("storage_manager") if isinstance(fields, dict) else None
-    l1_manager = (storage_manager or {}).get("l1_manager") if isinstance(storage_manager, dict) else None
+    l1_manager = (
+        (storage_manager or {}).get("l1_manager") if isinstance(storage_manager, dict) else None
+    )
     return l1_manager if isinstance(l1_manager, dict) else {}
 
 
@@ -2087,11 +1947,8 @@ __all__ = [
     "ExpectMode",
     "FailOn",
     "SCHEMA_VERSION",
-    "SGLANG_KV_EVENTS_SCHEMA_VERSION",
     "build_compat_report",
     "build_compat_report_from_paths",
     "build_compat_report_from_urls",
-    "read_sglang_kv_events_evidence",
-    "summarize_sglang_kv_events",
     "write_compat_report",
 ]
