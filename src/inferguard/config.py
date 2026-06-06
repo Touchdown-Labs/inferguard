@@ -15,6 +15,12 @@ def _read_bool_env(name: str, default: bool) -> bool:
 DEFAULT_GMI_BASE_URL = "https://api.gmi-serving.com/v1"
 DEFAULT_DIAGNOSIS_MODEL = "openai/gpt-oss-120b"
 
+HTTP_TIMEOUT_SECONDS: float = 5.0
+"""Default HTTP timeout for /metrics scrapes. CLI callers may override."""
+
+USER_AGENT: str = "inferguard/0.2.0 (+https://github.com/touchdown-labs/inferguard)"
+"""User-Agent header for all scrape requests. Identifies us in server logs."""
+
 
 def _read_env(primary: str, legacy: str, default: str = "") -> str:
     """Read a primary env var, then a documented legacy compatibility alias."""

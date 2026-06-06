@@ -87,6 +87,7 @@ nav:
       - LMCache Compatibility: guides/lmcache-compatibility.md
       - LMCache Coverage Plan: guides/lmcache-coverage-plan.md
       - Observability Coverage Matrix: guides/observability-coverage-matrix.md
+      - NVFP4 KV Diagnostics: guides/nvfp4-diagnostics.md
       - Troubleshooting: guides/troubleshooting.md
   - Reference:
       - CLI Reference: reference/cli.md

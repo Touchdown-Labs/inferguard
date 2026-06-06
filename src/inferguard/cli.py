@@ -67,6 +67,17 @@ from inferguard.profile.types import ProfileFinding
 from inferguard.router import classify_run_dir, render_verdict_markdown
 from inferguard.router.classify import RouterClassifyError
 from inferguard.schemas.telemetry import TelemetryValidationError, load_telemetry_payload
+from inferguard.nvfp4 import (
+    THRESHOLD_PROFILES,
+    NVFp4Qualification,
+    NVFp4Verdict,
+    QualThresholds,
+    render_qualification_console,
+    render_qualification_markdown,
+    run_kv_capacity,
+    run_nvfp4_quality,
+    run_sm120_compat,
+)
 from inferguard.workload import analyze_workload_dir, render_fingerprint_markdown
 from inferguard.workload.profile import WorkloadAnalyzeError
 
@@ -129,6 +140,106 @@ app.add_typer(daemon_app, name="daemon")
 app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(workload_app, name="workload")
 app.add_typer(router_app, name="router")
+nvfp4_app = typer.Typer(
+    no_args_is_help=True,
+    help="NVFP4 KV-cache qualification diagnostics (SM120 / RTX PRO 6000).",
+    add_completion=False,
+)
+app.add_typer(nvfp4_app, name="nvfp4")
+
+
+def _emit_nvfp4(q: NVFp4Qualification, json_out: bool, out: Optional[str]) -> None:
+    """Print the qualification and optionally write json + markdown artifacts."""
+    if json_out:
+        typer.echo(json.dumps(q.to_dict(), indent=2))
+    else:
+        typer.echo(render_qualification_console(q))
+    if out:
+        out_dir = Path(out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(out_dir / "nvfp4_qualification.json", q.to_dict())
+        (out_dir / "nvfp4_qualification.md").write_text(
+            render_qualification_markdown(q), encoding="utf-8"
+        )
+    code = {
+        NVFp4Verdict.QUALIFIED.value: 0,
+        NVFp4Verdict.NOT_QUALIFIED.value: 1,
+        NVFp4Verdict.NEEDS_REVIEW.value: 2,
+    }.get(str(q.verdict), 2)
+    raise typer.Exit(code)
+
+
+def _parse_cc(cc: Optional[str]) -> Optional[tuple]:
+    if not cc:
+        return None
+    parts = cc.replace("sm", "").replace("SM", "").split(".")
+    if len(parts) == 2 and all(p.isdigit() for p in parts):
+        return (int(parts[0]), int(parts[1]))
+    raise typer.BadParameter("--cc must look like '12.0'")
+
+
+@nvfp4_app.command("sm120-compat")
+def nvfp4_sm120_compat(
+    model: str = typer.Option("", "--model", help="Model name (for the report)."),
+    endpoint: str = typer.Option("", "--endpoint", help="Endpoint base URL (for the report)."),
+    cc: Optional[str] = typer.Option(None, "--cc", help="Compute capability, e.g. '12.0'. Else probed locally."),
+    json_out: bool = typer.Option(False, "--json", help="Emit JSON instead of console text."),
+    out: Optional[str] = typer.Option(None, "--out", help="Directory for json + markdown artifacts."),
+) -> None:
+    """Is the serving GPU on the SM120 FA2 NVFP4-KV path?"""
+    q = run_sm120_compat(model=model, endpoint=endpoint, capability=_parse_cc(cc))
+    _emit_nvfp4(q, json_out, out)
+
+
+@nvfp4_app.command("kv-capacity")
+def nvfp4_kv_capacity(
+    endpoint: str = typer.Option("", "--endpoint", help="NVFP4 endpoint base URL (reads /metrics)."),
+    model: str = typer.Option("", "--model", help="Model name (for the report)."),
+    nvfp4_tokens: Optional[int] = typer.Option(None, "--nvfp4-tokens", help="NVFP4 KV pool tokens (else parsed from /metrics)."),
+    fp8_tokens: Optional[int] = typer.Option(None, "--fp8-tokens", help="fp8 baseline KV pool tokens (for the ratio)."),
+    profile: str = typer.Option("default", "--profile", help="default | strict | relaxed."),
+    json_out: bool = typer.Option(False, "--json"),
+    out: Optional[str] = typer.Option(None, "--out"),
+) -> None:
+    """How much KV pool does NVFP4 buy vs fp8?"""
+    thr = THRESHOLD_PROFILES.get(profile, THRESHOLD_PROFILES["default"])
+    q = run_kv_capacity(
+        model=model,
+        endpoint=endpoint,
+        nvfp4_tokens=nvfp4_tokens,
+        fp8_tokens=fp8_tokens,
+        thresholds=thr,
+    )
+    _emit_nvfp4(q, json_out, out)
+
+
+@nvfp4_app.command("quality")
+def nvfp4_quality(
+    model: str = typer.Option(..., "--model", help="Model name (as served)."),
+    nvfp4_endpoint: str = typer.Option(..., "--nvfp4-endpoint", help="NVFP4 candidate endpoint base URL."),
+    fp8_endpoint: Optional[str] = typer.Option(None, "--fp8-endpoint", help="fp8 reference endpoint base URL."),
+    profile: str = typer.Option("default", "--profile", help="default | strict | relaxed."),
+    ctx: Optional[str] = typer.Option(None, "--ctx", help="Comma-separated PPL context lengths, e.g. '2000,8000,32000'."),
+    timeout: float = typer.Option(600.0, "--timeout"),
+    json_out: bool = typer.Option(False, "--json"),
+    out: Optional[str] = typer.Option(None, "--out"),
+) -> None:
+    """Is NVFP4 quality acceptable for this model? (PPL / divergence / retrieval / speed)"""
+    import dataclasses
+
+    thr: QualThresholds = THRESHOLD_PROFILES.get(profile, THRESHOLD_PROFILES["default"])
+    if ctx:
+        lengths = tuple(int(x) for x in ctx.split(",") if x.strip())
+        thr = dataclasses.replace(thr, ppl_ctx_lengths=lengths)
+    q = run_nvfp4_quality(
+        model=model,
+        nvfp4_endpoint=nvfp4_endpoint,
+        fp8_endpoint=fp8_endpoint,
+        thresholds=thr,
+        timeout=timeout,
+    )
+    _emit_nvfp4(q, json_out, out)
+
 
 _SIGNAL_HANDLERS_INSTALLED = False
 _SIGNAL_ALREADY_HANDLED = False
