@@ -1,5 +1,5 @@
 site_name: InferGuard
-site_description: Evidence-gated inference diagnostics for vLLM, SGLang, Dynamo, LMCache, and llm-d.
+site_description: Evidence-gated inference diagnostics inside Touchdown Labs' company AI architecture, with support for vLLM, SGLang, Dynamo, LMCache, and llm-d.
 site_url: https://touchdown-labs.com/inferguard/
 repo_name: Touchdown-Labs/inferguard
 repo_url: https://github.com/Touchdown-Labs/inferguard
