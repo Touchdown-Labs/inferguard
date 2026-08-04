@@ -126,7 +126,7 @@ jobs:
         run: twine upload --skip-existing --verbose dist/*
 
       - name: Sigstore sign artifacts
-        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
+        uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9
         with:
           inputs: dist/*.whl dist/*.tar.gz
           upload-signing-artifacts: true
